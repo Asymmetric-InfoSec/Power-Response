@@ -1,2 +1,8 @@
-Config.psd1
-Bin/*
+# Ignore everything
+*
+
+# Except
+!.gitignore
+!Config.Example.psd1
+!Power-Response.ps1
+!Plugins/Reload.ps1
