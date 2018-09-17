@@ -2,5 +2,3 @@
 PowerShell Framework for Incident Response
 
 Currently under development.
-
-Updated readme
