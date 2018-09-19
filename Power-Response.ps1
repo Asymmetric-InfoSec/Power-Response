@@ -10,12 +10,15 @@ function Get-Config {
 
         # Default 'Config' values
         $Default = @{
+            # C:\Path\To\Power-Response\{FolderName}
             Path = @{
                Bin = "{0}\Bin" -f $PSScriptRoot
                Logs = "{0}\Logs" -f $PSScriptRoot
                Output = "{0}\Output" -f $PSScriptRoot
                Plugins = "{0}\Plugins" -f $PSScriptRoot
             }
+
+            # Executing UserName
             Authentication = @{
                 UserName = $ENV:UserName
             }
@@ -23,29 +26,39 @@ function Get-Config {
 
         # Try to import the data, on failure set to default 
         try {
+            # If the Config file $Path does not exist, throw an error to skip to catch block
             if (!(Test-Path $Path)) {
                 throw 'Path does not exist'
             }
 
+            # Get the Config file at $Path
             $File = Get-Item -Path $Path
+
+            # Import the Config data file and bind it to the $Config variable
             Import-LocalizedData -BindingVariable Config -BaseDirectory $File.PSParentPath -FileName $File.Name -ErrorAction Stop
         } catch {
+            # Either intentionally threw an error on file absense, or Import-LocalizedData failed
             Write-Verbose ("Unable to import config on 'Path': '{0}'" -f $Path)
             $Config = $Default
         }
 
-        # Check for unexpected values in Config
+        # Check for unexpected values in Config file
         if ($RootKeys) {
-            $UnexpectedRootKeys = $Config.Keys | ? { $RootKeys -NotContains $PSItem }
+            # Iterate through Config.Keys and keep any values not contained in expected $RootKeys 
+            $UnexpectedRootKeys = $Config.Keys | Where-Object { $RootKeys -NotContains $PSItem }
+
+            # If we found unexpected keys, print a warning message
             if ($UnexpectedRootKeys) {
                 Write-Warning ("Discovered unexpected keys in config file '{0}':" -f $Path)
                 Write-Warning ("    '{0}'" -f ($UnexpectedRootKeys -Join ', '))
                 Write-Warning  "Removing these values from the Config hashtable"
+
+                # Remove any detected unexpected keys from $Config
                 $UnexpectedRootKeys | % { $Config.Remove($PSItem) }
             }
         }
 
-        # If no value is provided, set the default values
+        # If no value is provided in the config file, set the default values
         if (!$Config.Path) {
             $Config.Path = $Default.Path
         }
@@ -70,16 +83,16 @@ function Get-Config {
             $Config.Authentication.Username = $Default.Authentication.UserName
         }
 
-        # Check config value existence
+        # Check for required $Config value existence (sanity check - should never fail with default values)
         if (!$Config.Path -or !$Config.Authentication -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.Authentication.UserName) {
             throw "Missing required configuration value"
         }
 
-        # Check for directory existence
-        foreach ($Key in $Config.Path.Keys) {
-            $Path = $Config.Path.$Key
-            if (!(Test-Path $Path)) {
-                New-Item -Path $Path -ItemType Directory
+        # Ensure all $Config.Path directory values exist
+        foreach ($DirPath in $Config.Path.Values) {
+            # If the $DirPath doesn't exist, create it and get rid of the output
+            if (!(Test-Path $DirPath)) {
+                New-Item -Path $DirPath -ItemType Directory | Out-Null
             }
         }
 
@@ -129,19 +142,25 @@ function Get-Menu {
         # Print Title
         Write-Host ("`n  {0}:" -f $Title)
 
+        # Loop through the $Choice array and print off each line
         for ($i=0; $i -lt $Choice.Length; $i++) {
+            # Line format: [#] - $Choice[#]
             $Line = "[{0}] - {1}" -f $i,$Choice[$i]
+
+            # If we were provided an optional $Description for this line, add that wrapped in parenthesis
             if ($i -lt $Description.Length -and $Description[$i]) {
                 $Line += " ({0})" -f $Description[$i]
             }
+
             Write-Host $Line
         }
 
-        # Grab user response with validation
+        # Get user response with validation (0 <= $C < $Choice.Length)
         do {
             $C = Read-Host 'Choice'
-        } while ((0..($i-1)) -NotContains $C)
+        } while ((0..($Choice.Length-1)) -NotContains $C)
 
+        # Return the selected Choice string
         if ($Choice[$C] -eq $OtherText) {
             return Read-Host 'Response'
         } else {
@@ -152,16 +171,25 @@ function Get-Menu {
 
 function Power-Response {
     process {
+        # Get configuration data from file
         $Config = Get-Config
 
-        $Option = 'Power Response'
+        # Initialize the menu $Title to 'Power Response'
+        $Title = 'Power Response'
+
+        # Initialize the current $Location to the $Config.Path.Plugins directory item
         $Location = Get-Item -Path $Config.Path.Plugins
 
+        # While the $Location is a directory, and the directory has children (contents)
         while ($Location.PSIsContainer -and (Get-ChildItem $Location)) {
-            $Option = Get-Menu -Title $Option -Choice (Get-ChildItem -Path $Location | Sort-Object -Property Name)
-            $Location = Get-Item ("{0}\{1}" -f $Location,$Option)
+            # Get the next directory selection from the user
+            $Title = Get-Menu -Title $Title -Choice (Get-ChildItem -Path $Location | Sort-Object -Property Name)
+
+            # Get the selected $Location item
+            $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Title)
         }
 
+        # Print out the full path of the resulting $Location
         Write-Host ("End Path: {0}" -f $Location.FullName)
     }
 }
