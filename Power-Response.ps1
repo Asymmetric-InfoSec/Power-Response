@@ -109,8 +109,6 @@ function Get-Menu {
         
         [Parameter(Mandatory=$true,Position=1)]
         [String[]]$Choice,
-        
-        [String[]]$Description
     )
 
     process {
@@ -121,11 +119,6 @@ function Get-Menu {
         for ($i=0; $i -lt $Choice.Length; $i++) {
             # Line format: [#] - $Choice[#]
             $Line = "[{0}] - {1}" -f $i,$Choice[$i]
-
-            # If we were provided an optional $Description for this line, add that wrapped in parenthesis
-            if ($i -lt $Description.Length -and $Description[$i]) {
-                $Line += " ({0})" -f $Description[$i]
-            }
 
             Write-Host $Line
         }
