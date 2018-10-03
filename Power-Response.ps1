@@ -2,7 +2,7 @@ function Get-Config {
     [CmdletBinding()]
     param (
         [String]$Path = ("{0}\Config.psd1" -f $PSScriptRoot),
-        [String[]]$RootKeys = @('Path', 'Authentication')
+        [String[]]$RootKeys = @('Path', 'UserName')
     )
 
     process {
@@ -19,8 +19,8 @@ function Get-Config {
             }
 
             # Executing UserName
-            Authentication = @{
-                UserName = $ENV:UserName
+            UserName = @{
+                Windows = $ENV:UserName
             }
         }
 
@@ -62,8 +62,8 @@ function Get-Config {
         if (!$Config.Path) {
             $Config.Path = $Default.Path
         }
-        if (!$Config.Authentication) {
-            $Config.Authentication = $Default.Authentication
+        if (!$Config.UserName) {
+            $Config.UserName = $Default.UserName
         }
 
         if (!$Config.Path.Bin) {
@@ -79,12 +79,12 @@ function Get-Config {
             $Config.Path.Plugins = $Default.Path.Plugins
         }
 
-        if (!$Config.Authentication.UserName) {
-            $Config.Authentication.Username = $Default.Authentication.UserName
+        if (!$Config.UserName.Windows) {
+            $Config.UserName.Windows = $Default.UserName.Windows
         }
 
         # Check for required $Config value existence (sanity check - should never fail with default values)
-        if (!$Config.Path -or !$Config.Authentication -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.Authentication.UserName) {
+        if (!$Config.Path -or !$Config.UserName -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.UserName.Windows) {
             throw "Missing required configuration value"
         }
 
@@ -93,6 +93,14 @@ function Get-Config {
             # If the $DirPath doesn't exist, create it and get rid of the output
             if (!(Test-Path $DirPath)) {
                 New-Item -Path $DirPath -ItemType Directory | Out-Null
+            }
+        }
+
+        # Gather credentials for non-sessioned $UserName
+        $Config.Credential = @{}
+        foreach ($UserName in $Config.UserName.GetEnumerator()) {
+            if ($UserName.Value -ne $ENV:UserName) {
+                $Config.Credential.($UserName.Key) = Get-Credential -UserName $UserName.Value -Message ("Please enter {0} credentials" -f $UserName.Key)
             }
         }
 
