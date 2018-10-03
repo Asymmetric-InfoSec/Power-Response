@@ -102,43 +102,18 @@ function Get-Config {
 
 
 function Get-Menu {
-    [CmdletBinding(DefaultParameterSetName='Choice')]
+    [CmdletBinding()]
     param (
-        [Parameter(ParameterSetName='Choice',Mandatory=$true,Position=0)]
-        [Parameter(ParameterSetName='InputObject',Mandatory=$true,Position=0)]
+        [Parameter(Mandatory=$true,Position=0)]
         [String]$Title,
         
-        [Parameter(ParameterSetName='Choice',Mandatory=$true,Position=1)]
+        [Parameter(Mandatory=$true,Position=1)]
         [String[]]$Choice,
         
-        [Parameter(ParameterSetName='Choice')]
-        [String[]]$Description,
-        
-        [Parameter(ParameterSetName='InputObject',Mandatory=$true,Position=1)]
-        [Object[]]$InputObject,
-        
-        [Parameter(ParameterSetName='Choice')]
-        [Parameter(ParameterSetName='InputObject')]
-        [Switch]$Other
+        [String[]]$Description
     )
 
-    begin {
-        if ($PSCmdlet.ParameterSetName -eq 'InputObject') {
-            $Choice = $InputObject.Choice
-            $Description = $InputObject.Description
-        }
-
-        # Begin Configuration Section
-        $OtherText = 'Back'
-        # End Configuration Section
-    }
-
     process {
-        # If we want freeform input, add that option
-        if ($Other) {
-            $Choice += $OtherText
-        }
-
         # Print Title
         Write-Host ("`n  {0}:" -f $Title)
 
@@ -158,14 +133,9 @@ function Get-Menu {
         # Get user response with validation (0 <= $C < $Choice.Length)
         do {
             $C = Read-Host 'Choice'
-        } while ((0..($Choice.Length-1)) -NotContains $C)
-
-        # Return the selected Choice string
-        if ($Choice[$C] -eq $OtherText) {
-            return Read-Host 'Response'
-        } else {
-            return $Choice[$C]
-        }
+        } while ((0..($i-1)) -NotContains $C)
+        
+        return $Choice[$C]
     }
 }
 
