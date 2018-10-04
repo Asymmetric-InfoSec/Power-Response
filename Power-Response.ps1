@@ -164,7 +164,7 @@ function Power-Response {
         # While the $Location is a directory, and the directory has children (contents)
         while ($Location.PSIsContainer) {
             # Compute $Title - Power-Response\CurrentPath
-            $Title = 'Power-Response' + $Location.FullName -Replace [Regex]::Escape($PSScriptRoot)
+            $Title = 'Power-Response' + ($Location.FullName -Replace ('^' + [Regex]::Escape($PSScriptRoot)))
 
             # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
             $Choice = Get-ChildItem -Path $Location | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
@@ -176,7 +176,11 @@ function Power-Response {
             $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
 
             # Get the selected $Location item
-            $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection)
+            try {
+                $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection) -ErrorAction Stop
+            } catch {
+                Write-Warning 'Something went wrong, please try again'
+            }
         }
 
         # Print out the full path of the resulting $Location
