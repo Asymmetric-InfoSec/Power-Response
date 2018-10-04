@@ -17,8 +17,8 @@
     # ---------- End Path Section ----------
 
     # ---------- Begin Authentication Section ----------
-    #   UserName - administrative username (defaults to $ENV:UserName)
-    Authentication = @{
-        # UserName = $ENV:UserName
+    #   Windows - administrative username (defaults to $ENV:UserName)
+    UserName = @{
+        # Windows = $ENV:UserName
     }
 }
