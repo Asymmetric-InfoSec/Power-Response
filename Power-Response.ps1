@@ -109,12 +109,21 @@ function Get-Menu {
         
         [Parameter(Mandatory=$true,Position=1)]
         [String[]]$Choice,
+
+        [Switch]$Back
     )
 
-    process {
+    begin {
         # Print Title
         Write-Host ("`n  {0}:" -f $Title)
 
+        # Add the 'Back' option to $Choice
+        if ($Back) {
+            $Choice = @('..') + $Choice
+        }
+    }
+
+    process {
         # Loop through the $Choice array and print off each line
         for ($i=0; $i -lt $Choice.Length; $i++) {
             # Line format: [#] - $Choice[#]
@@ -126,7 +135,7 @@ function Get-Menu {
         # Get user response with validation (0 <= $C < $Choice.Length)
         do {
             $C = Read-Host 'Choice'
-        } while ((0..($i-1)) -NotContains $C)
+        } while ((0..($Choice.Length-1)) -NotContains $C)
         
         return $Choice[$C]
     }
@@ -137,19 +146,16 @@ function Power-Response {
         # Get configuration data from file
         $Config = Get-Config
 
-        # Initialize the menu $Title to 'Power Response'
-        $Title = 'Power Response'
-
         # Initialize the current $Location to the $Config.Path.Plugins directory item
         $Location = Get-Item -Path $Config.Path.Plugins
 
         # While the $Location is a directory, and the directory has children (contents)
         while ($Location.PSIsContainer -and (Get-ChildItem $Location)) {
-            # Get the next directory selection from the user
-            $Title = Get-Menu -Title $Title -Choice (Get-ChildItem -Path $Location | Sort-Object -Property Name)
+            # Get the next directory selection from the user, showing the back option if anywhere but the $Config.Path.Plugins
+            $Choice = Get-Menu -Title ('Power-Response' + $Location.FullName -Replace [Regex]::Escape($PSScriptRoot)) -Choice (Get-ChildItem -Path $Location | Sort-Object -Property Name) -Back:($Location.FullName -ne $Config.Path.Plugins)
 
             # Get the selected $Location item
-            $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Title)
+            $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Choice)
         }
 
         # Print out the full path of the resulting $Location
