@@ -112,10 +112,9 @@ function Get-Config {
 function Get-Menu {
     [CmdletBinding()]
     param (
-        [Parameter(Mandatory=$true,Position=0)]
+        [Parameter(Mandatory=$true)]
         [String]$Title,
         
-        [Parameter(Mandatory=$true,Position=1)]
         [String[]]$Choice,
 
         [Switch]$Back
@@ -127,7 +126,7 @@ function Get-Menu {
 
         # Add the 'Back' option to $Choice
         if ($Back) {
-            $Choice = @('..') + $Choice
+            [String[]]$Choice = @('..') + $Choice | Where-Object { $PSItem }
         }
     }
 
@@ -157,10 +156,15 @@ function Power-Response {
         # Initialize the current $Location to the $Config.Path.Plugins directory item
         $Location = Get-Item -Path $Config.Path.Plugins
 
+        # Ensure we have at least one plugin installed
+        if (!(Get-ChildItem $Location)) {
+            throw 'No Power-Response plugins detected'
+        }
+
         # While the $Location is a directory, and the directory has children (contents)
-        while ($Location.PSIsContainer -and (Get-ChildItem $Location)) {
+        while ($Location.PSIsContainer) {
             # Compute $Title - Power-Response\CurrentPath
-            $Title = 'Power-Response' + $Location.FullName -Replace [Regex]::Escape($PSScriptRoot)
+            $Title = 'Power-Response' + ($Location.FullName -Replace ('^' + [Regex]::Escape($PSScriptRoot)))
 
             # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
             $Choice = Get-ChildItem -Path $Location | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
@@ -172,7 +176,11 @@ function Power-Response {
             $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
 
             # Get the selected $Location item
-            $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection)
+            try {
+                $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection) -ErrorAction Stop
+            } catch {
+                Write-Warning 'Something went wrong, please try again'
+            }
         }
 
         # Print out the full path of the resulting $Location
