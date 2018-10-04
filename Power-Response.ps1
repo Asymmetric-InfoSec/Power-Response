@@ -159,11 +159,20 @@ function Power-Response {
 
         # While the $Location is a directory, and the directory has children (contents)
         while ($Location.PSIsContainer -and (Get-ChildItem $Location)) {
+            # Compute $Title - Power-Response\CurrentPath
+            $Title = 'Power-Response' + $Location.FullName -Replace [Regex]::Escape($PSScriptRoot)
+
+            # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
+            $Choice = Get-ChildItem -Path $Location | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
+
+            #Compute $Back - ensure we are not at the $Config.Path.Plugins
+            $Back = $Location.FullName -ne (Get-Item -Path $Config.Path.Plugins | Select-Object -ExpandProperty FullName)
+
             # Get the next directory selection from the user, showing the back option if anywhere but the $Config.Path.Plugins
-            $Choice = Get-Menu -Title ('Power-Response' + $Location.FullName -Replace [Regex]::Escape($PSScriptRoot)) -Choice (Get-ChildItem -Path $Location | Sort-Object -Property Name) -Back:($Location.FullName -ne $Config.Path.Plugins)
+            $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
 
             # Get the selected $Location item
-            $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Choice)
+            $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection)
         }
 
         # Print out the full path of the resulting $Location
