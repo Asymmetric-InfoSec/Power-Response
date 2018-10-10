@@ -323,9 +323,7 @@ function Power-Response {
                         Write-Help -Arguments $Arguments
                     }
                     'run' {
-                        Write-Host ('Would execute: ' + $Location.FullName)
-                        Write-Host 'With Parameters:'
-                        Write-Parameter
+                        & $Location.FullName @script:Parameters
                     }
                     'quit' {
                         Write-Host 'Quitting...'
