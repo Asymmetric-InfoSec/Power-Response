@@ -108,46 +108,6 @@ function Get-Config {
     }
 }
 
-
-function Get-Menu {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true)]
-        [String]$Title,
-        
-        [String[]]$Choice,
-
-        [Switch]$Back
-    )
-
-    begin {
-        # Print Title
-        Write-Host ("`n  {0}:" -f $Title)
-
-        # Add the 'Back' option to $Choice
-        if ($Back) {
-            [String[]]$Choice = @('..') + $Choice | Where-Object { $PSItem }
-        }
-    }
-
-    process {
-        # Loop through the $Choice array and print off each line
-        for ($i=0; $i -lt $Choice.Length; $i++) {
-            # Line format: [#] - $Choice[#]
-            $Line = "[{0}] - {1}" -f $i,$Choice[$i]
-
-            Write-Host $Line
-        }
-
-        # Get user response with validation (0 <= $C < $Choice.Length)
-        do {
-            $C = Read-Host 'Choice'
-        } while ((0..($Choice.Length-1)) -NotContains $C)
-        
-        return $Choice[$C]
-    }
-}
-
 function Write-Parameter {
     param (
         [String[]]$Arguments
@@ -179,7 +139,7 @@ function Write-Parameter {
         $Property = $Arguments | Sort-Object
 
         # Cast the HashTable to a PSCustomObject and format as an alphabetical-order list object
-        [PSCustomObject]$Param | Select-Object -Property $Property | Format-List
+        return [PSCustomObject]$Param | Select-Object -Property $Property | Format-List
     }
 }
 
@@ -206,7 +166,7 @@ function Set-Parameter {
         $script:Parameters.($Arguments[0]) = $Arguments[1]
 
         # Show the newly set value
-        Write-Parameter -Arguments $Arguments[0]
+        return Write-Parameter -Arguments $Arguments[0]
     }
 }
 
@@ -222,6 +182,7 @@ function Write-Help {
             @{ Name='show'; Usage='show [parameters...]'; Description='shows a list of all or specified parameters and values' },
             @{ Name='help'; Usage='help [commands...]'; Description='displays the help for all or specified commands'},
             @{ Name='run'; Usage='run'; Description='runs the selected script with parameters set in environment' },
+            @{ Name='back'; Usage='back'; Description='de-select a script file and move back to menu context' },
             @{ Name='quit'; Usage='quit'; Description='quits the selected script' },
             @{ Name='exit'; Usage='exit'; Description='exits the selected script' }
         ) | Foreach-Object { [PSCustomObject]$PSItem }
@@ -244,7 +205,99 @@ function Write-Help {
         }
 
         # Print out the rows of $Commands specified by $Arguments and the columns specified by $Property
-        $Commands | Where-Object { $Arguments -Contains $PSItem.Name } | Select-Object -Property $Property | Format-Table
+        return $Commands | Where-Object { $Arguments -Contains $PSItem.Name } | Select-Object -Property $Property | Format-Table
+    }
+}
+
+function Interpret-Command {
+    param (
+        [String]$UserInput,
+        [Switch]$Run
+    )
+
+    process {
+        # $Keyword will be the first word of the user input
+        $Keyword = $UserInput -Split ' ' | Select-Object -First 1
+
+        # $Arguments will be any following words
+        $Arguments = $UserInput -Split ' ' | Select-Object -Skip 1
+
+        # Determine which $Keyword we are executing
+        switch -Regex ($Keyword) {
+            '[0-9]+' {}
+            'back' {}
+            'set' {
+                Set-Parameter -Arguments $Arguments
+            }
+            'show' {
+                Write-Parameter -Arguments $Arguments
+            }
+            'help' {
+                Write-Help -Arguments $Arguments
+            }
+            'run' {
+                if ($Run) {
+                    & $Location.FullName @script:Parameters
+                } else {
+                    Write-Warning 'No file selected for execution'
+                }
+            }
+            'quit' {
+                Write-Host 'Quitting...'
+                exit
+            }
+            'exit' {
+                Write-Host 'Exiting...'
+                exit
+            }
+            default {
+                # Didn't understand keyword specified, write warning to screen and add help text to next prompt
+                if ($Keyword) {
+                    Write-Warning ("Unknown Command '{0}'" -f $Keyword)
+                }
+            }
+        }
+    }
+}
+
+function Get-Menu {
+    param (
+        [String]$Title,
+        [String[]]$Choice,
+        [Switch]$Back
+    )
+
+    begin {
+        # Print Title
+        Write-Host ("`n  {0}:" -f $Title)
+
+        # Add the 'Back' option to $Choice
+        if ($Back) {
+            [String[]]$Choice = @('..') + $Choice | Where-Object { $PSItem }
+        }
+    }
+
+    process {
+        # Loop through the $Choice array and print off each line
+        for ($i=0; $i -lt $Choice.Length; $i++) {
+            # Line format: [#] - $Choice[#]
+            $Line = "[{0}] - {1}" -f $i,$Choice[$i]
+
+            Write-Host $Line
+        }
+
+        # Get user response with validation (0 <= $UserInput <= $Choice.Length-1)
+        do {
+            # Get user input
+            $UserInput = Read-Host 'Enter Command'
+
+            # Try to interpret the user's input as a command
+            if ($UserInput) {
+                Interpret-Command -UserInput $UserInput | Out-Default
+            }
+        } while (!$UserInput -or (0..($Choice.Length-1)) -NotContains $UserInput)
+
+        return $Choice[$UserInput]
     }
 }
 
@@ -264,6 +317,11 @@ function Power-Response {
             throw 'No Power-Response plugins detected'
         }
 
+        # Initialize input parameters to empty hashtable (will eventually pull stored session data)
+        $script:Parameters = $Config
+
+        $script:CommandParameters = $Config
+
         # Loop through searching for a script file and setting parameters
         do {
             # While the $Location is a directory
@@ -272,7 +330,7 @@ function Power-Response {
                 $Title = 'Power-Response' + ($Location.FullName -Replace ('^' + [Regex]::Escape($PSScriptRoot)))
 
                 # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
-                $Choice = Get-ChildItem -Path $Location | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
+                $Choice = Get-ChildItem -Path $Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
 
                 #Compute $Back - ensure we are not at the $Config.Path.Plugins
                 $Back = $Plugins.FullName -NotMatch [Regex]::Escape($Location.FullName)
@@ -280,6 +338,7 @@ function Power-Response {
                 # Get the next directory selection from the user, showing the back option if anywhere but the $Config.Path.Plugins
                 $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
 
+                Write-Host $Selection
                 # Get the selected $Location item
                 try {
                     $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection) -ErrorAction Stop
@@ -291,59 +350,23 @@ function Power-Response {
             # Get the $CommandParameters of the selected script file
             $script:CommandParameters = Get-Command -Name $Location.FullName | Select-Object -ExpandProperty Parameters
 
-            # Initialize input parameters to empty hashtable (will eventually pull stored session data)
-            $script:Parameters = @{}
-
             # Write the list of parameters to the screen
             Write-Parameter
 
-            # Until the user specifies to run, quit, or exit the program, set the parameters
+            # Until the user specifies to run the program or back, set the parameters
             do {
                 # Get user input
-                $UserInput = Read-Host ('Enter Command' + $HelpText)
+                $UserInput = Read-Host 'Enter Command'
 
-                # Initialize HelpText to null string before command processing
-                $HelpText = ''
-
-                # $Keyword will be the first word of the user input
-                $Keyword = $UserInput -Split ' ' | Select-Object -First 1
-
-                # $Arguments will be any following words
-                $Arguments = $UserInput -Split ' ' | Select-Object -Skip 1
-
-                # Determine which $Keyword we are executing
-                switch($Keyword) {
-                    'set' {
-                        Set-Parameter -Arguments $Arguments
-                    }
-                    'show' {
-                        Write-Parameter -Arguments $Arguments
-                    }
-                    'help' {
-                        Write-Help -Arguments $Arguments
-                    }
-                    'run' {
-                        & $Location.FullName @script:Parameters
-                    }
-                    'quit' {
-                        Write-Host 'Quitting...'
-                    }
-                    'exit' {
-                        Write-Host 'Exiting...'
-                    }
-                    default {
-                        # Didn't understand keyword specified, write warning to screen and add help text to next prompt
-                        if ($Keyword) {
-                            Write-Warning ("Unknown Command '{0}'" -f $Keyword)
-                        }
-                        $HelpText = ' (''help'' will display a list of commands)'
-                    }
+                # Interpret user input as a command and allow execution
+                if ($UserInput) {
+                    Interpret-Command -Run -UserInput $UserInput | Out-Default
                 }
-            } while (@('run','quit','exit') -NotContains $Keyword)
+            } while (@('run','back') -NotContains $UserInput)
 
             # Set $Location to the previous directory
             $Location = Get-Item -Path ($Location.FullName -Replace ('\\[^\\]+$'))
-        } while (@('quit','exit') -NotContains $Keyword)
+        } while ($True)
     }
 }
 
