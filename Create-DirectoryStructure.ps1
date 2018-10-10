@@ -18,7 +18,7 @@ begin {
             $Words = Get-Verb | Select-Object -ExpandProperty Verb
             $Symbols = '.~!@#$%^&()-_+=' -Split '' | Where-Object { $PSItem }
             $Numbers = '0123456789' -Split '' | Where-Object { $PSItem }
-            $Extensions = '|.ps1|.doc|.ppt|.psd1|.json' -Split '\|'
+            $Extensions = '|.doc|.ppt|.psd1|.json' -Split '\|'
         }
 
         process {
