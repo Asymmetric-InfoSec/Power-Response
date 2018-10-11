@@ -303,6 +303,20 @@ function Get-Menu {
 
 function Power-Response {
     process {
+        #banner for Power-Response
+        $banner = @"
+    ____                                ____                                      
+   / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________ 
+  / /_/ / __ \ | /| / / _ \/ ___/_____/ /_/ / _ \/ ___/ __ \/ __ \/ __ \/ ___/ _ \
+ / ____/ /_/ / |/ |/ /  __/ /  /_____/ _, _/  __(__  ) /_/ / /_/ / / / (__  )  __/
+/_/    \____/|__/|__/\___/_/        /_/ |_|\___/____/ .___/\____/_/ /_/____/\___/ 
+                                                   /_/                            
+
+Authors: 5ynax | Valrkey | 5k33tz
+
+"@
+
+        Write-Host $banner
         # Get configuration data from file
         $Config = Get-Config
 
