@@ -329,6 +329,7 @@ Authors: 5ynax | Valrkey | 5k33tz
         # Ensure we have at least one plugin installed
         if (!(Get-ChildItem $Location)) {
             throw 'No Power-Response plugins detected'
+            Read-Host "Press Any Key To Continue"
         }
 
         # Initialize input parameters to empty hashtable (will eventually pull stored session data)
