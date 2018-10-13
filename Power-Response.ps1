@@ -304,7 +304,7 @@ function Get-Menu {
 function Power-Response {
     process {
         #banner for Power-Response
-        $banner = @"
+        $Banner = @'
     ____                                ____                                      
    / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________ 
   / /_/ / __ \ | /| / / _ \/ ___/_____/ /_/ / _ \/ ___/ __ \/ __ \/ __ \/ ___/ _ \
@@ -312,11 +312,12 @@ function Power-Response {
 /_/    \____/|__/|__/\___/_/        /_/ |_|\___/____/ .___/\____/_/ /_/____/\___/ 
                                                    /_/                            
 
-Authors: 5ynax | Valrkey | 5k33tz
+Authors: 5ynax | 5k33tz | Valrkey
 
-"@
+'@
 
-        Write-Host $banner
+        Write-Host $Banner
+
         # Get configuration data from file
         $Config = Get-Config
 
@@ -329,7 +330,7 @@ Authors: 5ynax | Valrkey | 5k33tz
         # Ensure we have at least one plugin installed
         if (!(Get-ChildItem $Location)) {
             Write-Error 'No Power-Response plugins detected'
-            Read-Host "Press Enter to Continue"
+            Read-Host 'Press Enter to Exit'
             exit
         }
 
@@ -354,7 +355,6 @@ Authors: 5ynax | Valrkey | 5k33tz
                 # Get the next directory selection from the user, showing the back option if anywhere but the $Config.Path.Plugins
                 $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
 
-                Write-Host $Selection
                 # Get the selected $Location item
                 try {
                     $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection) -ErrorAction Stop
