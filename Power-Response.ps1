@@ -108,7 +108,7 @@ function Get-Config {
     }
 }
 
-function Write-Help {
+function Invoke-HelpCommand {
     param (
         [String[]]$Arguments
     )
@@ -147,7 +147,7 @@ function Write-Help {
     }
 }
 
-function Set-Parameter {
+function Invoke-SetCommand {
     param (
         [String[]]$Arguments
     )
@@ -156,7 +156,7 @@ function Set-Parameter {
         # Set command requires a parameter as an argument
         if ($Arguments.Count -lt 1) {
             Write-Warning 'Improper ''set'' command usage'
-            Write-Help -Arguments 'set'
+            Invoke-HelpCommand -Arguments 'set'
             return
         }
 
@@ -170,11 +170,11 @@ function Set-Parameter {
         $script:Parameters.($Arguments[0]) = $Arguments[1]
 
         # Show the newly set value
-        return Write-Parameter -Arguments $Arguments[0]
+        return Invoke-ShowCommand -Arguments $Arguments[0]
     }
 }
 
-function Write-Parameter {
+function Invoke-ShowCommand {
     param (
         [String[]]$Arguments
     )
@@ -212,7 +212,7 @@ function Write-Parameter {
 function Invoke-PowerCommand {
     param (
         [String]$UserInput,
-        [Switch]$Run
+        [String]$Location
     )
 
     process {
@@ -231,24 +231,24 @@ function Invoke-PowerCommand {
                 exit
             }
             '^help$' {
-                Write-Help -Arguments $Arguments
+                Invoke-HelpCommand -Arguments $Arguments
             }
             '^quit$' {
                 Write-Host 'Quitting...'
                 exit
             }
             '^run$' {
-                if ($Run) {
-                    & $Location.FullName @script:Parameters
+                if ($Location) {
+                    & $Location @script:Parameters
                 } else {
                     Write-Warning 'No file selected for execution'
                 }
             }
             '^set$' {
-                Set-Parameter -Arguments $Arguments
+                Invoke-SetCommand -Arguments $Arguments
             }
             '^show$' {
-                Write-Parameter -Arguments $Arguments
+                Invoke-ShowCommand -Arguments $Arguments
             }
             default {
                 # Didn't understand keyword specified, write warning to screen and add help text to next prompt
@@ -368,7 +368,7 @@ Authors: 5ynax | 5k33tz | Valrkey
             $script:CommandParameters = Get-Command -Name $Location.FullName | Select-Object -ExpandProperty Parameters
 
             # Write the list of parameters to the screen
-            Write-Parameter
+            Invoke-ShowCommand
 
             # Until the user specifies to run the program or back, set the parameters
             do {
@@ -377,7 +377,7 @@ Authors: 5ynax | 5k33tz | Valrkey
 
                 # Interpret $UserInput as a command and allow execution
                 if ($UserInput) {
-                    Invoke-PowerCommand -Run -UserInput $UserInput | Out-Default
+                    Invoke-PowerCommand -UserInput $UserInput -Location $Location | Out-Default
                 }
             } while (@('run','back') -NotContains $UserInput)
 
