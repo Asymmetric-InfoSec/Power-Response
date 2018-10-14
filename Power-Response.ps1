@@ -108,28 +108,59 @@ function Get-Config {
     }
 }
 
-function Invoke-HelpCommand {
+function Invoke-BackCommand {
+    [Alias('Invoke-..Command')]
     param (
-        [String[]]$Arguments
+        [String[]]$Arguments,
+        [String]$Location
+    )
+    process {
+        Write-Verbose 'Chose to go back'
+    }
+}
+
+function Invoke-ExitCommand {
+    [Alias('Invoke-QuitCommand')]
+    param (
+        [String[]]$Arguments,
+        [String]$Location
+    )
+    process {
+        Write-Host 'Exiting...'
+        exit
+    }
+}
+
+function Invoke-HelpCommand {
+    [Alias('Invoke-?Command')]
+    param (
+        [String[]]$Arguments,
+        [String]$Location
     )
 
     process {
         # Load possible $Commands name, usage, and description
         $Commands = @(
             @{ Name='back'; Usage='back'; Description='de-select a script file and move back to menu context' },
-            @{ Name='exit'; Usage='exit'; Description='exits the selected script' }
+            @{ Name='exit'; Usage='exit'; Description='exits Power Response' },
             @{ Name='help'; Usage='help [commands...]'; Description='displays the help for all or specified commands'},
-            @{ Name='quit'; Usage='quit'; Description='quits the selected script' },
             @{ Name='run'; Usage='run'; Description='runs the selected script with parameters set in environment' },
             @{ Name='set'; Usage='set <parameter> [value]'; Description='sets a parameter to a value' },
-            @{ Name='show'; Usage='show [parameters...]'; Description='shows a list of all or specified parameters and values' },
+            @{ Name='show'; Usage='show [parameters...]'; Description='shows a list of all or specified parameters and values' }
         ) | Foreach-Object { [PSCustomObject]$PSItem }
+
+        # If there is no $Location set
+        if (!$Location) {
+            # Don't show 'back' or 'run' as command options
+            $Commands = $Commands | Where-Object { @('back','run') -NotContains $PSItem.Name }
+        }
 
         # Filter $Arguments to remove invalid $Commands.Name
         $Arguments = $Arguments | Where-Object { $Commands.Name -Contains $PSItem }
 
-        # If $Arguments are blank, assume full 'help' display
+        # If $Arguments are blank
         if ($Arguments.Count -eq 0) {
+            # Assume full 'help' display
             $Arguments = $Commands.Name
         }
 
@@ -147,9 +178,25 @@ function Invoke-HelpCommand {
     }
 }
 
+function Invoke-RunCommand {
+    param (
+        [String[]]$Arguments,
+        [String]$Location
+    )
+
+    process {
+        if ($Location) {
+            & $Location @script:Parameters
+        } else {
+            Write-Warning 'No file selected for execution'
+        }
+    }
+}
+
 function Invoke-SetCommand {
     param (
-        [String[]]$Arguments
+        [String[]]$Arguments,
+        [String]$Location
     )
 
     process {
@@ -157,12 +204,6 @@ function Invoke-SetCommand {
         if ($Arguments.Count -lt 1) {
             Write-Warning 'Improper ''set'' command usage'
             Invoke-HelpCommand -Arguments 'set'
-            return
-        }
-
-        # Ensure parameter passed has a matching parameter for selected script
-        if ($script:CommandParameters.Keys -NotContains $Arguments[0]) {
-            Write-Warning ("Unknown parameter '{0}'" -f $Arguments[0])
             return
         }
 
@@ -176,36 +217,55 @@ function Invoke-SetCommand {
 
 function Invoke-ShowCommand {
     param (
-        [String[]]$Arguments
+        [String[]]$Arguments,
+        [String]$Location
     )
 
     process {
-        # Filter $Arguments to remove invalid $CommandParameters.Keys
-        $Arguments = $Arguments | Where-Object { $script:CommandParameters.Keys -Contains $PSItem }
+        # If we have selected a file $Location
+        if ($Location -and !(Get-Item $Location | Select-Object -ExpandProperty PSIsContainer)) {
+            # Conform to $Location's $CommandParameters
+            $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
 
-        # If $Arguments array is empty
-        if ($Arguments.Count -eq 0) {
-            # List of $System scoped parameters
-            $System = @('WarningAction','Debug','InformationAction','ErrorVariable','InformationVariable','WarningVariable','Verbose','ErrorAction','OutVariable','OutBuffer','PipelineVariable')
+            # Filter $Arguments to remove invalid $CommandParameters.Keys
+            $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem }
 
-            # Get all $UserCommandParameters (non-system generated parameters)
-            $UserCommandParameters = $script:CommandParameters.GetEnumerator() | Where-Object { $System -NotContains $PSItem.Key }
+            # If $Arguments array is empty
+            if ($Arguments.Count -eq 0) {
+                # List of $System scoped parameters
+                $System = @('WarningAction','Debug','InformationAction','ErrorVariable','InformationVariable','WarningVariable','Verbose','ErrorAction','OutVariable','OutBuffer','PipelineVariable')
 
-            # Set $Arguments to $UserCommandParameters.Key to return full list
-            $Arguments = $UserCommandParameters.Key
+                # Get all $UserCommandParameters (non-system generated parameters)
+                $UserCommandParameters = $CommandParameters.GetEnumerator() | Where-Object { $System -NotContains $PSItem.Key -or $script:Parameters.($PSItem.Key) }
+
+                # Set $Arguments to $UserCommandParameters.Key to return full list
+                $Arguments = $UserCommandParameters.Key
+            }
+        } else {
+            # Ensure $CommandParameters is blank
+            $CommandParameters = @{}
+
+            # If $Arguments array is empty
+            if ($Arguments.Count -eq 0) {
+                # Set $Arguments to all Keys of $Parameters
+                $Arguments = $script:Parameters.Keys
+            }
         }
 
-        # Initialize empty $Param(eter) return hashtable
+
+        # Initialize empty $Param(eter) return HashTable
         $Param = @{}
 
-        # Set the key of $Param to the $Parameter.$Key value
-        $Arguments | Foreach-Object { $Param.$PSItem=$script:Parameters.$PSItem }
-
-        # Get alphabetical order of $Arguments keys
-        $Property = $Arguments | Sort-Object
+        if ($CommandParameters.Count -gt 0) {
+            # Set $Param.[Type]$Key to the $Parameters.$Key value
+            $Arguments | Sort-Object | Foreach-Object { $Param.("[{0}]{1}" -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$script:Parameters.$PSItem }
+        } else {
+            # Set $Param.$Key to the $Parameters.$Key value
+            $Arguments | Sort-Object | Foreach-Object { $Param.$PSItem=$script:Parameters.$PSItem }
+        }
 
         # Cast the HashTable to a PSCustomObject and format as an alphabetical-order list object
-        return [PSCustomObject]$Param | Select-Object -Property $Property | Format-List
+        return [PSCustomObject]$Param | Format-List
     }
 }
 
@@ -222,40 +282,17 @@ function Invoke-PowerCommand {
         # $Arguments will be any following words
         $Arguments = $UserInput -Split ' ' | Select-Object -Skip 1
 
-        # Determine which $Keyword we are executing
-        switch -Regex ($Keyword) {
-            '^[0-9]+$' {}
-            '^back$' {}
-            '^exit$' {
-                Write-Host 'Exiting...'
-                exit
-            }
-            '^help$' {
-                Invoke-HelpCommand -Arguments $Arguments
-            }
-            '^quit$' {
-                Write-Host 'Quitting...'
-                exit
-            }
-            '^run$' {
-                if ($Location) {
-                    & $Location @script:Parameters
-                } else {
-                    Write-Warning 'No file selected for execution'
-                }
-            }
-            '^set$' {
-                Invoke-SetCommand -Arguments $Arguments
-            }
-            '^show$' {
-                Invoke-ShowCommand -Arguments $Arguments
-            }
-            default {
-                # Didn't understand keyword specified, write warning to screen and add help text to next prompt
-                if ($Keyword) {
-                    Write-Warning ("Unknown Command '{0}'" -f $Keyword)
-                }
-            }
+        # If no $Keyword is not provided or we have no $Location and were provided a number return early
+        if (!$Keyword -or (!$Location -and $Keyword -Match '^[0-9]$')) {
+            return
+        }
+
+        # Try to execute function corresponding to command passed
+        try {
+            & ("Invoke-{0}Command" -f $Keyword) -Arguments $Arguments -Location $Location
+        } catch {
+            # Didn't understand keyword specified, write warning to screen
+            Write-Warning ("Unknown Command '{0}', 'help' prints a list of available commands" -f $Keyword)
         }
     }
 }
@@ -267,29 +304,27 @@ function Get-Menu {
         [Switch]$Back
     )
 
-    begin {
-        # Print Title
-        Write-Host ("`n  {0}:" -f $Title)
-
+    process {
         # Add the 'Back' option to $Choice
         if ($Back) {
             [String[]]$Choice = @('..') + $Choice | Where-Object { $PSItem }
         }
-    }
-
-    process {
-        # Loop through the $Choice array and print off each line
-        for ($i=0; $i -lt $Choice.Length; $i++) {
-            # Line format: [#] - $Choice[#]
-            $Line = "[{0}] - {1}" -f $i,$Choice[$i]
-
-            Write-Host $Line
-        }
 
         # Loop until $UserInput exists and is 0 <= $UserInput <= $Choice.Length-1
         do {
+            # Print Title
+            Write-Host ("`n  {0}:" -f $Title)
+
+            # Loop through the $Choice array and print off each line
+            for ($i=0; $i -lt $Choice.Length; $i++) {
+                # Line format: [#] - $Choice[#]
+                $Line = "[{0}] - {1}" -f $i,$Choice[$i]
+
+                Write-Host $Line
+            }
+
             # Get $UserInput
-            $UserInput = Read-Host 'Enter Command'
+            $UserInput = Read-Host 'Enter Choice or Command'
 
             # Try to interpret the $UserInput as a command
             if ($UserInput) {
@@ -318,7 +353,7 @@ Authors: 5ynax | 5k33tz | Valrkey
 
         Write-Host $Banner
 
-        # Get configuration data from file
+        # Get $Config from data file
         $Config = Get-Config
 
         # Get the $Plugins directory item
@@ -335,13 +370,10 @@ Authors: 5ynax | 5k33tz | Valrkey
         }
 
         # Initialize tracked $Parameters to $Config data
-        $script:Parameters = $Config
+        $script:Parameters = @{}
 
         # Loop through searching for a script file and setting parameters
         do {
-            # Initialize $CommandParameters to empty HashTable until we select a command
-            $script:CommandParameters = @{}
-
             # While the $Location is a directory
             while ($Location.PSIsContainer) {
                 # Compute $Title - Power-Response\CurrentPath
@@ -364,18 +396,15 @@ Authors: 5ynax | 5k33tz | Valrkey
                 }
             }
 
-            # Get the $CommandParameters of the selected script file
-            $script:CommandParameters = Get-Command -Name $Location.FullName | Select-Object -ExpandProperty Parameters
+            # Show all of the $Parameters relevent to the selected $CommandParameters
+            Invoke-ShowCommand -Location $Location
 
-            # Write the list of parameters to the screen
-            Invoke-ShowCommand
-
-            # Until the user specifies to run the program or back, set the parameters
+            # Until the user specifies to 'run' the program or go 'back', interpret $UserInput as commands
             do {
                 # Get $UserInput
                 $UserInput = Read-Host 'Enter Command'
 
-                # Interpret $UserInput as a command and allow execution
+                # Interpret $UserInput as a command and pass the $Location
                 if ($UserInput) {
                     Invoke-PowerCommand -UserInput $UserInput -Location $Location | Out-Default
                 }
