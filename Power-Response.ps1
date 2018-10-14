@@ -108,6 +108,72 @@ function Get-Config {
     }
 }
 
+function Write-Help {
+    param (
+        [String[]]$Arguments
+    )
+
+    process {
+        # Load possible $Commands name, usage, and description
+        $Commands = @(
+            @{ Name='back'; Usage='back'; Description='de-select a script file and move back to menu context' },
+            @{ Name='exit'; Usage='exit'; Description='exits the selected script' }
+            @{ Name='help'; Usage='help [commands...]'; Description='displays the help for all or specified commands'},
+            @{ Name='quit'; Usage='quit'; Description='quits the selected script' },
+            @{ Name='run'; Usage='run'; Description='runs the selected script with parameters set in environment' },
+            @{ Name='set'; Usage='set <parameter> [value]'; Description='sets a parameter to a value' },
+            @{ Name='show'; Usage='show [parameters...]'; Description='shows a list of all or specified parameters and values' },
+        ) | Foreach-Object { [PSCustomObject]$PSItem }
+
+        # Filter $Arguments to remove invalid $Commands.Name
+        $Arguments = $Arguments | Where-Object { $Commands.Name -Contains $PSItem }
+
+        # If $Arguments are blank, assume full 'help' display
+        if ($Arguments.Count -eq 0) {
+            $Arguments = $Commands.Name
+        }
+
+        # If $Arguments and $Command.Name are different
+        if ($Commands.Name | Where-Object { $Arguments -NotContains $PSItem }) {
+            # Specific 'help <command>' show the Usage and Description
+            $Property = @('Usage','Description')
+        } else {
+            # Generic 'help' show the Name and Description
+            $Property = @('Name','Description')
+        }
+
+        # Print out the rows of $Commands specified by $Arguments and the columns specified by $Property
+        return $Commands | Where-Object { $Arguments -Contains $PSItem.Name } | Select-Object -Property $Property | Format-Table
+    }
+}
+
+function Set-Parameter {
+    param (
+        [String[]]$Arguments
+    )
+
+    process {
+        # Set command requires a parameter as an argument
+        if ($Arguments.Count -lt 1) {
+            Write-Warning 'Improper ''set'' command usage'
+            Write-Help -Arguments 'set'
+            return
+        }
+
+        # Ensure parameter passed has a matching parameter for selected script
+        if ($script:CommandParameters.Keys -NotContains $Arguments[0]) {
+            Write-Warning ("Unknown parameter '{0}'" -f $Arguments[0])
+            return
+        }
+
+        # Set the $Parameter key and value specified by $Arguments
+        $script:Parameters.($Arguments[0]) = $Arguments[1]
+
+        # Show the newly set value
+        return Write-Parameter -Arguments $Arguments[0]
+    }
+}
+
 function Write-Parameter {
     param (
         [String[]]$Arguments
@@ -143,73 +209,7 @@ function Write-Parameter {
     }
 }
 
-function Set-Parameter {
-    param (
-        [String[]]$Arguments
-    )
-
-    process {
-        # Set command requires a parameter as an argument
-        if ($Arguments.Count -lt 1) {
-            Write-Warning 'Improper ''set'' command usage'
-            Write-Help -Arguments 'set'
-            return
-        }
-
-        # Ensure parameter passed has a matching parameter for selected script
-        if ($script:CommandParameters.Keys -NotContains $Arguments[0]) {
-            Write-Warning ("Unknown parameter '{0}'" -f $Arguments[0])
-            return
-        }
-
-        # Set the $Parameter key and value specified by $Arguments
-        $script:Parameters.($Arguments[0]) = $Arguments[1]
-
-        # Show the newly set value
-        return Write-Parameter -Arguments $Arguments[0]
-    }
-}
-
-function Write-Help {
-    param (
-        [String[]]$Arguments
-    )
-
-    process {
-        # Load possible $Commands name, usage, and description
-        $Commands = @(
-            @{ Name='set'; Usage='set <parameter> [value]'; Description='sets a parameter to a value' },
-            @{ Name='show'; Usage='show [parameters...]'; Description='shows a list of all or specified parameters and values' },
-            @{ Name='help'; Usage='help [commands...]'; Description='displays the help for all or specified commands'},
-            @{ Name='run'; Usage='run'; Description='runs the selected script with parameters set in environment' },
-            @{ Name='back'; Usage='back'; Description='de-select a script file and move back to menu context' },
-            @{ Name='quit'; Usage='quit'; Description='quits the selected script' },
-            @{ Name='exit'; Usage='exit'; Description='exits the selected script' }
-        ) | Foreach-Object { [PSCustomObject]$PSItem }
-
-        # Filter $Arguments to remove invalid $Commands.Name
-        $Arguments = $Arguments | Where-Object { $Commands.Name -Contains $PSItem }
-
-        # If $Arguments are blank, assume full 'help' display
-        if ($Arguments.Count -eq 0) {
-            $Arguments = $Commands.Name
-        }
-
-        # If $Arguments and $Command.Name are different
-        if ($Commands.Name | Where-Object { $Arguments -NotContains $PSItem }) {
-            # Specific 'help <command>' show the Usage and Description
-            $Property = @('Usage','Description')
-        } else {
-            # Generic 'help' show the Name and Description
-            $Property = @('Name','Description')
-        }
-
-        # Print out the rows of $Commands specified by $Arguments and the columns specified by $Property
-        return $Commands | Where-Object { $Arguments -Contains $PSItem.Name } | Select-Object -Property $Property | Format-Table
-    }
-}
-
-function Interpret-Command {
+function Invoke-PowerCommand {
     param (
         [String]$UserInput,
         [Switch]$Run
@@ -224,31 +224,31 @@ function Interpret-Command {
 
         # Determine which $Keyword we are executing
         switch -Regex ($Keyword) {
-            '[0-9]+' {}
-            'back' {}
-            'set' {
-                Set-Parameter -Arguments $Arguments
+            '^[0-9]+$' {}
+            '^back$' {}
+            '^exit$' {
+                Write-Host 'Exiting...'
+                exit
             }
-            'show' {
-                Write-Parameter -Arguments $Arguments
-            }
-            'help' {
+            '^help$' {
                 Write-Help -Arguments $Arguments
             }
-            'run' {
+            '^quit$' {
+                Write-Host 'Quitting...'
+                exit
+            }
+            '^run$' {
                 if ($Run) {
                     & $Location.FullName @script:Parameters
                 } else {
                     Write-Warning 'No file selected for execution'
                 }
             }
-            'quit' {
-                Write-Host 'Quitting...'
-                exit
+            '^set$' {
+                Set-Parameter -Arguments $Arguments
             }
-            'exit' {
-                Write-Host 'Exiting...'
-                exit
+            '^show$' {
+                Write-Parameter -Arguments $Arguments
             }
             default {
                 # Didn't understand keyword specified, write warning to screen and add help text to next prompt
@@ -286,14 +286,14 @@ function Get-Menu {
             Write-Host $Line
         }
 
-        # Get user response with validation (0 <= $UserInput <= $Choice.Length-1)
+        # Loop until $UserInput exists and is 0 <= $UserInput <= $Choice.Length-1
         do {
-            # Get user input
+            # Get $UserInput
             $UserInput = Read-Host 'Enter Command'
 
-            # Try to interpret the user's input as a command
+            # Try to interpret the $UserInput as a command
             if ($UserInput) {
-                Interpret-Command -UserInput $UserInput | Out-Default
+                Invoke-PowerCommand -UserInput $UserInput | Out-Default
             }
         } while (!$UserInput -or (0..($Choice.Length-1)) -NotContains $UserInput)
 
@@ -303,7 +303,7 @@ function Get-Menu {
 
 function Power-Response {
     process {
-        #banner for Power-Response
+        # $Banner for Power-Response
         $Banner = @'
     ____                                ____                                      
    / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________ 
@@ -334,13 +334,14 @@ Authors: 5ynax | 5k33tz | Valrkey
             exit
         }
 
-        # Initialize input parameters to empty hashtable (will eventually pull stored session data)
+        # Initialize tracked $Parameters to $Config data
         $script:Parameters = $Config
-
-        $script:CommandParameters = $Config
 
         # Loop through searching for a script file and setting parameters
         do {
+            # Initialize $CommandParameters to empty HashTable until we select a command
+            $script:CommandParameters = @{}
+
             # While the $Location is a directory
             while ($Location.PSIsContainer) {
                 # Compute $Title - Power-Response\CurrentPath
@@ -371,12 +372,12 @@ Authors: 5ynax | 5k33tz | Valrkey
 
             # Until the user specifies to run the program or back, set the parameters
             do {
-                # Get user input
+                # Get $UserInput
                 $UserInput = Read-Host 'Enter Command'
 
-                # Interpret user input as a command and allow execution
+                # Interpret $UserInput as a command and allow execution
                 if ($UserInput) {
-                    Interpret-Command -Run -UserInput $UserInput | Out-Default
+                    Invoke-PowerCommand -Run -UserInput $UserInput | Out-Default
                 }
             } while (@('run','back') -NotContains $UserInput)
 
