@@ -185,8 +185,16 @@ function Invoke-RunCommand {
     )
 
     process {
-        if ($Location) {
-            & $Location @script:Parameters
+        # If we have selected a file $Location
+        if ($Location -and !(Get-Item $Location | Select-Object -ExpandProperty PSIsContainer)) {
+            # Gather to $Location's $CommandParameters
+            $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
+
+            # Parse the $ReleventParameters from $Parameters
+            $ReleventParameters = $script:Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key }
+
+            # Execute the $Location with the $ReleventParameters
+            & $Location @ReleventParameters
         } else {
             Write-Warning 'No file selected for execution'
         }
@@ -207,8 +215,13 @@ function Invoke-SetCommand {
             return
         }
 
-        # Set the $Parameter key and value specified by $Arguments
-        $script:Parameters.($Arguments[0]) = $Arguments[1]
+        # Set the $Parameters key and value specified by $Arguments
+        $script:Parameters.($Arguments[0]) = ($Arguments | Select-Object -Skip 1) -Join ' '
+
+        # If we have a selected $Location, format the $Parameters
+        if ($Location) {
+            Format-Parameter -Location $Location -Arguments $Arguments[0]
+        }
 
         # Show the newly set value
         return Invoke-ShowCommand -Arguments $Arguments[0]
@@ -224,7 +237,7 @@ function Invoke-ShowCommand {
     process {
         # If we have selected a file $Location
         if ($Location -and !(Get-Item $Location | Select-Object -ExpandProperty PSIsContainer)) {
-            # Conform to $Location's $CommandParameters
+            # Gather to $Location's $CommandParameters
             $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
 
             # Filter $Arguments to remove invalid $CommandParameters.Keys
@@ -251,7 +264,6 @@ function Invoke-ShowCommand {
                 $Arguments = $script:Parameters.Keys
             }
         }
-
 
         # Initialize empty $Param(eter) return HashTable
         $Param = @{}
@@ -293,6 +305,55 @@ function Invoke-PowerCommand {
         } catch {
             # Didn't understand keyword specified, write warning to screen
             Write-Warning ("Unknown Command '{0}', 'help' prints a list of available commands" -f $Keyword)
+        }
+    }
+}
+
+function Format-Parameter {
+    param (
+        [String[]]$Arguments,
+        [String]$Location
+    )
+
+    process {
+        # Gather to $Location's $CommandParameters
+        $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
+
+        # If we are passed no $Arguments, assume full $Parameter format check
+        if ($Arguments.Count -eq 0) {
+            $Arguments = $CommandParameters.Keys
+        }
+
+        # Narrow the scope of $Arguments to the $CommandParameters that have a stored value in $Parameters
+        $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem -and $script:Parameters.$PSItem }
+
+        # Foreach $CommandParam listed in $Arguments
+        foreach ($CommandParam in $Arguments) {
+            # Gather the $CommandParameter $ParameterType
+            $ParameterType = $CommandParameters.$CommandParam.ParameterType.FullName
+
+            # Ignore string $ParameterType with an existing string $Parameters.CommandParam value
+            if ($ParameterType -ne 'System.String' -or $script:Parameters.$CommandParam.GetType().FullName -ne 'System.String') {
+                # Build the $Command string '[TYPE]($Parameters.VALUE)'
+                $Command = "[{0}]({1})" -f $ParameterType,$script:Parameters.$CommandParam
+                try {
+                    # Try to interpret the $Command expression and store it back to $Parameters.$CommandParam
+                    $script:Parameters.$CommandParam = Invoke-Expression -Command $Command
+                } catch {
+                    # Failed to interpret the $Command expression, determine if it was a casting or expression issue
+                    if ($Error[0] -and $Error[0].FullyQualifiedErrorId -eq 'ConvertToFinalInvalidCastException') {
+                        $Warning = "Cannot convert parameter '{0}' of value '{1}' to type '{2}'" -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
+                    } else {
+                        $Warning = "Cannot interpret parameter '{0}' of value '{1}' as a valid PowerShell expression" -f $CommandParam,$script:Parameters.$CommandParam
+                    }
+
+                    # Write an appropriate $Warning
+                    Write-Warning $Warning
+
+                    # Ensure the $Parameters.$CommandParam value is NULL
+                    $script:Parameters.$CommandParam = $null
+                }
+            }
         }
     }
 }
@@ -395,6 +456,9 @@ Authors: 5ynax | 5k33tz | Valrkey
                     Write-Warning 'Something went wrong, please try again'
                 }
             }
+
+            # Format all the $Parameters to form to the selected $Location
+            Format-Parameter -Location $Location
 
             # Show all of the $Parameters relevent to the selected $CommandParameters
             Invoke-ShowCommand -Location $Location
