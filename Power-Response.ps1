@@ -333,7 +333,7 @@ function Format-Parameter {
             $ParameterType = $CommandParameters.$CommandParam.ParameterType.FullName
 
             # Ignore string $ParameterType with an existing string $Parameters.CommandParam value
-            if ($ParameterType -ne 'System.String' -or $script:Parameters.$CommandParam.GetType().FullName -ne 'System.String') {
+            if ($ParameterType -ne $script:Parameters.$CommandParam.GetType().FullName) {
                 # Build the $Command string '[TYPE]($Parameters.VALUE)'
                 $Command = "[{0}]({1})" -f $ParameterType,$script:Parameters.$CommandParam
                 try {
