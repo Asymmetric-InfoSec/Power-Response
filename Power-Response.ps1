@@ -180,6 +180,8 @@ function Invoke-HelpCommand {
 }
 
 function Invoke-RemoveCommand {
+    [Alias('Invoke-RMCommand')]
+    [Alias('Invoke-DelCommand')]
     param (
         [String[]]$Arguments,
         [String]$Location
