@@ -78,7 +78,7 @@ function Get-Menu {
 
             # Try to interpret the $UserInput as a command
             if ($UserInput) {
-                Invoke-PowerCommand -UserInput $UserInput | Out-Default
+                Invoke-PRCommand -UserInput $UserInput | Out-Default
             }
         } while (!$UserInput -or (0..($Choice.Length-1)) -NotContains $UserInput)
 
@@ -408,7 +408,7 @@ function Invoke-ShowCommand {
     }
 }
 
-function Invoke-PowerCommand {
+function Invoke-PRCommand {
     param (
         [String]$UserInput,
         [String]$Location
@@ -517,7 +517,7 @@ Authors: 5ynax | 5k33tz | Valrkey
 
                     # Interpret $UserInput as a command and pass the $Location
                     if ($UserInput) {
-                        Invoke-PowerCommand -UserInput $UserInput -Location $Location | Out-Default
+                        Invoke-PRCommand -UserInput $UserInput -Location $Location | Out-Default
                     }
                 } while (@('run','back') -NotContains $UserInput)
 
