@@ -1,19 +1,18 @@
 function Format-Parameter {
     param (
-        [String[]]$Arguments,
-        [String]$Location
+        [String[]]$Arguments
     )
 
     process {
-        # Gather to $Location's $CommandParameters
-        $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
+        # Gather to $script:Location's $CommandParameters
+        $CommandParameters = Get-Command -Name $script:Location | Select-Object -ExpandProperty Parameters
 
         # If we are passed no $Arguments, assume full $Parameter format check
         if ($Arguments.Count -eq 0) {
             $Arguments = $CommandParameters.Keys
         }
 
-        # Narrow the scope of $Arguments to the $CommandParameters that have a stored value in $Parameters
+        # Narrow the scope of $Arguments to the $CommandParameters that have a stored value in $script:Parameters
         $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem -and $script:Parameters.$PSItem }
 
         # Foreach $CommandParam listed in $Arguments
@@ -21,12 +20,12 @@ function Format-Parameter {
             # Gather the $CommandParameter $ParameterType
             $ParameterType = $CommandParameters.$CommandParam.ParameterType.FullName
 
-            # Ignore string $ParameterType with an existing string $Parameters.CommandParam value
+            # Ignore string $ParameterType with an existing string $script:Parameters.CommandParam value
             if ($ParameterType -ne $script:Parameters.$CommandParam.GetType().FullName) {
-                # Build the $Command string '[TYPE]($Parameters.VALUE)'
+                # Build the $Command string '[TYPE]($script:Parameters.VALUE)'
                 $Command = "[{0}]({1})" -f $ParameterType,$script:Parameters.$CommandParam
                 try {
-                    # Try to interpret the $Command expression and store it back to $Parameters.$CommandParam
+                    # Try to interpret the $Command expression and store it back to $script:Parameters.$CommandParam
                     $script:Parameters.$CommandParam = Invoke-Expression -Command $Command
                 } catch {
                     # Failed to interpret the $Command expression, determine if it was a casting or expression issue
@@ -39,7 +38,7 @@ function Format-Parameter {
                     # Write an appropriate $Warning
                     Write-Warning $Warning
 
-                    # remove the $CommandParam key from $Parameters
+                    # remove the $CommandParam key from $script:Parameters
                     $script:Parameters.Remove($CommandParam) | Out-Null
                 }
             }
@@ -196,8 +195,7 @@ function Import-Config {
 function Invoke-BackCommand {
     [Alias('Invoke-..Command')]
     param (
-        [String[]]$Arguments,
-        [String]$Location
+        [String[]]$Arguments
     )
     process {
         Write-Host 'Going back...'
@@ -207,8 +205,7 @@ function Invoke-BackCommand {
 function Invoke-ExitCommand {
     [Alias('Invoke-QuitCommand')]
     param (
-        [String[]]$Arguments,
-        [String]$Location
+        [String[]]$Arguments
     )
     process {
         exit
@@ -218,8 +215,7 @@ function Invoke-ExitCommand {
 function Invoke-HelpCommand {
     [Alias('Invoke-?Command')]
     param (
-        [String[]]$Arguments,
-        [String]$Location
+        [String[]]$Arguments
     )
 
     process {
@@ -234,8 +230,8 @@ function Invoke-HelpCommand {
             @{ Name='show'; Usage='show [parameters...]'; Description='shows a list of all or specified parameters and values' }
         ) | Foreach-Object { [PSCustomObject]$PSItem }
 
-        # If there is no $Location set
-        if (!$Location) {
+        # If $script:Location is a directory
+        if ($script:Location.PSIsContainer) {
             # Don't show 'back' or 'run' as command options
             $Commands = $Commands | Where-Object { @('back','run') -NotContains $PSItem.Name }
         }
@@ -266,55 +262,53 @@ function Invoke-HelpCommand {
 function Invoke-RemoveCommand {
     [Alias('Invoke-ClearCommand')]
     param (
-        [String[]]$Arguments,
-        [String]$Location
+        [String[]]$Arguments
     )
 
     process {
-        # If $Arguments are blank and we have selected a file $Location
-        if ($Arguments.Count -eq 0 -and $Location -and !(Get-Item $Location | Select-Object -ExpandProperty PSIsContainer)) {
+        # If $Arguments are blank and we have selected a file $script:Location
+        if ($Arguments.Count -eq 0 -and !$script:Location.PSIsContainer) {
             # Assume 'remove' all tracked command parameters
-            $Arguments = Get-Command $Location | Select-Object -ExpandProperty Parameters | Select-Object -ExpandProperty Keys
+            $Arguments = Get-Command -Name $script:Location | Select-Object -ExpandProperty Parameters | Select-Object -ExpandProperty Keys
         } elseif ($Arguments.Count -eq 0) {
-            # Assume 'remove' all tracked $Parameters
+            # Assume 'remove' all tracked $script:Parameters
             $Arguments = $script:Parameters | Select-Object -ExpandProperty Keys
         }
 
-        # Filter $Arguments to remove invalid $Parameters.Keys
+        # Filter $Arguments to remove invalid $script:Parameters.Keys
         $Arguments = $Arguments | Where-Object { $script:Parameters.Keys -Contains $PSItem }
 
         # If we have $Arguments to remove
         if ($Arguments.Count -ne 0) {
-            # Remove $Arguments from $Parameters
+            # Remove $Arguments from $script:Parameters
             $Arguments | Foreach-Object { $script:Parameters.Remove($PSItem) | Out-Null }
         }
 
         # Show the new parameter list
-        Invoke-ShowCommand -Location $Location
+        Invoke-ShowCommand
     }
 }
 
 function Invoke-RunCommand {
     param (
-        [String[]]$Arguments,
-        [String]$Location
+        [String[]]$Arguments
     )
 
     process {
-        # If we have selected a file $Location
-        if ($Location -and !(Get-Item $Location | Select-Object -ExpandProperty PSIsContainer)) {
-            # Gather to $Location's $CommandParameters
-            $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
+        # If we have selected a file $script:Location
+        if ($script:Location -and !$script:Location.PSIsContainer) {
+            # Gather to $script:Location's $CommandParameters
+            $CommandParameters = Get-Command -Name $script:Location | Select-Object -ExpandProperty Parameters
 
             # Initialize $ReleventParameters Hashtable
             $ReleventParameters = @{}
 
-            # Parse the $ReleventParameters from $Parameters
+            # Parse the $ReleventParameters from $script:Parameters
             $script:Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
             try {
-                # Execute the $Location with the $ReleventParameters
-                & $Location @ReleventParameters
+                # Execute the $script:Location with the $ReleventParameters
+                & $script:Location.FullName @ReleventParameters
             } catch {
                 Write-Warning ('Command execution error: {0}' -f $PSItem)
             }
@@ -326,8 +320,7 @@ function Invoke-RunCommand {
 
 function Invoke-SetCommand {
     param (
-        [String[]]$Arguments,
-        [String]$Location
+        [String[]]$Arguments
     )
 
     process {
@@ -337,17 +330,17 @@ function Invoke-SetCommand {
             return Invoke-HelpCommand -Arguments 'set'
         }
 
-        # Set the $Parameters key and value specified by $Arguments
+        # Set the $script:Parameters key and value specified by $Arguments
         $script:Parameters.($Arguments[0]) = ($Arguments | Select-Object -Skip 1) -Join ' '
 
-        # If we are provided a blank set command, remove the key from $Parameters
+        # If we are provided a blank set command, remove the key from $script:Parameters
         if ($script:Parameters.($Arguments[0]) -eq '') {
-            return Invoke-RemoveCommand -Arguments $Arguments -Location $Location
+            return Invoke-RemoveCommand -Arguments $Arguments
         }
 
-        # If we have a selected $Location, format the $Parameters
-        if ($Location) {
-            Format-Parameter -Location $Location -Arguments $Arguments[0]
+        # If we have a file $script:Location, format the $script:Parameters
+        if (!$script:Location.PSIsContainer) {
+            Format-Parameter -Arguments $Arguments[0]
         }
 
         # Show the newly set value
@@ -357,15 +350,14 @@ function Invoke-SetCommand {
 
 function Invoke-ShowCommand {
     param (
-        [String[]]$Arguments,
-        [String]$Location
+        [String[]]$Arguments
     )
 
     process {
-        # If we have selected a file $Location
-        if ($Location -and !(Get-Item $Location | Select-Object -ExpandProperty PSIsContainer)) {
-            # Gather to $Location's $CommandParameters
-            $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
+        # If we have selected a file $script:Location
+        if (!$script:Location.PSIsContainer) {
+            # Gather to $script:Location's $CommandParameters
+            $CommandParameters = Get-Command -Name $script:Location | Select-Object -ExpandProperty Parameters
 
             # Filter $Arguments to remove invalid $CommandParameters.Keys
             $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem }
@@ -387,7 +379,7 @@ function Invoke-ShowCommand {
 
             # If $Arguments array is empty
             if ($Arguments.Count -eq 0) {
-                # Set $Arguments to all Keys of $Parameters
+                # Set $Arguments to all Keys of $script:Parameters
                 $Arguments = $script:Parameters.Keys
             }
         }
@@ -396,10 +388,10 @@ function Invoke-ShowCommand {
         $Param = @{}
 
         if ($CommandParameters.Count -gt 0) {
-            # Set $Param.[Type]$Key to the $Parameters.$Key value
+            # Set $Param.[Type]$Key to the $script:Parameters.$Key value
             $Arguments | Sort-Object | Foreach-Object { $Param.("[{0}]{1}" -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$script:Parameters.$PSItem }
         } else {
-            # Set $Param.$Key to the $Parameters.$Key value
+            # Set $Param.$Key to the $script:Parameters.$Key value
             $Arguments | Sort-Object | Foreach-Object { $Param.$PSItem=$script:Parameters.$PSItem }
         }
 
@@ -410,8 +402,7 @@ function Invoke-ShowCommand {
 
 function Invoke-PRCommand {
     param (
-        [String]$UserInput,
-        [String]$Location
+        [String]$UserInput
     )
 
     process {
@@ -421,14 +412,14 @@ function Invoke-PRCommand {
         # $Arguments will be any following words
         $Arguments = $UserInput -Split ' ' | Select-Object -Skip 1
 
-        # If no $Keyword is not provided or we have no $Location and were provided a number return early
-        if (!$Keyword -or (!$Location -and $Keyword -Match '^[0-9]$')) {
+        # If no $Keyword is not provided or we have no $script:Location and were provided a number return early
+        if (!$Keyword -or ($script:Location.PSIsContainer -and $Keyword -Match '^[0-9]$')) {
             return
         }
 
         # Try to execute function corresponding to command passed
         try {
-            & ("Invoke-{0}Command" -f $Keyword) -Arguments $Arguments -Location $Location
+            & ("Invoke-{0}Command" -f $Keyword) -Arguments $Arguments
         } catch {
             # Didn't understand keyword specified, write warning to screen
             Write-Warning ("Unknown Command '{0}', 'help' prints a list of available commands" -f $Keyword)
@@ -465,64 +456,64 @@ Authors: 5ynax | 5k33tz | Valrkey
         # Get the $Plugins directory item
         $Plugins = Get-Item -Path $script:Config.Path.Plugins
 
-        # Initialize the current $Location to the $script:Config.Path.Plugins directory item
-        $Location = $Plugins
+        # Initialize the current $script:Location to the $script:Config.Path.Plugins directory item
+        $script:Location = $Plugins
 
         # Ensure we have at least one plugin installed
-        if (!(Get-ChildItem $Location)) {
+        if (!(Get-ChildItem $script:Location)) {
             Write-Error 'No Power-Response plugins detected'
             Read-Host 'Press Enter to Exit'
             exit
         }
 
-        # Initialize tracked $Parameters to $script:Config data
+        # Initialize tracked $script:Parameters to $script:Config data
         $script:Parameters = @{}
 
         # Trap 'exit's and Ctrl-C interrupts
         try {
             # Loop through searching for a script file and setting parameters
             do {
-                # While the $Location is a directory
-                while ($Location.PSIsContainer) {
+                # While the $script:Location is a directory
+                while ($script:Location.PSIsContainer) {
                     # Compute $Title - Power-Response\CurrentPath
-                    $Title = 'Power-Response' + ($Location.FullName -Replace ('^' + [Regex]::Escape($PSScriptRoot)))
+                    $Title = 'Power-Response' + ($script:Location.FullName -Replace ('^' + [Regex]::Escape($PSScriptRoot)))
 
                     # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
-                    $Choice = Get-ChildItem -Path $Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
+                    $Choice = Get-ChildItem -Path $script:Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
 
                     #Compute $Back - ensure we are not at the $script:Config.Path.Plugins
-                    $Back = $Plugins.FullName -NotMatch [Regex]::Escape($Location.FullName)
+                    $Back = $Plugins.FullName -NotMatch [Regex]::Escape($script:Location.FullName)
 
                     # Get the next directory selection from the user, showing the back option if anywhere but the $script:Config.Path.Plugins
                     $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
 
-                    # Get the selected $Location item
+                    # Get the selected $script:Location item
                     try {
-                        $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection) -ErrorAction Stop
+                        $script:Location = Get-Item ("{0}\{1}" -f $script:Location.FullName,$Selection) -ErrorAction Stop
                     } catch {
                         Write-Warning 'Something went wrong, please try again'
                     }
                 }
 
-                # Format all the $Parameters to form to the selected $Location
-                Format-Parameter -Location $Location
+                # Format all the $script:Parameters to form to the selected $script:Location
+                Format-Parameter
 
-                # Show all of the $Parameters relevent to the selected $CommandParameters
-                Invoke-ShowCommand -Location $Location
+                # Show all of the $script:Parameters relevent to the selected $CommandParameters
+                Invoke-ShowCommand
 
                 # Until the user specifies to 'run' the program or go 'back', interpret $UserInput as commands
                 do {
                     # Get $UserInput
                     $UserInput = Read-Host 'Enter Command'
 
-                    # Interpret $UserInput as a command and pass the $Location
+                    # Interpret $UserInput as a command and pass the $script:Location
                     if ($UserInput) {
-                        Invoke-PRCommand -UserInput $UserInput -Location $Location | Out-Default
+                        Invoke-PRCommand -UserInput $UserInput | Out-Default
                     }
                 } while (@('run','back') -NotContains $UserInput)
 
-                # Set $Location to the previous directory
-                $Location = Get-Item -Path ($Location.FullName -Replace ('\\[^\\]+$'))
+                # Set $script:Location to the previous directory
+                $script:Location = Get-Item -Path ($script:Location.FullName -Replace ('\\[^\\]+$'))
             } while ($True)
         } finally {
             # Set location back to original $SavedLocation
