@@ -115,7 +115,7 @@ function Invoke-BackCommand {
         [String]$Location
     )
     process {
-        Write-Verbose 'Chose to go back'
+        Write-Host 'Going back...'
     }
 }
 
@@ -144,6 +144,7 @@ function Invoke-HelpCommand {
             @{ Name='back'; Usage='back'; Description='de-select a script file and move back to menu context' },
             @{ Name='exit'; Usage='exit'; Description='exits Power Response' },
             @{ Name='help'; Usage='help [commands...]'; Description='displays the help for all or specified commands'},
+            @{ Name='remove'; Usage='remove [parameters...]'; Description='removes all or a specified parameter values' },
             @{ Name='run'; Usage='run'; Description='runs the selected script with parameters set in environment' },
             @{ Name='set'; Usage='set <parameter> [value]'; Description='sets a parameter to a value' },
             @{ Name='show'; Usage='show [parameters...]'; Description='shows a list of all or specified parameters and values' }
@@ -178,6 +179,36 @@ function Invoke-HelpCommand {
     }
 }
 
+function Invoke-RemoveCommand {
+    param (
+        [String[]]$Arguments,
+        [String]$Location
+    )
+
+    process {
+        # If $Arguments are blank and we have selected a file $Location
+        if ($Arguments.Count -eq 0 -and $Location -and !(Get-Item $Location | Select-Object -ExpandProperty PSIsContainer)) {
+            # Assume 'remove' all tracked command parameters
+            $Arguments = Get-Command $Location | Select-Object -ExpandProperty Parameters | Select-Object -ExpandProperty Keys
+        } elseif ($Arguments.Count -eq 0) {
+            # Assume 'remove' all tracked $Parameters
+            $Arguments = $script:Parameters | Select-Object -ExpandProperty Keys
+        }
+
+        # Filter $Arguments to remove invalid $Parameters.Keys
+        $Arguments = $Arguments | Where-Object { $script:Parameters.Keys -Contains $PSItem }
+
+        # If we have $Arguments to remove
+        if ($Arguments.Count -ne 0) {
+            # Remove $Arguments from $Parameters
+            $Arguments | Foreach-Object { $script:Parameters.Remove($PSItem) | Out-Null }
+        }
+
+        # Show the new parameter list
+        Invoke-ShowCommand -Location $Location
+    }
+}
+
 function Invoke-RunCommand {
     param (
         [String[]]$Arguments,
@@ -206,7 +237,6 @@ function Invoke-RunCommand {
 }
 
 function Invoke-SetCommand {
-    [Alias('Invoke-RemoveCommand')]
     param (
         [String[]]$Arguments,
         [String]$Location
@@ -216,18 +246,19 @@ function Invoke-SetCommand {
         # Set command requires a parameter as an argument
         if ($Arguments.Count -lt 1) {
             Write-Warning 'Improper ''set'' command usage'
-            Invoke-HelpCommand -Arguments 'set'
-            return
+            return Invoke-HelpCommand -Arguments 'set'
         }
 
         # Set the $Parameters key and value specified by $Arguments
         $script:Parameters.($Arguments[0]) = ($Arguments | Select-Object -Skip 1) -Join ' '
 
+        # If we are provided a blank set command, remove the key from $Parameters
         if ($script:Parameters.($Arguments[0]) -eq '') {
-            # If we are provided a blank set command, remove the key from $Parameters
-            $script:Parameters.Remove($Arguments[0]) | Out-Null
-        } elseif ($Location) {
-            # If we have a selected $Location, format the $Parameters
+            return Invoke-RemoveCommand -Arguments $Arguments -Location $Location
+        }
+
+        # If we have a selected $Location, format the $Parameters
+        if ($Location) {
             Format-Parameter -Location $Location -Arguments $Arguments[0]
         }
 
@@ -358,8 +389,8 @@ function Format-Parameter {
                     # Write an appropriate $Warning
                     Write-Warning $Warning
 
-                    # Ensure the $Parameters.$CommandParam value is NULL
-                    $script:Parameters.$CommandParam = $null
+                    # remove the $CommandParam key from $Parameters
+                    $script:Parameters.Remove($CommandParam) | Out-Null
                 }
             }
         }
