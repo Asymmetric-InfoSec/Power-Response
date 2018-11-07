@@ -1,5 +1,4 @@
-function Get-Config {
-    [CmdletBinding()]
+function Import-Config {
     param (
         [String]$Path = ("{0}\Config.psd1" -f $PSScriptRoot),
         [String[]]$RootKeys = @('Path', 'UserName')
@@ -34,18 +33,18 @@ function Get-Config {
             # Get the Config file at $Path
             $File = Get-Item -Path $Path
 
-            # Import the Config data file and bind it to the $Config variable
+            # Import the Config data file and bind it to the $script:Config variable
             Import-LocalizedData -BindingVariable Config -BaseDirectory $File.PSParentPath -FileName $File.Name -ErrorAction Stop
         } catch {
             # Either intentionally threw an error on file absense, or Import-LocalizedData failed
             Write-Verbose ("Unable to import config on 'Path': '{0}'" -f $Path)
-            $Config = $Default
+            $script:Config = $Default
         }
 
         # Check for unexpected values in Config file
         if ($RootKeys) {
             # Iterate through Config.Keys and keep any values not contained in expected $RootKeys 
-            $UnexpectedRootKeys = $Config.Keys | Where-Object { $RootKeys -NotContains $PSItem }
+            $UnexpectedRootKeys = $script:Config.Keys | Where-Object { $RootKeys -NotContains $PSItem }
 
             # If we found unexpected keys, print a warning message
             if ($UnexpectedRootKeys) {
@@ -53,43 +52,43 @@ function Get-Config {
                 Write-Warning ("    '{0}'" -f ($UnexpectedRootKeys -Join ', '))
                 Write-Warning  "Removing these values from the Config hashtable"
 
-                # Remove any detected unexpected keys from $Config
-                $UnexpectedRootKeys | % { $Config.Remove($PSItem) }
+                # Remove any detected unexpected keys from $script:Config
+                $UnexpectedRootKeys | % { $script:Config.Remove($PSItem) }
             }
         }
 
         # If no value is provided in the config file, set the default values
-        if (!$Config.Path) {
-            $Config.Path = $Default.Path
+        if (!$script:Config.Path) {
+            $script:Config.Path = $Default.Path
         }
-        if (!$Config.UserName) {
-            $Config.UserName = $Default.UserName
+        if (!$script:Config.UserName) {
+            $script:Config.UserName = $Default.UserName
         }
 
-        if (!$Config.Path.Bin) {
-            $Config.Path.Bin = $Default.Path.Bin
+        if (!$script:Config.Path.Bin) {
+            $script:Config.Path.Bin = $Default.Path.Bin
         } 
-        if (!$Config.Path.Logs) {
-            $Config.Path.Logs = $Default.Path.Logs
+        if (!$script:Config.Path.Logs) {
+            $script:Config.Path.Logs = $Default.Path.Logs
         }
-        if (!$Config.Path.Output) {
-            $Config.Path.Output = $Default.Path.Output
+        if (!$script:Config.Path.Output) {
+            $script:Config.Path.Output = $Default.Path.Output
         } 
-        if (!$Config.Path.Plugins) {
-            $Config.Path.Plugins = $Default.Path.Plugins
+        if (!$script:Config.Path.Plugins) {
+            $script:Config.Path.Plugins = $Default.Path.Plugins
         }
 
-        if (!$Config.UserName.Windows) {
-            $Config.UserName.Windows = $Default.UserName.Windows
+        if (!$script:Config.UserName.Windows) {
+            $script:Config.UserName.Windows = $Default.UserName.Windows
         }
 
-        # Check for required $Config value existence (sanity check - should never fail with default values)
-        if (!$Config.Path -or !$Config.UserName -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.UserName.Windows) {
+        # Check for required $script:Config value existence (sanity check - should never fail with default values)
+        if (!$script:Config.Path -or !$script:Config.UserName -or !$script:Config.Path.Bin -or !$script:Config.Path.Logs -or !$script:Config.Path.Output -or !$script:Config.Path.Plugins -or !$script:Config.UserName.Windows) {
             throw "Missing required configuration value"
         }
 
-        # Ensure all $Config.Path directory values exist
-        foreach ($DirPath in $Config.Path.Values) {
+        # Ensure all $script:Config.Path directory values exist
+        foreach ($DirPath in $script:Config.Path.Values) {
             # If the $DirPath doesn't exist, create it and get rid of the output
             if (!(Test-Path $DirPath)) {
                 New-Item -Path $DirPath -ItemType Directory | Out-Null
@@ -97,14 +96,12 @@ function Get-Config {
         }
 
         # Gather credentials for non-sessioned $UserName
-        $Config.Credential = @{}
-        foreach ($UserName in $Config.UserName.GetEnumerator()) {
+        $script:Config.Credential = @{}
+        foreach ($UserName in $script:Config.UserName.GetEnumerator()) {
             if ($UserName.Value -ne $ENV:UserName) {
-                $Config.Credential.($UserName.Key) = Get-Credential -UserName $UserName.Value -Message ("Please enter {0} credentials" -f $UserName.Key)
+                $script:Config.Credential.($UserName.Key) = Get-Credential -UserName $UserName.Value -Message ("Please enter {0} credentials" -f $UserName.Key)
             }
         }
-
-        return $Config
     }
 }
 
@@ -126,7 +123,6 @@ function Invoke-ExitCommand {
         [String]$Location
     )
     process {
-        Write-Host 'Exiting...'
         exit
     }
 }
@@ -458,13 +454,19 @@ Authors: 5ynax | 5k33tz | Valrkey
 
         Write-Host $Banner
 
-        # Get $Config from data file
-        $Config = Get-Config
+        # Get $script:Config from data file
+        Import-Config
+
+        # Save the execution location
+        $SavedLocation = Get-Location
+
+        # Set the location to Bin folder to allow easy asset access
+        Set-Location $script:Config.Path.Bin
 
         # Get the $Plugins directory item
-        $Plugins = Get-Item -Path $Config.Path.Plugins
+        $Plugins = Get-Item -Path $script:Config.Path.Plugins
 
-        # Initialize the current $Location to the $Config.Path.Plugins directory item
+        # Initialize the current $Location to the $script:Config.Path.Plugins directory item
         $Location = $Plugins
 
         # Ensure we have at least one plugin installed
@@ -474,53 +476,61 @@ Authors: 5ynax | 5k33tz | Valrkey
             exit
         }
 
-        # Initialize tracked $Parameters to $Config data
+        # Initialize tracked $Parameters to $script:Config data
         $script:Parameters = @{}
 
-        # Loop through searching for a script file and setting parameters
-        do {
-            # While the $Location is a directory
-            while ($Location.PSIsContainer) {
-                # Compute $Title - Power-Response\CurrentPath
-                $Title = 'Power-Response' + ($Location.FullName -Replace ('^' + [Regex]::Escape($PSScriptRoot)))
-
-                # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
-                $Choice = Get-ChildItem -Path $Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
-
-                #Compute $Back - ensure we are not at the $Config.Path.Plugins
-                $Back = $Plugins.FullName -NotMatch [Regex]::Escape($Location.FullName)
-
-                # Get the next directory selection from the user, showing the back option if anywhere but the $Config.Path.Plugins
-                $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
-
-                # Get the selected $Location item
-                try {
-                    $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection) -ErrorAction Stop
-                } catch {
-                    Write-Warning 'Something went wrong, please try again'
-                }
-            }
-
-            # Format all the $Parameters to form to the selected $Location
-            Format-Parameter -Location $Location
-
-            # Show all of the $Parameters relevent to the selected $CommandParameters
-            Invoke-ShowCommand -Location $Location
-
-            # Until the user specifies to 'run' the program or go 'back', interpret $UserInput as commands
+        # Trap 'exit's and Ctrl-C interrupts
+        try {
+            # Loop through searching for a script file and setting parameters
             do {
-                # Get $UserInput
-                $UserInput = Read-Host 'Enter Command'
+                # While the $Location is a directory
+                while ($Location.PSIsContainer) {
+                    # Compute $Title - Power-Response\CurrentPath
+                    $Title = 'Power-Response' + ($Location.FullName -Replace ('^' + [Regex]::Escape($PSScriptRoot)))
 
-                # Interpret $UserInput as a command and pass the $Location
-                if ($UserInput) {
-                    Invoke-PowerCommand -UserInput $UserInput -Location $Location | Out-Default
+                    # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
+                    $Choice = Get-ChildItem -Path $Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
+
+                    #Compute $Back - ensure we are not at the $script:Config.Path.Plugins
+                    $Back = $Plugins.FullName -NotMatch [Regex]::Escape($Location.FullName)
+
+                    # Get the next directory selection from the user, showing the back option if anywhere but the $script:Config.Path.Plugins
+                    $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
+
+                    # Get the selected $Location item
+                    try {
+                        $Location = Get-Item ("{0}\{1}" -f $Location.FullName,$Selection) -ErrorAction Stop
+                    } catch {
+                        Write-Warning 'Something went wrong, please try again'
+                    }
                 }
-            } while (@('run','back') -NotContains $UserInput)
 
-            # Set $Location to the previous directory
-            $Location = Get-Item -Path ($Location.FullName -Replace ('\\[^\\]+$'))
-        } while ($True)
+                # Format all the $Parameters to form to the selected $Location
+                Format-Parameter -Location $Location
+
+                # Show all of the $Parameters relevent to the selected $CommandParameters
+                Invoke-ShowCommand -Location $Location
+
+                # Until the user specifies to 'run' the program or go 'back', interpret $UserInput as commands
+                do {
+                    # Get $UserInput
+                    $UserInput = Read-Host 'Enter Command'
+
+                    # Interpret $UserInput as a command and pass the $Location
+                    if ($UserInput) {
+                        Invoke-PowerCommand -UserInput $UserInput -Location $Location | Out-Default
+                    }
+                } while (@('run','back') -NotContains $UserInput)
+
+                # Set $Location to the previous directory
+                $Location = Get-Item -Path ($Location.FullName -Replace ('\\[^\\]+$'))
+            } while ($True)
+        } finally {
+            # Set location back to original $SavedLocation
+            Set-Location -Path $SavedLocation
+
+            Write-Host "`nExiting..."
+        }
     }
 }
 
