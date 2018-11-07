@@ -191,10 +191,14 @@ function Invoke-RunCommand {
             $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
 
             # Parse the $ReleventParameters from $Parameters
-            $ReleventParameters = $script:Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key }
+            $ReleventParameters = $script:Parameters.Keys | Where-Object { $CommandParameters.Keys -Contains $PSItem } | Foreach-Object { @{ $PSItem=$script:Parameters.$PSItem } }
 
-            # Execute the $Location with the $ReleventParameters
-            & $Location @ReleventParameters
+            try {
+                # Execute the $Location with the $ReleventParameters
+                & $Location @ReleventParameters
+            } catch {
+                Write-Warning ('Command execution error: {0}' -f $PSItem)
+            }
         } else {
             Write-Warning 'No file selected for execution'
         }
@@ -218,8 +222,11 @@ function Invoke-SetCommand {
         # Set the $Parameters key and value specified by $Arguments
         $script:Parameters.($Arguments[0]) = ($Arguments | Select-Object -Skip 1) -Join ' '
 
-        # If we have a selected $Location, format the $Parameters
-        if ($Location) {
+        if ($script:Parameters.($Arguments[0]) -eq '') {
+            # If we are provided a blank set command, remove the key from $Parameters
+            $script:Parameters.Remove($Arguments[0]) | Out-Null
+        } elseif ($Location) {
+            # If we have a selected $Location, format the $Parameters
             Format-Parameter -Location $Location -Arguments $Arguments[0]
         }
 
