@@ -206,6 +206,7 @@ function Invoke-RunCommand {
 }
 
 function Invoke-SetCommand {
+    [Alias('Invoke-RemoveCommand')]
     param (
         [String[]]$Arguments,
         [String]$Location
