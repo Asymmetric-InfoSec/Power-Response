@@ -223,8 +223,11 @@ function Invoke-RunCommand {
             # Gather to $Location's $CommandParameters
             $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
 
+            # Initialize $ReleventParameters Hashtable
+            $ReleventParameters = @{}
+
             # Parse the $ReleventParameters from $Parameters
-            $ReleventParameters = $script:Parameters.Keys | Where-Object { $CommandParameters.Keys -Contains $PSItem } | Foreach-Object { @{ $PSItem=$script:Parameters.$PSItem } }
+            $script:Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
             try {
                 # Execute the $Location with the $ReleventParameters
