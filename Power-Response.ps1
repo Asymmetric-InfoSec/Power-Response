@@ -448,18 +448,27 @@ function Out-PRFile {
         [PSObject]$InputObject
     )
 
-    process {
+    begin {
         # Get UTC $Date
         $Date = (Get-Date).ToUniversalTime()
 
         # Create the destination $Path: {$script:Config.Path.Output}\{SCRIPT NAME}_{UTC TIMESTAMP}.xml
-        $Path = '{0}\{1}_{2:yyyy-MM-dd_hh-mm-ss}.xml' -f $script:Config.Path.Output, $script:Location.BaseName.ToLower(), $Date
+        $Path = New-Item -Path ('{0}\{1}_{2:yyyy-MM-dd_hh-mm-ss}.xml' -f $script:Config.Path.Output, $script:Location.BaseName.ToLower(), $Date)
 
         # Determine the $HashPath
         $HashPath = '{0}\output-{1}' -f $script:Config.Path.Output,$script:Config.Hash.FileName
 
+        # Initialize $Objects array for Pipeline handling
+        $Objects = @()
+    }
+
+    process {
+        $Objects += $InputObject
+    }
+
+    end {
         # Export the $InputObject to the $Path
-        Export-CliXml -Path $Path -InputObject $InputObject
+        Export-CliXml -Path $Path -InputObject $Objects
 
         # Make the $Path file Read Only
         Set-ItemProperty -Path $Path -Name IsReadOnly -Value $true
@@ -468,7 +477,7 @@ function Out-PRFile {
         $Hash = Get-FileHash -Algorithm $script:Config.Hash.Algorithm -Path $Path | Select-Object -ExpandProperty Hash
 
         # Set up the $LogLine with Date, Path, and Hash headers
-        $LogLine = [PSCustomObject]@{ Date = '{0:yyyy-MM-dd hh:mm:ss}' -f $Date; Path = $Path; Hash = $Hash }
+        $LogLine = [PSCustomObject]@{ Date = '{0:u}' -f $Date; Path = $Path; Hash = $Hash }
 
         # Hash the $Path file and append it to the $HashPath
         Export-Csv -NoTypeInformation -Append -Path $HashPath -InputObject $LogLine
