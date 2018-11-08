@@ -87,8 +87,8 @@ function Get-Menu {
 
 function Import-Config {
     param (
-        [String]$Path = ("{0}\Config.psd1" -f $PSScriptRoot),
-        [String[]]$RootKeys = @('Path', 'UserName')
+        [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
+        [String[]]$RootKeys = @('Path', 'Hash', 'UserName')
     )
 
     process {
@@ -98,10 +98,15 @@ function Import-Config {
         $Default = @{
             # C:\Path\To\Power-Response\{FolderName}
             Path = @{
-               Bin = "{0}\Bin" -f $PSScriptRoot
-               Logs = "{0}\Logs" -f $PSScriptRoot
-               Output = "{0}\Output" -f $PSScriptRoot
-               Plugins = "{0}\Plugins" -f $PSScriptRoot
+               Bin = '{0}\Bin' -f $PSScriptRoot
+               Logs = '{0}\Logs' -f $PSScriptRoot
+               Output = '{0}\Output' -f $PSScriptRoot
+               Plugins = '{0}\Plugins' -f $PSScriptRoot
+            }
+
+            Hash = @{
+                Algorithm = 'SHA256'
+                FileName = 'hashes.csv'
             }
 
             # Executing UserName
@@ -148,6 +153,9 @@ function Import-Config {
         if (!$script:Config.Path) {
             $script:Config.Path = $Default.Path
         }
+        if (!$script:Config.Hash) {
+            $script:Config.Hash = $Default.Hash
+        }
         if (!$script:Config.UserName) {
             $script:Config.UserName = $Default.UserName
         }
@@ -165,12 +173,19 @@ function Import-Config {
             $script:Config.Path.Plugins = $Default.Path.Plugins
         }
 
+        if (!$script:Config.Hash.Algorithm) {
+            $script:Config.Hash.Algorithm = $Default.Hash.Algorithm
+        }
+        if (!$script:Config.Hash.FileName) {
+            $script:Config.Hash.FileName = $Default.Hash.FileName
+        }
+
         if (!$script:Config.UserName.Windows) {
             $script:Config.UserName.Windows = $Default.UserName.Windows
         }
 
         # Check for required $script:Config value existence (sanity check - should never fail with default values)
-        if (!$script:Config.Path -or !$script:Config.UserName -or !$script:Config.Path.Bin -or !$script:Config.Path.Logs -or !$script:Config.Path.Output -or !$script:Config.Path.Plugins -or !$script:Config.UserName.Windows) {
+        if (!$script:Config.Path -or !$script:Config.UserName -or !$script:Config.Path.Bin -or !$script:Config.Path.Logs -or !$script:Config.Path.Output -or !$script:Config.Path.Plugins -or !$script:Config.Hash.Algorithm -or !$script:Config.Hash.FileName -or !$script:Config.UserName.Windows) {
             throw "Missing required configuration value"
         }
 
@@ -424,6 +439,39 @@ function Invoke-PRCommand {
             # Didn't understand keyword specified, write warning to screen
             Write-Warning ("Unknown Command '{0}', 'help' prints a list of available commands" -f $Keyword)
         }
+    }
+}
+
+function Out-PRFile {
+    param (
+        [Parameter(ValueFromPipeline=$true)]
+        [PSObject]$InputObject
+    )
+
+    process {
+        # Get UTC $Date
+        $Date = (Get-Date).ToUniversalTime()
+
+        # Create the destination $Path: {$script:Config.Path.Output}\{SCRIPT NAME}_{UTC TIMESTAMP}.xml
+        $Path = '{0}\{1}_{2:yyyy-MM-dd_hh-mm-ss}.xml' -f $script:Config.Path.Output, $script:Location.BaseName.ToLower(), $Date
+
+        # Determine the $HashPath
+        $HashPath = '{0}\output-{1}' -f $script:Config.Path.Output,$script:Config.Hash.FileName
+
+        # Export the $InputObject to the $Path
+        Export-CliXml -Path $Path -InputObject $InputObject
+
+        # Make the $Path file Read Only
+        Set-ItemProperty -Path $Path -Name IsReadOnly -Value $true
+
+        # Hash the $Path file
+        $Hash = Get-FileHash -Algorithm $script:Config.Hash.Algorithm -Path $Path | Select-Object -ExpandProperty Hash
+
+        # Set up the $LogLine with Date, Path, and Hash headers
+        $LogLine = [PSCustomObject]@{ Date = '{0:yyyy-MM-dd hh:mm:ss}' -f $Date; Path = $Path; Hash = $Hash }
+
+        # Hash the $Path file and append it to the $HashPath
+        Export-Csv -NoTypeInformation -Append -Path $HashPath -InputObject $LogLine
     }
 }
 
