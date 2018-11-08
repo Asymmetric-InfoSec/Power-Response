@@ -1,3 +1,91 @@
+function Format-Parameter {
+    param (
+        [String[]]$Arguments,
+        [String]$Location
+    )
+
+    process {
+        # Gather to $Location's $CommandParameters
+        $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
+
+        # If we are passed no $Arguments, assume full $Parameter format check
+        if ($Arguments.Count -eq 0) {
+            $Arguments = $CommandParameters.Keys
+        }
+
+        # Narrow the scope of $Arguments to the $CommandParameters that have a stored value in $Parameters
+        $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem -and $script:Parameters.$PSItem }
+
+        # Foreach $CommandParam listed in $Arguments
+        foreach ($CommandParam in $Arguments) {
+            # Gather the $CommandParameter $ParameterType
+            $ParameterType = $CommandParameters.$CommandParam.ParameterType.FullName
+
+            # Ignore string $ParameterType with an existing string $Parameters.CommandParam value
+            if ($ParameterType -ne $script:Parameters.$CommandParam.GetType().FullName) {
+                # Build the $Command string '[TYPE]($Parameters.VALUE)'
+                $Command = "[{0}]({1})" -f $ParameterType,$script:Parameters.$CommandParam
+                try {
+                    # Try to interpret the $Command expression and store it back to $Parameters.$CommandParam
+                    $script:Parameters.$CommandParam = Invoke-Expression -Command $Command
+                } catch {
+                    # Failed to interpret the $Command expression, determine if it was a casting or expression issue
+                    if ($Error[0] -and $Error[0].FullyQualifiedErrorId -eq 'ConvertToFinalInvalidCastException') {
+                        $Warning = "Cannot convert parameter '{0}' of value '{1}' to type '{2}'" -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
+                    } else {
+                        $Warning = "Cannot interpret parameter '{0}' of value '{1}' as a valid PowerShell expression" -f $CommandParam,$script:Parameters.$CommandParam
+                    }
+
+                    # Write an appropriate $Warning
+                    Write-Warning $Warning
+
+                    # remove the $CommandParam key from $Parameters
+                    $script:Parameters.Remove($CommandParam) | Out-Null
+                }
+            }
+        }
+    }
+}
+
+function Get-Menu {
+    param (
+        [String]$Title,
+        [String[]]$Choice,
+        [Switch]$Back
+    )
+
+    process {
+        # Add the 'Back' option to $Choice
+        if ($Back) {
+            [String[]]$Choice = @('..') + $Choice | Where-Object { $PSItem }
+        }
+
+        # Loop until $UserInput exists and is 0 <= $UserInput <= $Choice.Length-1
+        do {
+            # Print Title
+            Write-Host ("`n  {0}:" -f $Title)
+
+            # Loop through the $Choice array and print off each line
+            for ($i=0; $i -lt $Choice.Length; $i++) {
+                # Line format: [#] - $Choice[#]
+                $Line = "[{0}] - {1}" -f $i,$Choice[$i]
+
+                Write-Host $Line
+            }
+
+            # Get $UserInput
+            $UserInput = Read-Host 'Enter Choice or Command'
+
+            # Try to interpret the $UserInput as a command
+            if ($UserInput) {
+                Invoke-PRCommand -UserInput $UserInput | Out-Default
+            }
+        } while (!$UserInput -or (0..($Choice.Length-1)) -NotContains $UserInput)
+
+        return $Choice[$UserInput]
+    }
+}
+
 function Import-Config {
     param (
         [String]$Path = ("{0}\Config.psd1" -f $PSScriptRoot),
@@ -176,8 +264,7 @@ function Invoke-HelpCommand {
 }
 
 function Invoke-RemoveCommand {
-    [Alias('Invoke-RMCommand')]
-    [Alias('Invoke-DelCommand')]
+    [Alias('Invoke-ClearCommand')]
     param (
         [String[]]$Arguments,
         [String]$Location
@@ -321,7 +408,7 @@ function Invoke-ShowCommand {
     }
 }
 
-function Invoke-PowerCommand {
+function Invoke-PRCommand {
     param (
         [String]$UserInput,
         [String]$Location
@@ -349,94 +436,6 @@ function Invoke-PowerCommand {
     }
 }
 
-function Format-Parameter {
-    param (
-        [String[]]$Arguments,
-        [String]$Location
-    )
-
-    process {
-        # Gather to $Location's $CommandParameters
-        $CommandParameters = Get-Command $Location | Select-Object -ExpandProperty Parameters
-
-        # If we are passed no $Arguments, assume full $Parameter format check
-        if ($Arguments.Count -eq 0) {
-            $Arguments = $CommandParameters.Keys
-        }
-
-        # Narrow the scope of $Arguments to the $CommandParameters that have a stored value in $Parameters
-        $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem -and $script:Parameters.$PSItem }
-
-        # Foreach $CommandParam listed in $Arguments
-        foreach ($CommandParam in $Arguments) {
-            # Gather the $CommandParameter $ParameterType
-            $ParameterType = $CommandParameters.$CommandParam.ParameterType.FullName
-
-            # Ignore string $ParameterType with an existing string $Parameters.CommandParam value
-            if ($ParameterType -ne $script:Parameters.$CommandParam.GetType().FullName) {
-                # Build the $Command string '[TYPE]($Parameters.VALUE)'
-                $Command = "[{0}]({1})" -f $ParameterType,$script:Parameters.$CommandParam
-                try {
-                    # Try to interpret the $Command expression and store it back to $Parameters.$CommandParam
-                    $script:Parameters.$CommandParam = Invoke-Expression -Command $Command
-                } catch {
-                    # Failed to interpret the $Command expression, determine if it was a casting or expression issue
-                    if ($Error[0] -and $Error[0].FullyQualifiedErrorId -eq 'ConvertToFinalInvalidCastException') {
-                        $Warning = "Cannot convert parameter '{0}' of value '{1}' to type '{2}'" -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
-                    } else {
-                        $Warning = "Cannot interpret parameter '{0}' of value '{1}' as a valid PowerShell expression" -f $CommandParam,$script:Parameters.$CommandParam
-                    }
-
-                    # Write an appropriate $Warning
-                    Write-Warning $Warning
-
-                    # remove the $CommandParam key from $Parameters
-                    $script:Parameters.Remove($CommandParam) | Out-Null
-                }
-            }
-        }
-    }
-}
-
-function Get-Menu {
-    param (
-        [String]$Title,
-        [String[]]$Choice,
-        [Switch]$Back
-    )
-
-    process {
-        # Add the 'Back' option to $Choice
-        if ($Back) {
-            [String[]]$Choice = @('..') + $Choice | Where-Object { $PSItem }
-        }
-
-        # Loop until $UserInput exists and is 0 <= $UserInput <= $Choice.Length-1
-        do {
-            # Print Title
-            Write-Host ("`n  {0}:" -f $Title)
-
-            # Loop through the $Choice array and print off each line
-            for ($i=0; $i -lt $Choice.Length; $i++) {
-                # Line format: [#] - $Choice[#]
-                $Line = "[{0}] - {1}" -f $i,$Choice[$i]
-
-                Write-Host $Line
-            }
-
-            # Get $UserInput
-            $UserInput = Read-Host 'Enter Choice or Command'
-
-            # Try to interpret the $UserInput as a command
-            if ($UserInput) {
-                Invoke-PowerCommand -UserInput $UserInput | Out-Default
-            }
-        } while (!$UserInput -or (0..($Choice.Length-1)) -NotContains $UserInput)
-
-        return $Choice[$UserInput]
-    }
-}
-
 function Power-Response {
     process {
         # $Banner for Power-Response
@@ -454,7 +453,7 @@ Authors: 5ynax | 5k33tz | Valrkey
 
         Write-Host $Banner
 
-        # Get $script:Config from data file
+        # Import $script:Config from data file
         Import-Config
 
         # Save the execution location
@@ -518,7 +517,7 @@ Authors: 5ynax | 5k33tz | Valrkey
 
                     # Interpret $UserInput as a command and pass the $Location
                     if ($UserInput) {
-                        Invoke-PowerCommand -UserInput $UserInput -Location $Location | Out-Default
+                        Invoke-PRCommand -UserInput $UserInput -Location $Location | Out-Default
                     }
                 } while (@('run','back') -NotContains $UserInput)
 
