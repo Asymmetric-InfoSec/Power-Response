@@ -452,13 +452,22 @@ function Out-PRFile {
         # Get UTC $Date
         $Date = (Get-Date).ToUniversalTime()
 
-        # Create the destination $Path: {$script:Config.Path.Output}\{SCRIPT NAME}_{UTC TIMESTAMP}.xml
-        $Path = New-Item -Path ('{0}\{1}_{2:yyyy-MM-dd_hh-mm-ss}.xml' -f $script:Config.Path.Output, $script:Location.BaseName.ToLower(), $Date)
+        # Create the destination $FileName: {$script:Config.Path.Output}\{SCRIPT NAME}_{UTC TIMESTAMP}
+        $FileName = '{0}_{1:yyyy-MM-dd_hh-mm-ss}' -f $script:Location.BaseName.ToLower(), $Date
+
+        # Set up $CSVPath based on $FileName
+        $CSVPath = New-Item -Path ('{0}\{1}.csv' -f $script:Config.Path.Output, $FileName)
+
+        # Set up $XMLPath based on $FileName
+        $XMLPath = New-Item -Path ('{0}\{1}.xml' -f $script:Config.Path.Output, $FileName)
+
+        # Initialize $Paths array containing $CSVPath and $XMLPath
+        $Paths = @($CSVPath, $XMLPath)
 
         # Determine the $HashPath
         $HashPath = '{0}\output-{1}' -f $script:Config.Path.Output,$script:Config.Hash.FileName
 
-        # Initialize $Objects array for Pipeline handling
+        # Initialize $Objects array for pipeline handling
         $Objects = @()
     }
 
@@ -467,20 +476,38 @@ function Out-PRFile {
     }
 
     end {
-        # Export the $InputObject to the $Path
-        Export-CliXml -Path $Path -InputObject $Objects
+        try {
+            # Export the $Objects in CSV format without type information
+            $Objects | Export-Csv -NoTypeInformation -Path $CSVPath
+        } catch {
+            # Caught error exporting $Objects to XML
+            Write-Warning ('Error exporting object as CSV: {0}' -f $PSItem)
 
-        # Make the $Path file Read Only
-        Set-ItemProperty -Path $Path -Name IsReadOnly -Value $true
+            # Remove $CSVPath from $Paths array to prevent future processing
+            $Paths = $Paths | Where-Object { $PSItem -ne $CSVPath }
+        }
 
-        # Hash the $Path file
-        $Hash = Get-FileHash -Algorithm $script:Config.Hash.Algorithm -Path $Path | Select-Object -ExpandProperty Hash
+        try {
+            # Export the $Objects in XML format
+            $Objects | Export-CliXml -Path $XMLPath
+        } catch {
+            # Caught error exporting $Objects to XML
+            Write-Warning ('Error exporting object as XML: {0}' -f $PSItem)
 
-        # Set up the $LogLine with Date, Path, and Hash headers
-        $LogLine = [PSCustomObject]@{ Date = '{0:u}' -f $Date; Path = $Path; Hash = $Hash }
+            # Remove $XMLPath from $Paths array to prevent future processing
+            $Paths = $Paths | Where-Object { $PSItem -ne $XMLPath }
+        }
 
-        # Hash the $Path file and append it to the $HashPath
-        Export-Csv -NoTypeInformation -Append -Path $HashPath -InputObject $LogLine
+        if ($Paths.Count -gt 0) {
+            # Make the $Paths ReadOnly
+            Set-ItemProperty -Path $Paths -Name IsReadOnly -Value $true
+
+            # Hash the $Paths and add the Date attribute
+            $Hash = Get-FileHash -Algorithm $script:Config.Hash.Algorithm -Path $Paths | Add-Member -NotePropertyName 'Date' -NotePropertyValue ('{0:u}' -f $Date) -PassThru | Select-Object -Property 'Date', 'Path', 'Algorithm', 'Hash'
+
+            # Append the $Hash(es) to the $HashPath file
+            $Hash | Export-Csv -NoTypeInformation -Append -Path $HashPath
+        }
     }
 }
 
