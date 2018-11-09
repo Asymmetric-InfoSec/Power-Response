@@ -660,6 +660,7 @@ Authors: 5ynax | 5k33tz | Valrkey
 
                     # Interpret $UserInput as a command and pass the $script:Location
                     if ($UserInput) {
+                        Write-Host 'Executing Plugin, please wait...'
                         Invoke-PRCommand -UserInput $UserInput | Out-Default
                     }
                 } while (@('run','back') -NotContains $UserInput)
