@@ -23,20 +23,23 @@ function Format-Parameter {
             # Ignore string $ParameterType with an existing string $script:Parameters.CommandParam value
             if ($ParameterType -ne $script:Parameters.$CommandParam.GetType().FullName) {
                 # Build the $Command string '[TYPE]($script:Parameters.VALUE)'
-                $Command = "[{0}]({1})" -f $ParameterType,$script:Parameters.$CommandParam
+                $Command = '[{0}]({1})' -f $ParameterType,$script:Parameters.$CommandParam
                 try {
                     # Try to interpret the $Command expression and store it back to $script:Parameters.$CommandParam
                     $script:Parameters.$CommandParam = Invoke-Expression -Command $Command
                 } catch {
                     # Failed to interpret the $Command expression, determine if it was a casting or expression issue
                     if ($Error[0] -and $Error[0].FullyQualifiedErrorId -eq 'ConvertToFinalInvalidCastException') {
-                        $Warning = "Cannot convert parameter '{0}' of value '{1}' to type '{2}'" -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
+                        $Warning = 'Parameter ''{0}'' removed: cannot convert value ''{1}'' to type ''{2}''' -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
                     } else {
-                        $Warning = "Cannot interpret parameter '{0}' of value '{1}' as a valid PowerShell expression" -f $CommandParam,$script:Parameters.$CommandParam
+                        $Warning = 'Parameter ''{0}'' removed: cannot interpret value ''{1}'' as a valid PowerShell expression' -f $CommandParam,$script:Parameters.$CommandParam
                     }
 
                     # Write an appropriate $Warning
                     Write-Warning $Warning
+
+                    # Write an appropriate log
+                    Write-Log -Message $Warning
 
                     # remove the $CommandParam key from $script:Parameters
                     $script:Parameters.Remove($CommandParam) | Out-Null
@@ -67,13 +70,16 @@ function Get-Menu {
             # Loop through the $Choice array and print off each line
             for ($i=0; $i -lt $Choice.Length; $i++) {
                 # Line format: [#] - $Choice[#]
-                $Line = "[{0}] - {1}" -f $i,$Choice[$i]
+                $Line = '[{0}] - {1}' -f $i,$Choice[$i]
 
                 Write-Host $Line
             }
 
+            # Write an extra line for formatting
+            Write-Host ''
+
             # Get $UserInput
-            $UserInput = Read-Host 'Enter Choice or Command'
+            $UserInput = Read-PRHost
 
             # Try to interpret the $UserInput as a command
             if ($UserInput) {
@@ -88,7 +94,7 @@ function Get-Menu {
 function Import-Config {
     param (
         [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
-        [String[]]$RootKeys = @('Path', 'Hash', 'UserName')
+        [String[]]$RootKeys = @('HashAlgorithm', 'PromptText', 'Path', 'UserName')
     )
 
     process {
@@ -96,17 +102,16 @@ function Import-Config {
 
         # Default 'Config' values
         $Default = @{
+            # SHA256
+            HashAlgorithm = 'SHA256'
+            PromptText = 'power-response'
+
             # C:\Path\To\Power-Response\{FolderName}
             Path = @{
                Bin = '{0}\Bin' -f $PSScriptRoot
                Logs = '{0}\Logs' -f $PSScriptRoot
                Output = '{0}\Output' -f $PSScriptRoot
                Plugins = '{0}\Plugins' -f $PSScriptRoot
-            }
-
-            Hash = @{
-                Algorithm = 'SHA256'
-                FileName = 'hashes.csv'
             }
 
             # Executing UserName
@@ -126,10 +131,10 @@ function Import-Config {
             $File = Get-Item -Path $Path
 
             # Import the Config data file and bind it to the $script:Config variable
-            Import-LocalizedData -BindingVariable Config -BaseDirectory $File.PSParentPath -FileName $File.Name -ErrorAction Stop
+            Import-LocalizedData -BindingVariable script:Config -BaseDirectory $File.PSParentPath -FileName $File.Name -ErrorAction Stop
         } catch {
             # Either intentionally threw an error on file absense, or Import-LocalizedData failed
-            Write-Verbose ("Unable to import config on 'Path': '{0}'" -f $Path)
+            Write-Verbose ('Unable to import config on ''Path'': ''{0}''' -f $Path)
             $script:Config = $Default
         }
 
@@ -140,21 +145,24 @@ function Import-Config {
 
             # If we found unexpected keys, print a warning message
             if ($UnexpectedRootKeys) {
-                Write-Warning ("Discovered unexpected keys in config file '{0}':" -f $Path)
-                Write-Warning ("    '{0}'" -f ($UnexpectedRootKeys -Join ', '))
-                Write-Warning  "Removing these values from the Config hashtable"
+                Write-Warning ('Discovered unexpected keys in config file ''{0}'':' -f $Path)
+                Write-Warning ('    ''{0}''' -f ($UnexpectedRootKeys -Join ''', '''))
+                Write-Warning  'Removing these values from the Config hashtable'
 
                 # Remove any detected unexpected keys from $script:Config
-                $UnexpectedRootKeys | % { $script:Config.Remove($PSItem) }
+                $UnexpectedRootKeys | % { $script:Config.Remove($PSItem) | Out-Null }
             }
         }
 
         # If no value is provided in the config file, set the default values
+        if (!$script:Config.HashAlgorithm) {
+            $script:Config.HashAlgorithm = $Default.HashAlgorithm
+        }
+        if (!$script:Config.PromptText) {
+            $script:Config.PromptText = $Default.PromptText
+        }
         if (!$script:Config.Path) {
             $script:Config.Path = $Default.Path
-        }
-        if (!$script:Config.Hash) {
-            $script:Config.Hash = $Default.Hash
         }
         if (!$script:Config.UserName) {
             $script:Config.UserName = $Default.UserName
@@ -173,35 +181,32 @@ function Import-Config {
             $script:Config.Path.Plugins = $Default.Path.Plugins
         }
 
-        if (!$script:Config.Hash.Algorithm) {
-            $script:Config.Hash.Algorithm = $Default.Hash.Algorithm
-        }
-        if (!$script:Config.Hash.FileName) {
-            $script:Config.Hash.FileName = $Default.Hash.FileName
-        }
-
         if (!$script:Config.UserName.Windows) {
             $script:Config.UserName.Windows = $Default.UserName.Windows
         }
 
         # Check for required $script:Config value existence (sanity check - should never fail with default values)
-        if (!$script:Config.Path -or !$script:Config.UserName -or !$script:Config.Path.Bin -or !$script:Config.Path.Logs -or !$script:Config.Path.Output -or !$script:Config.Path.Plugins -or !$script:Config.Hash.Algorithm -or !$script:Config.Hash.FileName -or !$script:Config.UserName.Windows) {
-            throw "Missing required configuration value"
+        if (!$script:Config.HashAlgorithm -or !$script:Config.Path -or !$script:Config.UserName -or !$script:Config.Path.Bin -or !$script:Config.Path.Logs -or !$script:Config.Path.Output -or !$script:Config.Path.Plugins -or !$script:Config.UserName.Windows) {
+            throw 'Missing required configuration value'
         }
 
-        # Ensure all $script:Config.Path directory values exist
-        foreach ($DirPath in $script:Config.Path.Values) {
+        # Loop through $DirPath
+        $script:Regex = @{}
+        foreach ($DirPath in $script:Config.Path.GetEnumerator()) {
             # If the $DirPath doesn't exist, create it and get rid of the output
-            if (!(Test-Path $DirPath)) {
-                New-Item -Path $DirPath -ItemType Directory | Out-Null
+            if (!(Test-Path $DirPath.Key)) {
+                New-Item -Path $DirPath.Key -ItemType Directory | Out-Null
             }
+
+            # Store each path as a regular expressions for string replacing later
+            $script:Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}$' -f $DirPath.Key))
         }
 
         # Gather credentials for non-sessioned $UserName
-        $script:Config.Credential = @{}
+        $script:Credential = @{}
         foreach ($UserName in $script:Config.UserName.GetEnumerator()) {
             if ($UserName.Value -ne $ENV:UserName) {
-                $script:Config.Credential.($UserName.Key) = Get-Credential -UserName $UserName.Value -Message ("Please enter {0} credentials" -f $UserName.Key)
+                $script:Credential.($UserName.Key) = Get-Credential -UserName $UserName.Value -Message ('Please enter {0} credentials' -f $UserName.Key)
             }
         }
     }
@@ -297,6 +302,9 @@ function Invoke-RemoveCommand {
         if ($Arguments.Count -ne 0) {
             # Remove $Arguments from $script:Parameters
             $Arguments | Foreach-Object { $script:Parameters.Remove($PSItem) | Out-Null }
+
+            # Write parameter removal log
+            Write-Log ('Removed Parameter(s): ''{0}''' -f ($Arguments -Join ''', '''))
         }
 
         # Show the new parameter list
@@ -321,14 +329,23 @@ function Invoke-RunCommand {
             # Parse the $ReleventParameters from $script:Parameters
             $script:Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
+            # Write execution log
+            Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
+
             try {
                 # Execute the $script:Location with the $ReleventParameters
-                & $script:Location.FullName @ReleventParameters
+                & $script:Location.FullName @ReleventParameters | Out-PRFile
+
+                # Write execution success log
+                Write-Log -Message 'Plugin execution succeeded'
             } catch {
-                Write-Warning ('Command execution error: {0}' -f $PSItem)
+                Write-Warning ('Plugin execution error: {0}' -f $PSItem)
+
+                # Write execution error log
+                Write-Log -Message ('Plugin execution error: {0}' -f $PSItem)
             }
         } else {
-            Write-Warning 'No file selected for execution'
+            Write-Warning 'No plugin selected for execution'
         }
     }
 }
@@ -352,6 +369,9 @@ function Invoke-SetCommand {
         if ($script:Parameters.($Arguments[0]) -eq '') {
             return Invoke-RemoveCommand -Arguments $Arguments
         }
+
+        # Write a set parameter log
+        Write-Log -Message ('Set Parameter: ''{0}'' = ''{1}''' -f $Arguments[0], $script:Parameters.($Arguments[0]))
 
         # If we have a file $script:Location, format the $script:Parameters
         if (!$script:Location.PSIsContainer) {
@@ -404,7 +424,7 @@ function Invoke-ShowCommand {
 
         if ($CommandParameters.Count -gt 0) {
             # Set $Param.[Type]$Key to the $script:Parameters.$Key value
-            $Arguments | Sort-Object | Foreach-Object { $Param.("[{0}]{1}" -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$script:Parameters.$PSItem }
+            $Arguments | Sort-Object | Foreach-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$script:Parameters.$PSItem }
         } else {
             # Set $Param.$Key to the $script:Parameters.$Key value
             $Arguments | Sort-Object | Foreach-Object { $Param.$PSItem=$script:Parameters.$PSItem }
@@ -434,10 +454,10 @@ function Invoke-PRCommand {
 
         # Try to execute function corresponding to command passed
         try {
-            & ("Invoke-{0}Command" -f $Keyword) -Arguments $Arguments
+            & ('Invoke-{0}Command' -f $Keyword) -Arguments $Arguments
         } catch {
             # Didn't understand keyword specified, write warning to screen
-            Write-Warning ("Unknown Command '{0}', 'help' prints a list of available commands" -f $Keyword)
+            Write-Warning ('Unknown Command ''{0}'', ''help'' prints a list of available commands' -f $Keyword)
         }
     }
 }
@@ -452,20 +472,17 @@ function Out-PRFile {
         # Get UTC $Date
         $Date = (Get-Date).ToUniversalTime()
 
-        # Create the destination $FileName: {UTC TIMESTAMP}_{PLUGIN}
-        $FileName = '{0:yyyy-MM-dd_hh-mm-ss}_{1}' -f $Date, $script:Location.BaseName.ToLower()
+        # Create the destination file $BaseName: {UTC TIMESTAMP}_{PLUGIN}
+        $BaseName = '{0:yyyy-MM-dd_hh-mm-ss}_{1}' -f $Date, $script:Location.BaseName.ToLower()
 
         # Set up $CSVPath based on $FileName
-        $CSVPath = New-Item -Path ('{0}\{1}.csv' -f $script:Config.Path.Output, $FileName)
+        $CSVPath = New-Item -Path ('{0}\{1}.csv' -f $script:Config.Path.Output, $BaseName)
 
         # Set up $XMLPath based on $FileName
-        $XMLPath = New-Item -Path ('{0}\{1}.xml' -f $script:Config.Path.Output, $FileName)
+        $XMLPath = New-Item -Path ('{0}\{1}.xml' -f $script:Config.Path.Output, $BaseName)
 
         # Initialize $Paths array containing $CSVPath and $XMLPath
         $Paths = @($CSVPath, $XMLPath)
-
-        # Determine the $HashPath
-        $HashPath = '{0}\output-{1}' -f $script:Config.Path.Output,$script:Config.Hash.FileName
 
         # Initialize $Objects array for pipeline handling
         $Objects = @()
@@ -481,7 +498,10 @@ function Out-PRFile {
             $Objects | Export-Csv -NoTypeInformation -Path $CSVPath
         } catch {
             # Caught error exporting $Objects to XML
-            Write-Warning ('Error exporting object as CSV: {0}' -f $PSItem)
+            Write-Warning ('CSV output export error: {0}' -f $PSItem)
+
+            # Write output object export error log
+            Write-Log -Message ('CSV output export error: {0}' -f $PSItem)
 
             # Remove $CSVPath from $Paths array to prevent future processing
             $Paths = $Paths | Where-Object { $PSItem -ne $CSVPath }
@@ -492,7 +512,10 @@ function Out-PRFile {
             $Objects | Export-CliXml -Path $XMLPath
         } catch {
             # Caught error exporting $Objects to XML
-            Write-Warning ('Error exporting object as XML: {0}' -f $PSItem)
+            Write-Warning ('XML output export error: {0}' -f $PSItem)
+
+            # Write output object export error log
+            Write-Log -Message ('XML output export error: {0}' -f $PSItem)
 
             # Remove $XMLPath from $Paths array to prevent future processing
             $Paths = $Paths | Where-Object { $PSItem -ne $XMLPath }
@@ -502,12 +525,54 @@ function Out-PRFile {
             # Make the $Paths ReadOnly
             Set-ItemProperty -Path $Paths -Name IsReadOnly -Value $true
 
-            # Hash the $Paths and add the Date attribute
-            $Hash = Get-FileHash -Algorithm $script:Config.Hash.Algorithm -Path $Paths | Add-Member -NotePropertyName 'Date' -NotePropertyValue ('{0:u}' -f $Date) -PassThru | Select-Object -Property 'Date', 'Path', 'Algorithm', 'Hash'
-
-            # Append the $Hash(es) to the $HashPath file
-            $Hash | Export-Csv -NoTypeInformation -Append -Path $HashPath
+            # Write the new output file log with Hash for each entity in $Paths
+            Get-FileHash -Algorithm $script:Config.HashAlgorithm -Path $Paths | Foreach-Object { Write-Log -Message ('Created output file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $script:Regex.Output), $PSItem.Algorithm, $PSItem.Hash) }
         }
+    }
+}
+
+function Read-PRHost {
+    process {
+        # Set up $Prompt text
+        $Prompt = '{0}> ' -f $script:Config.PromptText
+
+        # Write the $Prompt to the host
+        Write-Host $Prompt -NoNewLine
+
+        # Return the line entered by the user
+        return $Host.UI.ReadLine()
+    }
+}
+
+function Write-Log {
+    param (
+        [Parameter(Mandatory=$true)]
+        [String]$Message
+    )
+
+    process {
+        # Get UTC $Date
+        $Date = (Get-Date).ToUniversalTime()
+
+        # Build the $LogPath
+        $LogPath = '{0}\{1:yyyy-MM-dd}.csv' -f $script:Config.Path.Logs, $Date
+
+        # Determine Plugin or Menu context
+        if (!$script:Location -or $script:Location.PSIsContainer) {
+            $Context = 'Menu'
+        } else {
+            $Context = $script:Location.FullName -Replace $script:Regex.Plugins
+        }
+
+        # Build $LogLine
+        $LogLine = [PSCustomObject]@{
+            Date = '{0:u}' -f $Date
+            UserName = $ENV:UserName
+            Context = $Context
+            Message = $Message
+        }
+
+        $LogLine | Export-Csv -NoTypeInformation -Append -Path $LogPath
     }
 }
 
@@ -530,6 +595,9 @@ Authors: 5ynax | 5k33tz | Valrkey
 
         # Import $script:Config from data file
         Import-Config
+
+        # Write a log to indicate framework startup
+        Write-Log -Message 'Began the Power-Response framework'
 
         # Save the execution location
         $SavedLocation = Get-Location
@@ -560,7 +628,7 @@ Authors: 5ynax | 5k33tz | Valrkey
                 # While the $script:Location is a directory
                 while ($script:Location.PSIsContainer) {
                     # Compute $Title - Power-Response\CurrentPath
-                    $Title = 'Power-Response' + ($script:Location.FullName -Replace ('^' + [Regex]::Escape($PSScriptRoot)))
+                    $Title = $script:Location.FullName -Replace $script:Regex.Plugins
 
                     # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
                     $Choice = Get-ChildItem -Path $script:Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
@@ -573,7 +641,7 @@ Authors: 5ynax | 5k33tz | Valrkey
 
                     # Get the selected $script:Location item
                     try {
-                        $script:Location = Get-Item ("{0}\{1}" -f $script:Location.FullName,$Selection) -ErrorAction Stop
+                        $script:Location = Get-Item ('{0}\{1}' -f $script:Location.FullName,$Selection) -ErrorAction Stop
                     } catch {
                         Write-Warning 'Something went wrong, please try again'
                     }
@@ -588,7 +656,7 @@ Authors: 5ynax | 5k33tz | Valrkey
                 # Until the user specifies to 'run' the program or go 'back', interpret $UserInput as commands
                 do {
                     # Get $UserInput
-                    $UserInput = Read-Host 'Enter Command'
+                    $UserInput = Read-PRHost
 
                     # Interpret $UserInput as a command and pass the $script:Location
                     if ($UserInput) {
@@ -602,6 +670,9 @@ Authors: 5ynax | 5k33tz | Valrkey
         } finally {
             # Set location back to original $SavedLocation
             Set-Location -Path $SavedLocation
+
+            # Write a log to indicate framework exit
+            Write-Log -Message 'Exited the Power-Response framework'
 
             Write-Host "`nExiting..."
         }
