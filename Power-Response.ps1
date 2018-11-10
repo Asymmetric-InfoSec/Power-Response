@@ -473,7 +473,7 @@ function Out-PRFile {
         $Date = (Get-Date).ToUniversalTime()
 
         # Create the destination file $BaseName: {UTC TIMESTAMP}_{PLUGIN}
-        $BaseName = '{0:yyyy-MM-dd_HH-mm-ss}_{1}' -f $Date, $script:Location.BaseName.ToLower()
+        $BaseName = '{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}' -f $Date, $script:Location.BaseName.ToLower()
 
         # Set up $CSVPath based on $FileName
         $CSVPath = New-Item -Path ('{0}\{1}.csv' -f $script:Config.Path.Output, $BaseName)
