@@ -20,8 +20,11 @@ function Format-Parameter {
             # Gather the $CommandParameter $ParameterType
             $ParameterType = $CommandParameters.$CommandParam.ParameterType.FullName
 
+            # Gather the $script:Parameters.$CommandParameter $ValueType
+            $ValueType = $script:Parameters.$CommandParam.GetType().FullName
+
             # Ignore string $ParameterType with an existing string $script:Parameters.CommandParam value
-            if ($ParameterType -ne $script:Parameters.$CommandParam.GetType().FullName) {
+            if ($ParameterType -ne $ValueType -and !($ParameterType -Match '\[\]$' -and $ValueType -eq 'System.Object[]')) {
                 # Build the $Command string '[TYPE]($script:Parameters.VALUE)'
                 $Command = '[{0}]({1})' -f $ParameterType,$script:Parameters.$CommandParam
                 try {
