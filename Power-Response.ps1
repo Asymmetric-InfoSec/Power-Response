@@ -20,18 +20,17 @@ function Format-Parameter {
             # Gather the $CommandParameter $ParameterType
             $ParameterType = $CommandParameters.$CommandParam.ParameterType.FullName
 
-            # Build the $Command string '[TYPE]($script:Parameters.VALUE)'
-            $Command = '[{0}]({1})' -f $ParameterType,$script:Parameters.$CommandParam
-            
-            # Build the $ParamTypeRegex to detect matching object types including arrays
-            $ParamTypeRegex = '{0}(\[\])?' -f $script:Parameters.$CommandParam.GetType().FullName
-            
-            try {
-                # Try to interpret the $Command expression and store it back to $script:Parameters.$CommandParam
-                $script:Parameters.$CommandParam = Invoke-Expression -Command $Command
-            } catch {
-                # Ignore $ParameterType that matches the type for $script:Parameters.CommandParam 's value
-                if ($ParameterType -NotMatch $ParamTypeRegex) {
+            # Gather the $script:Parameters.$CommandParameter $ValueType
+            $ValueType = $script:Parameters.$CommandParam.GetType().FullName
+
+            # Ignore string $ParameterType with an existing string $script:Parameters.CommandParam value
+            if ($ParameterType -ne $ValueType -and !($ParameterType -Match '\[\]$' -and $ValueType -eq 'System.Object[]')) {
+                # Build the $Command string '[TYPE]($script:Parameters.VALUE)'
+                $Command = '[{0}]({1})' -f $ParameterType,$script:Parameters.$CommandParam
+                try {
+                    # Try to interpret the $Command expression and store it back to $script:Parameters.$CommandParam
+                    $script:Parameters.$CommandParam = Invoke-Expression -Command $Command
+                } catch {
                     # Failed to interpret the $Command expression, determine if it was a casting or expression issue
                     if ($Error[0] -and $Error[0].FullyQualifiedErrorId -eq 'ConvertToFinalInvalidCastException') {
                         $Warning = 'Parameter ''{0}'' removed: cannot convert value ''{1}'' to type ''{2}''' -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
