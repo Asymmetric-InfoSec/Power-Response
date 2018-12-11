@@ -97,7 +97,7 @@ function Get-Menu {
 function Import-Config {
     param (
         [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
-        [String[]]$RootKeys = @('HashAlgorithm', 'PromptText', 'Path', 'UserName')
+        [String[]]$RootKeys = @('HashAlgorithm', 'OutputType', 'PromptText', 'Path', 'UserName')
     )
 
     process {
@@ -105,8 +105,8 @@ function Import-Config {
 
         # Default 'Config' values
         $Default = @{
-            # SHA256
             HashAlgorithm = 'SHA256'
+            OutputType = @('XML','CSV')
             PromptText = 'power-response'
 
             # C:\Path\To\Power-Response\{FolderName}
@@ -160,6 +160,9 @@ function Import-Config {
         # If no value is provided in the config file, set the default values
         if (!$script:Config.HashAlgorithm) {
             $script:Config.HashAlgorithm = $Default.HashAlgorithm
+        }
+        if (!$script:Config.OutputType) {
+            $script:Config.OutputType = $Default.OutputType
         }
         if (!$script:Config.PromptText) {
             $script:Config.PromptText = $Default.PromptText
@@ -332,12 +335,18 @@ function Invoke-RunCommand {
             # Parse the $ReleventParameters from $script:Parameters
             $script:Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
+            # Initialize $OutputParameters Hashtable
+            $OutputParameters = @{}
+
+            # Parse the $OutputParameters from $script:Parameters
+            $script:Parameters.GetEnumerator() | Where-Object { @('OutputType') -Contains $PSItem.Key } | Foreach-Object { $OutputParameters.($PSItem.Key) = $PSItem.Value }
+
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
             try {
                 # Execute the $script:Location with the $ReleventParameters
-                & $script:Location.FullName @ReleventParameters | Out-PRFile
+                & $script:Location.FullName @ReleventParameters | Out-PRFile @OutputParameters
 
                 # Write execution success log
                 Write-Log -Message 'Plugin execution succeeded'
@@ -480,7 +489,10 @@ function Invoke-PRCommand {
 function Out-PRFile {
     param (
         [Parameter(ValueFromPipeline=$true)]
-        [PSObject]$InputObject
+        [PSObject]$InputObject,
+
+        [ValidateSet('CSV','XML')]
+        [String[]]$OutputType = $script:Config.OutputType
     )
 
     begin {
@@ -490,14 +502,8 @@ function Out-PRFile {
         # Create the destination file $BaseName: {UTC TIMESTAMP}_{PLUGIN}
         $BaseName = '{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}' -f $Date, $script:Location.BaseName.ToLower()
 
-        # Set up $CSVPath based on $FileName
-        $CSVPath = New-Item -Path ('{0}\{1}.csv' -f $script:Config.Path.Output, $BaseName)
-
-        # Set up $XMLPath based on $FileName
-        $XMLPath = New-Item -Path ('{0}\{1}.xml' -f $script:Config.Path.Output, $BaseName)
-
-        # Initialize $Paths array containing $CSVPath and $XMLPath
-        $Paths = @($CSVPath, $XMLPath)
+        # Set up $Path based on $BaseName and $OutputType
+        $Path = '{0}\{1}' -f $script:Config.Path.Output, $BaseName
 
         # Initialize $Objects array for pipeline handling
         $Objects = @()
@@ -510,45 +516,38 @@ function Out-PRFile {
     end {
         if ($Objects.Count -eq 0) {
             # Return early if there is no output data
-            Remove-Item -Path $Paths -Force
             return
         }
 
         try {
-            # Export the $Objects in CSV format without type information
-            $Objects | Export-Csv -NoTypeInformation -Path $CSVPath
+            # Initialize $Paths to empty array
+            $Paths = @()
+
+            # Export the $Objects into specified format
+            switch($OutputType) {
+                'CSV' { $Objects | Export-Csv -NoTypeInformation -Path ('{0}.{1}' -f $Path, $PSItem.ToLower()); $Paths += ('{0}.{1}' -f $Path, $PSItem.ToLower()) }
+                'XML' { $Objects | Export-CliXml -Path ('{0}.{1}' -f $Path, $PSItem.ToLower()); $Paths += ('{0}.{1}' -f $Path, $PSItem.ToLower()) }
+                default { Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType); exit }
+            }
         } catch {
-            # Caught error exporting $Objects to XML
-            Write-Warning ('CSV output export error: {0}' -f $PSItem)
+            # Caught error exporting $Objects
+            Write-Warning ('{0} output export error: {1}' -f ($OutputType -Join ','), $PSItem)
 
             # Write output object export error log
-            Write-Log -Message ('CSV output export error: {0}' -f $PSItem)
+            Write-Log -Message ('{0} output export error: {1}' -f ($OutputType -Join ','), $PSItem)
 
-            # Remove $CSVPath from $Paths array to prevent future processing
-            $Paths = $Paths | Where-Object { $PSItem -ne $CSVPath }
+            # Remove the created $Path file
+            Remove-Item -Force -Path $Path
+
+            # Return early on error
+            return
         }
 
-        try {
-            # Export the $Objects in XML format
-            $Objects | Export-CliXml -Path $XMLPath
-        } catch {
-            # Caught error exporting $Objects to XML
-            Write-Warning ('XML output export error: {0}' -f $PSItem)
+        # Make the $Paths ReadOnly
+        Set-ItemProperty -Path $Paths -Name 'IsReadOnly' -Value $true
 
-            # Write output object export error log
-            Write-Log -Message ('XML output export error: {0}' -f $PSItem)
-
-            # Remove $XMLPath from $Paths array to prevent future processing
-            $Paths = $Paths | Where-Object { $PSItem -ne $XMLPath }
-        }
-
-        if ($Paths.Count -gt 0) {
-            # Make the $Paths ReadOnly
-            Set-ItemProperty -Path $Paths -Name IsReadOnly -Value $true
-
-            # Write the new output file log with Hash for each entity in $Paths
-            Get-FileHash -Algorithm $script:Config.HashAlgorithm -Path $Paths | Foreach-Object { Write-Log -Message ('Created output file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $script:Regex.Output), $PSItem.Algorithm, $PSItem.Hash) }
-        }
+        # Write the new output file log with Hash for each entity in $Paths
+        Get-FileHash -Algorithm $script:Config.HashAlgorithm -Path $Paths | Foreach-Object { Write-Log -Message ('Created output file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $script:Regex.Output), $PSItem.Algorithm, $PSItem.Hash) }
     }
 }
 
@@ -640,7 +639,7 @@ Authors: 5ynax | 5k33tz | Valrkey
         }
 
         # Initialize tracked $script:Parameters to $script:Config data
-        $script:Parameters = @{}
+        $script:Parameters = @{ OutputType = $script:Config.OutputType }
 
         # Trap 'exit's and Ctrl-C interrupts
         try {
