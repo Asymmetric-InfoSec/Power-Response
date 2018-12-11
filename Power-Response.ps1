@@ -106,7 +106,7 @@ function Import-Config {
         # Default 'Config' values
         $Default = @{
             HashAlgorithm = 'SHA256'
-            OutputType = 'XML'
+            OutputType = @('XML','CSV')
             PromptText = 'power-response'
 
             # C:\Path\To\Power-Response\{FolderName}
@@ -480,7 +480,7 @@ function Out-PRFile {
         [PSObject]$InputObject,
 
         [ValidateSet('CSV','XML')]
-        [String]$OutputType = $script:Config.OutputType
+        [String[]]$OutputType = $script:Config.OutputType
     )
 
     begin {
@@ -491,7 +491,7 @@ function Out-PRFile {
         $BaseName = '{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}' -f $Date, $script:Location.BaseName.ToLower()
 
         # Set up $Path based on $BaseName and $OutputType
-        $Path = '{0}\{1}.{2}' -f $script:Config.Path.Output, $BaseName, $OutputType.ToLower()
+        $Path = '{0}\{1}' -f $script:Config.Path.Output, $BaseName
 
         # Initialize $Objects array for pipeline handling
         $Objects = @()
@@ -508,18 +508,21 @@ function Out-PRFile {
         }
 
         try {
+            # Initialize $Paths to empty array
+            $Paths = @()
+
             # Export the $Objects into specified format
             switch($OutputType) {
-                'CSV' { $Objects | Export-Csv -NoTypeInformation -Path $Path }
-                'XML' { $Objects | Export-CliXml -Path $Path }
+                'CSV' { $Objects | Export-Csv -NoTypeInformation -Path ('{0}.{1}' -f $Path, $PSItem.ToLower()); $Paths += ('{0}.{1}' -f $Path, $PSItem.ToLower()) }
+                'XML' { $Objects | Export-CliXml -Path ('{0}.{1}' -f $Path, $PSItem.ToLower()); $Paths += ('{0}.{1}' -f $Path, $PSItem.ToLower()) }
                 default { Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType); exit }
             }
         } catch {
             # Caught error exporting $Objects
-            Write-Warning ('{0} output export error: {1}' -f $OutputType, $PSItem)
+            Write-Warning ('{0} output export error: {1}' -f ($OutputType -Join ','), $PSItem)
 
             # Write output object export error log
-            Write-Log -Message ('{0} output export error: {1}' -f $OutputType, $PSItem)
+            Write-Log -Message ('{0} output export error: {1}' -f ($OutputType -Join ','), $PSItem)
 
             # Remove the created $Path file
             Remove-Item -Force -Path $Path
@@ -529,10 +532,10 @@ function Out-PRFile {
         }
 
         # Make the $Paths ReadOnly
-        Set-ItemProperty -Path $Path -Name 'IsReadOnly' -Value $true
+        Set-ItemProperty -Path $Paths -Name 'IsReadOnly' -Value $true
 
         # Write the new output file log with Hash for each entity in $Paths
-        Get-FileHash -Algorithm $script:Config.HashAlgorithm -Path $Path | Foreach-Object { Write-Log -Message ('Created output file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $script:Regex.Output), $PSItem.Algorithm, $PSItem.Hash) }
+        Get-FileHash -Algorithm $script:Config.HashAlgorithm -Path $Paths | Foreach-Object { Write-Log -Message ('Created output file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $script:Regex.Output), $PSItem.Algorithm, $PSItem.Hash) }
     }
 }
 
