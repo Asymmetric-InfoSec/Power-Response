@@ -445,7 +445,8 @@ function Invoke-ShowCommand {
 
         # Initialize empty $Param(eter) return HashTable
         $Param = @{}
-            #For plugins with no parameters, write-host to run plugin
+        
+        #For plugins with no parameters, write-host to run plugin
         if ($CommandParameters.Count -eq 0 -and !$script:Location.PSIsContainer) {
             Write-Host "`r`nNo parameters detected. Type run to execute plugin."
         }
