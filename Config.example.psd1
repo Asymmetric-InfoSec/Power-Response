@@ -1,10 +1,12 @@
 @{
-    # ---------- Begin General Section ----------
+    # --------- Begin General Section --------
     #   HashAlgorithm - Hash algorithm to use for file integrity log (defaults to SHA256)
+    #   OutputType - Default output type for plugins (defaults to XML)
     #   PromptText - Text to show with your prompt (defaults to power-response)
     # HashAlgorithm = 'SHA256'
+    # OutputType = 'XML'
     # PromptText = 'power-response'
-    # ---------- End General Section ----------
+    # --------- End General Section ----------
 
     # ---------- Begin Path Section ----------
     #   Bin - Location of the binary distribution folder (defaults to $PSScriptRoot\Bin)
@@ -24,4 +26,5 @@
     UserName = @{
         # Windows = $ENV:UserName
     }
+    # ---------- End Authentication Section ----------
 }
