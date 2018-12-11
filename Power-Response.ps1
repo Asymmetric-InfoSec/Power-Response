@@ -496,6 +496,12 @@ function Out-PRFile {
     }
 
     end {
+        if ($Objects.Count -eq 0) {
+            # Return early if there is no output data
+            Remove-Item -Path $Paths -Force
+            return
+        }
+
         try {
             # Export the $Objects in CSV format without type information
             $Objects | Export-Csv -NoTypeInformation -Path $CSVPath
