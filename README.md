@@ -1,4 +1,4 @@
-![alt text](https://github.com/Asymmetric-InfoSec/Power-Response/blob/master/PR-Extras/Power-Response.GIF "Sweet Power-Response Logo")
+![alt text](https://github.com/Asymmetric-InfoSec/Power-Response/blob/master/Extras/PR_Logo.PNG "Sweet Power-Response Logo")
 ________________________________________________________________________________________________
 
 A modular PowerShell Framework for Incident Response
