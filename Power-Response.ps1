@@ -445,8 +445,11 @@ function Invoke-ShowCommand {
 
         # Initialize empty $Param(eter) return HashTable
         $Param = @{}
-
-        if ($CommandParameters.Count -gt 0) {
+            #For plugins with no parameters, write-host to run plugin
+        if ($CommandParameters.Count -eq 0 -and !$script:Location.PSIsContainer) {
+            Write-Host "`r`nNo parameters detected. Type run to execute plugin."
+        }
+        elseif ($CommandParameters.Count -gt 0) {
             # Set $Param.[Type]$Key to the $script:Parameters.$Key value
             $Arguments | Sort-Object | Foreach-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$script:Parameters.$PSItem }
         } else {
