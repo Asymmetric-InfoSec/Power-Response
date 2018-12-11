@@ -251,12 +251,13 @@ function Invoke-HelpCommand {
             @{ Name='run'; Usage='run'; Description='runs the selected script with parameters set in environment' },
             @{ Name='set'; Usage='set <parameter> [value]'; Description='sets a parameter to a value' },
             @{ Name='show'; Usage='show [parameters...]'; Description='shows a list of all or specified parameters and values' }
+            @{ Name='clear'; Usage='clear'; Description='clears the screen of clutter while running plugins' }
         ) | Foreach-Object { [PSCustomObject]$PSItem }
 
         # If $script:Location is a directory
         if ($script:Location.PSIsContainer) {
-            # Don't show 'back' or 'run' as command options
-            $Commands = $Commands | Where-Object { @('back','run') -NotContains $PSItem.Name }
+            # Don't show 'back' or 'run' or 'clear' as command options
+            $Commands = $Commands | Where-Object { @('back','run', 'clear') -NotContains $PSItem.Name }
         }
 
         # Filter $Arguments to remove invalid $Commands.Name
@@ -283,7 +284,6 @@ function Invoke-HelpCommand {
 }
 
 function Invoke-RemoveCommand {
-    [Alias('Invoke-ClearCommand')]
     param (
         [String[]]$Arguments
     )
@@ -351,6 +351,18 @@ function Invoke-RunCommand {
             Write-Warning 'No plugin selected for execution'
         }
     }
+}
+
+function Invoke-ClearCommand {
+   param (
+        [String[]]$Arguments
+    )
+
+    process {
+        
+        [System.Console]::Clear()
+    }
+
 }
 
 function Invoke-SetCommand {
@@ -675,6 +687,9 @@ Authors: 5ynax | 5k33tz | Valrkey
                         Invoke-PRCommand -UserInput $UserInput | Out-Default
                     }
                 } while (@('run','back') -NotContains $UserInput)
+
+                #Clears the screen after a run or back command is executed
+                Invoke-ClearCommand
 
                 # Set $script:Location to the previous directory
                 $script:Location = Get-Item -Path ($script:Location.FullName -Replace ('\\[^\\]+$'))
