@@ -260,7 +260,7 @@ function Invoke-HelpCommand {
         # If $script:Location is a directory
         if ($script:Location.PSIsContainer) {
             # Don't show 'back' or 'run' or 'clear' as command options
-            $Commands = $Commands | Where-Object { @('back','run', 'clear') -NotContains $PSItem.Name }
+            $Commands = $Commands | Where-Object { @('back','run') -NotContains $PSItem.Name }
         }
 
         # Filter $Arguments to remove invalid $Commands.Name
@@ -363,6 +363,7 @@ function Invoke-RunCommand {
 }
 
 function Invoke-ClearCommand {
+    [alias("Invoke-CLSCommand")]
    param (
         [String[]]$Arguments
     )
