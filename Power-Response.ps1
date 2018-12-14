@@ -33,9 +33,9 @@ function Format-Parameter {
                 } catch {
                     # Failed to interpret the $Command expression, determine if it was a casting or expression issue
                     if ($Error[0] -and $Error[0].FullyQualifiedErrorId -eq 'ConvertToFinalInvalidCastException') {
-                        $Warning = 'Parameter ''{0}'' removed: cannot convert value ''{1}'' to type ''{2}''' -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
+                        $Warning = 'Parameter ''{0}'' removed: cannot convert value ''{1}'' to type ''{2}''. Have you tried using quotes?' -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
                     } else {
-                        $Warning = 'Parameter ''{0}'' removed: cannot interpret value ''{1}'' as a valid PowerShell expression' -f $CommandParam,$script:Parameters.$CommandParam
+                        $Warning = 'Parameter ''{0}'' removed: cannot interpret value ''{1}'' as a valid PowerShell expression. Have you tried using quotes?' -f $CommandParam,$script:Parameters.$CommandParam
                     }
 
                     # Write an appropriate $Warning
@@ -672,6 +672,9 @@ Authors: 5ynax | 5k33tz | Valrkey
                     }
                 }
 
+                #Clear $error.count for future validation 
+                $Error.Clear()
+
                 # Format all the $script:Parameters to form to the selected $script:Location
                 Format-Parameter
 
@@ -692,9 +695,17 @@ Authors: 5ynax | 5k33tz | Valrkey
                     }
                 } while (@('run','back') -NotContains $UserInput)
 
-                #Clears the screen after a run or back command is executed
-                Invoke-ClearCommand
+                #Confirm plugin execution complete. If errors, wait for user confirmation prior to continuing
 
+                if ($Error.Count -eq 0 -and $UserInput -ne "back") {
+                    Write-Host "The plugin has executed successfully. Go forth and forensicate!"
+                    Start-Sleep -s 2
+                    Invoke-ClearCommand
+                } elseif ($Error.Count -gt 0 -and $UserInput -ne "back"){
+                    Read-Host "`r`nThe plugin has executed with errors. Review the errors and press Enter to continue"
+                    Invoke-ClearCommand
+                }
+                
                 # Set $script:Location to the previous directory
                 $script:Location = Get-Item -Path ($script:Location.FullName -Replace ('\\[^\\]+$'))
             } while ($True)
