@@ -244,6 +244,15 @@ $Sched_Tasks_Events = @(
 
 foreach ($Computer in $ComputerName) {
 
+        #Verify Computer is online prior to processing
+
+        if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
+        Write-Error ("{0} appears to be offline, event logs were not collected" -f $Computer)
+        continue
+        
+        #If online, collect event logs for $Computer
+        } else {
+
         #Get Windows Security Event Logs
         Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
 
@@ -272,5 +281,6 @@ foreach ($Computer in $ComputerName) {
         Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TaskScheduler/Operational"; StartTime=$StartDate; ID=$Sched_Tasks_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         }
+    }
 
 }
