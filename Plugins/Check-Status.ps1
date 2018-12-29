@@ -21,7 +21,7 @@
 .NOTES
     Author: 5yn@x
     Date Created: 12/28/2018
-    Twitter: @%ynax
+    Twitter: @5ynax
     
     Last Modified By:
     Last Modified Date:
