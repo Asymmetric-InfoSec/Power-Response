@@ -22,7 +22,7 @@
     finding a pivot point, and then search for events around your pivot point.
 
 .EXAMPLE
-    .\Get-WindowsEvents.ps1 -ComputerName Test-PC -Start_Time 12/23/2018
+    .\Get-WindowsEvents.ps1 -ComputerName Test-PC -StartDate 12/23/2018
 
     Power-Response Execution
 
