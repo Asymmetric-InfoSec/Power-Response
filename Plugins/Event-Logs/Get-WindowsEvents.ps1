@@ -27,7 +27,7 @@
     Power-Response Execution
 
     Set ComputerName Test-PC
-    Set Start_Date 12/23/2018 
+    Set StartDate 12/23/2018 
     Run
 
 .NOTES
@@ -46,12 +46,15 @@ param (
     [Parameter(Mandatory=$true, Position=0)]
     [string[]]$ComputerName,
 
+    #If no date is supplied, the default is the current date minus 90 days (average dwell time of an adversary)
     [Parameter(Mandatory=$false, Position=1)]
-    [string]$Start_Date
+    [DateTime]$StartDate=(Get-Date).AddDays(-90)
 
     )
 
 process {
+
+Write-Host "The StartDate is" $StartDate
 
 #Security Event Log IDs to Retrieve (Security)
 $SecurityEvents = @(
@@ -239,48 +242,36 @@ $Sched_Tasks_Events = @(
 
     )
 
-#if no date is supplied in a parameter through Power-Response, fill in start date based on number of days of assumed dwell time
-
-if ($Start_Date.length -gt 1) {
-    
-    $Date = Get-Date $Start_Date
-
-}else {
-
-    $Date = (Get-Date).AddDays(-90)
-    
-}
-
 #Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
 
 foreach ($Computer in $ComputerName) {
 
         #Get Windows Security Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$Date; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get Windows System Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="System"; StartTime=$Date; ID=$SystemEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="System"; StartTime=$StartDate; ID=$SystemEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get Windows Application Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$Date; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get Windows Firewall Event Logs
-        Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-Windows Firewall With Advanced Security/Firewall"; StartTime=$Date; ID=$WinFirewallEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-Windows Firewall With Advanced Security/Firewall"; StartTime=$StartDate; ID=$WinFirewallEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get Windows PowerShell Event Logs
-        Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-PowerShell/Operational"; StartTime=$Date; ID=$PowerShellEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-PowerShell/Operational"; StartTime=$StartDate; ID=$PowerShellEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get WMI Event Logs 
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-WMI-Activity/Operational"; StartTime=$Date; ID=$WMI_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-WMI-Activity/Operational"; StartTime=$StartDate; ID=$WMI_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get Remote Desktop Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RDPClient/Operational"; StartTime=$Date; ID=$RDP_TC_RDPClient_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational"; StartTime=$Date; ID=$RDP_TC_RCM_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"; StartTime=$Date; ID=$RDP_TC_LSM_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational"; StartTime=$Date; ID=$RDP_RdpTS_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RDPClient/Operational"; StartTime=$StartDate; ID=$RDP_TC_RDPClient_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_RCM_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_LSM_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational"; StartTime=$StartDate; ID=$RDP_RdpTS_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get Scheduled Tasks Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TaskScheduler/Operational"; StartTime=$Date; ID=$Sched_Tasks_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TaskScheduler/Operational"; StartTime=$StartDate; ID=$Sched_Tasks_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         }
 
