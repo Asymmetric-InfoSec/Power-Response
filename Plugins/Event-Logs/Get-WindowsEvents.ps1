@@ -54,8 +54,6 @@ param (
 
 process {
 
-Write-Host "The StartDate is" $StartDate
-
 #Security Event Log IDs to Retrieve (Security)
 $SecurityEvents = @(
 
