@@ -76,13 +76,11 @@ process{
 
     if (-not $64bitTestPath) {
 
-        Write-Error "Autorunsc64.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
-        Exit 
+        Throw "Autorunsc64.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
 
     } elseif (-not $32bitTestPath) {
 
-        Write-Error "Autorunsc.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-        Exit
+        Throw "Autorunsc.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
 
     }
 
@@ -90,7 +88,7 @@ process{
     foreach ($Computer in $ComputerName) {
 
     #Handle $ComputerName defined as localhost and not break the Plugin
-    if ($Computer -match "Localhost") {
+    if ($Computer -eq "Localhost") {
 
         $Computer = $ENV:ComputerName
     }
@@ -104,7 +102,7 @@ process{
 
     #Determine system architecture and select proper Autorunsc executable
     try {
-        $Architecture = (Get-WmiObject -ComputerName $Computer -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction SilentlyContinue).OSArchitecture
+        $Architecture = (Get-WmiObject -ComputerName $Computer -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
         
         if ($Architecture -eq "64-bit") {
 
@@ -129,8 +127,8 @@ process{
     $SmbPath = ("\\{0}\c`$\ProgramData\{1}" -f $Computer, (Split-Path -Path $Installexe -Leaf))
     try {
         
-        Copy-Item -Path $Installexe -Destination $SmbPath -ErrorAction SilentlyContinue
-        $RemoteFile = Get-Item -Path $SmbPath -ErrorAction SilentlyContinue
+        Copy-Item -Path $Installexe -Destination $SmbPath -ErrorAction Stop
+        $RemoteFile = Get-Item -Path $SmbPath -ErrorAction Stop
 
         # verify that the file copy succeeded to the remote host
         if (-not $RemoteFile) {
