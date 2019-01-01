@@ -18,35 +18,63 @@ function Format-Parameter {
         # Foreach $CommandParam listed in $Arguments
         foreach ($CommandParam in $Arguments) {
             # Gather the $CommandParameter $ParameterType
-            $ParameterType = $CommandParameters.$CommandParam.ParameterType.FullName
+            $ParameterType = $CommandParameters.$CommandParam.ParameterType
 
             # Gather the $script:Parameters.$CommandParameter $ValueType
-            $ValueType = $script:Parameters.$CommandParam.GetType().FullName
+            $ValueType = $script:Parameters.$CommandParam.GetType()
 
-            # Ignore string $ParameterType with an existing string $script:Parameters.CommandParam value
-            if ($ParameterType -ne $ValueType -and !($ParameterType -Match '\[\]$' -and $ValueType -eq 'System.Object[]')) {
-                # Build the $Command string '[TYPE]($script:Parameters.VALUE)'
-                $Command = '[{0}]({1})' -f $ParameterType,$script:Parameters.$CommandParam
-                try {
-                    # Try to interpret the $Command expression and store it back to $script:Parameters.$CommandParam
-                    $script:Parameters.$CommandParam = Invoke-Expression -Command $Command
-                } catch {
-                    # Failed to interpret the $Command expression, determine if it was a casting or expression issue
-                    if ($Error[0] -and $Error[0].FullyQualifiedErrorId -eq 'ConvertToFinalInvalidCastException') {
-                        $Warning = 'Parameter ''{0}'' removed: cannot convert value ''{1}'' to type ''{2}''. Have you tried using quotes?' -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
-                    } else {
-                        $Warning = 'Parameter ''{0}'' removed: cannot interpret value ''{1}'' as a valid PowerShell expression. Have you tried using quotes?' -f $CommandParam,$script:Parameters.$CommandParam
-                    }
+            # Initialize $Commands array and $ExpressionResult and $i
+            [String[]]$Commands = @()
+            $ExpressionResult = $null
+            $i = 0
 
-                    # Write an appropriate $Warning
-                    Write-Warning $Warning
+            # If we have a UserInput object, attempt expression and array expansion
+            if ($ValueType.FullName -eq 'Power-Response.UserInput') {
+                # Convert UserInput object to String for more complex casting
+                $script:Parameters.$CommandParam = $script:Parameters.$CommandParam.ToString()
 
-                    # Write an appropriate log
-                    Write-Log -Message $Warning
+                # Build a $Commands string to check for PowerShell expressions '[TYPE]($script:Parameters.VALUE)'
+                $Commands += '[{0}]({1})' -f $ParameterType.FullName,$script:Parameters.$CommandParam
 
-                    # remove the $CommandParam key from $script:Parameters
-                    $script:Parameters.Remove($CommandParam) | Out-Null
+                # If we have an array $ParameterType and string $ValueType
+                if ($ParameterType.BaseType.FullName -eq 'System.Array') {
+                    # Build a $Commands string to check for array comma expansion '[TYPE]($script:Parameters.VALUE -Split "\s*,\s*")'
+                    $Commands += '[{0}]($script:Parameters.$CommandParam -Split "\s*,\s*|\s+" | Where-Object {{ $PSItem }})' -f $ParameterType.FullName
                 }
+            }
+
+            # Build a $Commands string to check for direct input typecasts '[TYPE]$script:Parameters.VALUE'
+            $Commands += '[{0}]$script:Parameters.$CommandParam' -f $ParameterType.FullName
+
+            # Loop while we haven't resolved a successful $ExpressionResult and we still have more $Commands to try
+            do {
+                # Try to evaluate the $Commands string
+                try { $ExpressionResult = Invoke-Expression -Command $Commands[$i] } catch {}
+
+                # Increment $i
+                $i += 1
+            } while (!$ExpressionResult -and $i -lt $Commands.Length)
+
+            # If successful command execution
+            if ($ExpressionResult) {
+                # Set $script:Parameters.$CommandParam to $ExpressionResult
+                $script:Parameters.$CommandParam = $ExpressionResult
+            } else {
+                # Determine if it was a casting or expression issue
+                if ($ValueType.FullName -eq 'Power-Response.UserInput') {
+                    $Warning = 'Parameter ''{0}'' removed: cannot interpret value ''{1}'' as a valid PowerShell expression. Have you tried using quotes?' -f $CommandParam,$script:Parameters.$CommandParam
+                } else {
+                    $Warning = 'Parameter ''{0}'' removed: cannot convert value ''{1}'' to type ''{2}''. Have you tried using quotes?' -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
+                }
+
+                # Write an appropriate $Warning
+                Write-Warning -Message $Warning
+
+                # Write an appropriate log
+                Write-Log -Message $Warning
+
+                # Remove the $CommandParam key from $script:Parameters
+                $script:Parameters.Remove($CommandParam) | Out-Null
             }
         }
     }
@@ -388,7 +416,7 @@ function Invoke-SetCommand {
         }
 
         # Set the $script:Parameters key and value specified by $Arguments
-        $script:Parameters.($Arguments[0]) = ($Arguments | Select-Object -Skip 1) -Join ' '
+        $script:Parameters.($Arguments[0]) = [UserInput](($Arguments | Select-Object -Skip 1) -Join ' ')
 
         # If we are provided a blank set command, remove the key from $script:Parameters
         if ($script:Parameters.($Arguments[0]) -eq '') {
@@ -602,6 +630,26 @@ function Write-Log {
 }
 
 function Power-Response {
+    begin {
+        # UserInput class is designed to separate user input strings to successfully casted string type parameters
+        # Essentially acts like a string for our purposes
+        $UserInputType = [System.AppDomain]::CurrentDomain.GetAssemblies() | Foreach-Object { $PSItem.GetTypes() | Where-Object { $PSItem.Name -eq 'UserInput' } }
+        if (!$UserInputType) {
+            Write-Host 'Importing UserInput class'
+            class UserInput {
+                [String]$Value
+
+                UserInput([String]$Value) {
+                    $this.Value = $Value
+                }
+
+                [String] ToString() {
+                    return $this.Value
+                }
+            }
+        }
+    }
+
     process {
         # $Banner for Power-Response
         $Banner = @'
@@ -693,7 +741,7 @@ Authors: 5ynax | 5k33tz | Valrkey
                     } elseif ($UserInput) {
                         Invoke-PRCommand -UserInput $UserInput | Out-Default
                     }
-                } while (@('run','back') -NotContains $UserInput)
+                } while (@('run','back','..') -NotContains $UserInput)
 
                 #Confirm plugin execution complete. If errors, wait for user confirmation prior to continuing
 
