@@ -354,6 +354,8 @@ function Invoke-RunCommand {
     process {
         # If we have selected a file $script:Location
         if ($script:Location -and !$script:Location.PSIsContainer) {
+            Write-Host 'Executing Plugin, please wait...'
+
             # Gather to $script:Location's $CommandParameters
             $CommandParameters = Get-Command -Name $script:Location | Select-Object -ExpandProperty Parameters
 
@@ -378,6 +380,11 @@ function Invoke-RunCommand {
 
                 # Write execution success log
                 Write-Log -Message 'Plugin execution succeeded'
+
+                # Print message to the screen, pause 2 seconds then clear the screen
+                Write-Host "The plugin has executed successfully. Go forth and forensicate!"
+                Start-Sleep -s 2
+                Invoke-ClearCommand
             } catch {
                 Write-Warning ('Plugin execution error: {0}' -f $PSItem)
 
@@ -397,7 +404,7 @@ function Invoke-ClearCommand {
     )
 
     process {
-        
+        # Clear the console
         [System.Console]::Clear()
     }
 
@@ -720,9 +727,6 @@ Authors: 5ynax | 5k33tz | Valrkey
                     }
                 }
 
-                #Clear $error.count for future validation 
-                $Error.Clear()
-
                 # Format all the $script:Parameters to form to the selected $script:Location
                 Format-Parameter
 
@@ -735,25 +739,11 @@ Authors: 5ynax | 5k33tz | Valrkey
                     $UserInput = Read-PRHost
 
                     # Interpret $UserInput as a command and pass the $script:Location
-                    if ($UserInput -Contains 'run') {
-                        Write-Host 'Executing Plugin, please wait...'
-                        Invoke-PRCommand -UserInput $UserInput | Out-Default
-                    } elseif ($UserInput) {
+                    if ($UserInput) {
                         Invoke-PRCommand -UserInput $UserInput | Out-Default
                     }
                 } while (@('run','back','..') -NotContains $UserInput)
 
-                #Confirm plugin execution complete. If errors, wait for user confirmation prior to continuing
-
-                if ($Error.Count -eq 0 -and $UserInput -ne "back") {
-                    Write-Host "The plugin has executed successfully. Go forth and forensicate!"
-                    Start-Sleep -s 2
-                    Invoke-ClearCommand
-                } elseif ($Error.Count -gt 0 -and $UserInput -ne "back"){
-                    Read-Host "`r`nThe plugin has executed with errors. Review the errors and press Enter to continue"
-                    Invoke-ClearCommand
-                }
-                
                 # Set $script:Location to the previous directory
                 $script:Location = Get-Item -Path ($script:Location.FullName -Replace ('\\[^\\]+$'))
             } while ($True)
