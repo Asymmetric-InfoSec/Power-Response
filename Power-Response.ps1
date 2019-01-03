@@ -4,24 +4,24 @@ function Format-Parameter {
     )
 
     process {
-        # Gather to $script:Location's $CommandParameters
-        $CommandParameters = Get-Command -Name $script:Location | Select-Object -ExpandProperty Parameters
+        # Gather to $global:PowerResponse.Location's $CommandParameters
+        $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
 
         # If we are passed no $Arguments, assume full $Parameter format check
         if ($Arguments.Count -eq 0) {
             $Arguments = $CommandParameters.Keys
         }
 
-        # Narrow the scope of $Arguments to the $CommandParameters that have a stored value in $script:Parameters
-        $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem -and $script:Parameters.$PSItem }
+        # Narrow the scope of $Arguments to the $CommandParameters that have a stored value in $global:PowerResponse.Parameters
+        $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem -and $global:PowerResponse.Parameters.$PSItem }
 
         # Foreach $CommandParam listed in $Arguments
         foreach ($CommandParam in $Arguments) {
             # Gather the $CommandParameter $ParameterType
             $ParameterType = $CommandParameters.$CommandParam.ParameterType
 
-            # Gather the $script:Parameters.$CommandParameter $ValueType
-            $ValueType = $script:Parameters.$CommandParam.GetType()
+            # Gather the $global:PowerResponse.Parameters.$CommandParameter $ValueType
+            $ValueType = $global:PowerResponse.Parameters.$CommandParam.GetType()
 
             # Initialize $Commands array and $ExpressionResult and $i
             [String[]]$Commands = @()
@@ -31,20 +31,20 @@ function Format-Parameter {
             # If we have a UserInput object, attempt expression and array expansion
             if ($ValueType.FullName -eq 'Power-Response.UserInput') {
                 # Convert UserInput object to String for more complex casting
-                $script:Parameters.$CommandParam = $script:Parameters.$CommandParam.ToString()
+                $global:PowerResponse.Parameters.$CommandParam = $global:PowerResponse.Parameters.$CommandParam.ToString()
 
-                # Build a $Commands string to check for PowerShell expressions '[TYPE]($script:Parameters.VALUE)'
-                $Commands += '[{0}]({1})' -f $ParameterType.FullName,$script:Parameters.$CommandParam
+                # Build a $Commands string to check for PowerShell expressions '[TYPE]($global:PowerResponse.Parameters.VALUE)'
+                $Commands += '[{0}]({1})' -f $ParameterType.FullName,$global:PowerResponse.Parameters.$CommandParam
 
                 # If we have an array $ParameterType and string $ValueType
                 if ($ParameterType.BaseType.FullName -eq 'System.Array') {
-                    # Build a $Commands string to check for array comma expansion '[TYPE]($script:Parameters.VALUE -Split "\s*,\s*")'
-                    $Commands += '[{0}]($script:Parameters.$CommandParam -Split "\s*,\s*|\s+" | Where-Object {{ $PSItem }})' -f $ParameterType.FullName
+                    # Build a $Commands string to check for array comma expansion '[TYPE]($global:PowerResponse.Parameters.VALUE -Split "\s*,\s*")'
+                    $Commands += '[{0}]($global:PowerResponse.Parameters.$CommandParam -Split "\s*,\s*|\s+" | Where-Object {{ $PSItem }})' -f $ParameterType.FullName
                 }
             }
 
-            # Build a $Commands string to check for direct input typecasts '[TYPE]$script:Parameters.VALUE'
-            $Commands += '[{0}]$script:Parameters.$CommandParam' -f $ParameterType.FullName
+            # Build a $Commands string to check for direct input typecasts '[TYPE]$global:PowerResponse.Parameters.VALUE'
+            $Commands += '[{0}]$global:PowerResponse.Parameters.$CommandParam' -f $ParameterType.FullName
 
             # Loop while we haven't resolved a successful $ExpressionResult and we still have more $Commands to try
             do {
@@ -57,14 +57,14 @@ function Format-Parameter {
 
             # If successful command execution
             if ($ExpressionResult) {
-                # Set $script:Parameters.$CommandParam to $ExpressionResult
-                $script:Parameters.$CommandParam = $ExpressionResult
+                # Set $global:PowerResponse.Parameters.$CommandParam to $ExpressionResult
+                $global:PowerResponse.Parameters.$CommandParam = $ExpressionResult
             } else {
                 # Determine if it was a casting or expression issue
                 if ($ValueType.FullName -eq 'Power-Response.UserInput') {
-                    $Warning = 'Parameter ''{0}'' removed: cannot interpret value ''{1}'' as a valid PowerShell expression. Have you tried using quotes?' -f $CommandParam,$script:Parameters.$CommandParam
+                    $Warning = 'Parameter ''{0}'' removed: cannot interpret value ''{1}'' as a valid PowerShell expression. Have you tried using quotes?' -f $CommandParam,$global:PowerResponse.Parameters.$CommandParam
                 } else {
-                    $Warning = 'Parameter ''{0}'' removed: cannot convert value ''{1}'' to type ''{2}''. Have you tried using quotes?' -f $CommandParam,$script:Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
+                    $Warning = 'Parameter ''{0}'' removed: cannot convert value ''{1}'' to type ''{2}''. Have you tried using quotes?' -f $CommandParam,$global:PowerResponse.Parameters.$CommandParam,$CommandParameters.$CommandParam.ParameterType.Name
                 }
 
                 # Write an appropriate $Warning
@@ -73,8 +73,8 @@ function Format-Parameter {
                 # Write an appropriate log
                 Write-Log -Message $Warning
 
-                # Remove the $CommandParam key from $script:Parameters
-                $script:Parameters.Remove($CommandParam) | Out-Null
+                # Remove the $CommandParam key from $global:PowerResponse.Parameters
+                $global:PowerResponse.Parameters.Remove($CommandParam) | Out-Null
             }
         }
     }
@@ -161,18 +161,18 @@ function Import-Config {
             # Get the Config file at $Path
             $File = Get-Item -Path $Path
 
-            # Import the Config data file and bind it to the $script:Config variable
-            Import-LocalizedData -BindingVariable script:Config -BaseDirectory $File.PSParentPath -FileName $File.Name -ErrorAction Stop
+            # Import the Config data file and bind it to the $Config variable
+            Import-LocalizedData -BindingVariable 'Config' -BaseDirectory $File.PSParentPath -FileName $File.Name -ErrorAction Stop
         } catch {
             # Either intentionally threw an error on file absense, or Import-LocalizedData failed
             Write-Verbose ('Unable to import config on ''Path'': ''{0}''' -f $Path)
-            $script:Config = $Default
+            $Config = $Default
         }
 
         # Check for unexpected values in Config file
         if ($RootKeys) {
             # Iterate through Config.Keys and keep any values not contained in expected $RootKeys 
-            $UnexpectedRootKeys = $script:Config.Keys | Where-Object { $RootKeys -NotContains $PSItem }
+            $UnexpectedRootKeys = $Config.Keys | Where-Object { $RootKeys -NotContains $PSItem }
 
             # If we found unexpected keys, print a warning message
             if ($UnexpectedRootKeys) {
@@ -180,67 +180,69 @@ function Import-Config {
                 Write-Warning ('    ''{0}''' -f ($UnexpectedRootKeys -Join ''', '''))
                 Write-Warning  'Removing these values from the Config hashtable'
 
-                # Remove any detected unexpected keys from $script:Config
-                $UnexpectedRootKeys | % { $script:Config.Remove($PSItem) | Out-Null }
+                # Remove any detected unexpected keys from $Config
+                $UnexpectedRootKeys | % { $Config.Remove($PSItem) | Out-Null }
             }
         }
 
         # If no value is provided in the config file, set the default values
-        if (!$script:Config.HashAlgorithm) {
-            $script:Config.HashAlgorithm = $Default.HashAlgorithm
+        if (!$Config.HashAlgorithm) {
+            $Config.HashAlgorithm = $Default.HashAlgorithm
         }
-        if (!$script:Config.OutputType) {
-            $script:Config.OutputType = $Default.OutputType
+        if (!$Config.OutputType) {
+            $Config.OutputType = $Default.OutputType
         }
-        if (!$script:Config.PromptText) {
-            $script:Config.PromptText = $Default.PromptText
+        if (!$Config.PromptText) {
+            $Config.PromptText = $Default.PromptText
         }
-        if (!$script:Config.Path) {
-            $script:Config.Path = $Default.Path
+        if (!$Config.Path) {
+            $Config.Path = $Default.Path
         }
-        if (!$script:Config.UserName) {
-            $script:Config.UserName = $Default.UserName
+        if (!$Config.UserName) {
+            $Config.UserName = $Default.UserName
         }
 
-        if (!$script:Config.Path.Bin) {
-            $script:Config.Path.Bin = $Default.Path.Bin
+        if (!$Config.Path.Bin) {
+            $Config.Path.Bin = $Default.Path.Bin
         } 
-        if (!$script:Config.Path.Logs) {
-            $script:Config.Path.Logs = $Default.Path.Logs
+        if (!$Config.Path.Logs) {
+            $Config.Path.Logs = $Default.Path.Logs
         }
-        if (!$script:Config.Path.Output) {
-            $script:Config.Path.Output = $Default.Path.Output
+        if (!$Config.Path.Output) {
+            $Config.Path.Output = $Default.Path.Output
         } 
-        if (!$script:Config.Path.Plugins) {
-            $script:Config.Path.Plugins = $Default.Path.Plugins
+        if (!$Config.Path.Plugins) {
+            $Config.Path.Plugins = $Default.Path.Plugins
         }
 
-        if (!$script:Config.UserName.Windows) {
-            $script:Config.UserName.Windows = $Default.UserName.Windows
+        if (!$Config.UserName.Windows) {
+            $Config.UserName.Windows = $Default.UserName.Windows
         }
 
-        # Check for required $script:Config value existence (sanity check - should never fail with default values)
-        if (!$script:Config.HashAlgorithm -or !$script:Config.Path -or !$script:Config.UserName -or !$script:Config.Path.Bin -or !$script:Config.Path.Logs -or !$script:Config.Path.Output -or !$script:Config.Path.Plugins -or !$script:Config.UserName.Windows) {
+        # Check for required $Config value existence (sanity check - should never fail with default values)
+        if (!$Config.HashAlgorithm -or !$Config.Path -or !$Config.UserName -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.UserName.Windows) {
             throw 'Missing required configuration value'
         }
 
+        $global:PowerResponse.Config = $Config
+
         # Loop through $DirPath
-        $script:Regex = @{}
-        foreach ($DirPath in $script:Config.Path.GetEnumerator()) {
+        $global:PowerResponse.Regex = @{}
+        foreach ($DirPath in $Config.Path.GetEnumerator()) {
             # If the $DirPath doesn't exist, create it and get rid of the output
             if (!(Test-Path $DirPath.Key)) {
                 New-Item -Path $DirPath.Key -ItemType Directory | Out-Null
             }
 
             # Store each path as a regular expressions for string replacing later
-            $script:Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}$' -f $DirPath.Key))
+            $global:PowerResponse.Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}$' -f $DirPath.Key))
         }
 
         # Gather credentials for non-sessioned $UserName
-        $script:Credential = @{}
-        foreach ($UserName in $script:Config.UserName.GetEnumerator()) {
+        $global:PowerResponse.Credential = @{}
+        foreach ($UserName in $Config.UserName.GetEnumerator()) {
             if ($UserName.Value -ne $ENV:UserName) {
-                $script:Credential.($UserName.Key) = Get-Credential -UserName $UserName.Value -Message ('Please enter {0} credentials' -f $UserName.Key)
+                $global:PowerResponse.Credential.($UserName.Key) = Get-Credential -UserName $UserName.Value -Message ('Please enter {0} credentials' -f $UserName.Key)
             }
         }
     }
@@ -285,8 +287,8 @@ function Invoke-HelpCommand {
             @{ Name='clear'; Usage='clear'; Description='clears the screen of clutter while running plugins' }
         ) | Foreach-Object { [PSCustomObject]$PSItem }
 
-        # If $script:Location is a directory
-        if ($script:Location.PSIsContainer) {
+        # If $global:PowerResponse.Location is a directory
+        if ($global:PowerResponse.Location.PSIsContainer) {
             # Don't show 'back' or 'run' or 'clear' as command options
             $Commands = $Commands | Where-Object { @('back','run') -NotContains $PSItem.Name }
         }
@@ -320,22 +322,22 @@ function Invoke-RemoveCommand {
     )
 
     process {
-        # If $Arguments are blank and we have selected a file $script:Location
-        if ($Arguments.Count -eq 0 -and !$script:Location.PSIsContainer) {
+        # If $Arguments are blank and we have selected a file $global:PowerResponse.Location
+        if ($Arguments.Count -eq 0 -and !$global:PowerResponse.Location.PSIsContainer) {
             # Assume 'remove' all tracked command parameters
-            $Arguments = Get-Command -Name $script:Location | Select-Object -ExpandProperty Parameters | Select-Object -ExpandProperty Keys
+            $Arguments = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters | Select-Object -ExpandProperty Keys
         } elseif ($Arguments.Count -eq 0) {
-            # Assume 'remove' all tracked $script:Parameters
-            $Arguments = $script:Parameters | Select-Object -ExpandProperty Keys
+            # Assume 'remove' all tracked $global:PowerResponse.Parameters
+            $Arguments = $global:PowerResponse.Parameters | Select-Object -ExpandProperty Keys
         }
 
-        # Filter $Arguments to remove invalid $script:Parameters.Keys
-        $Arguments = $Arguments | Where-Object { $script:Parameters.Keys -Contains $PSItem }
+        # Filter $Arguments to remove invalid $global:PowerResponse.Parameters.Keys
+        $Arguments = $Arguments | Where-Object { $global:PowerResponse.Parameters.Keys -Contains $PSItem }
 
         # If we have $Arguments to remove
         if ($Arguments.Count -ne 0) {
-            # Remove $Arguments from $script:Parameters
-            $Arguments | Foreach-Object { $script:Parameters.Remove($PSItem) | Out-Null }
+            # Remove $Arguments from $global:PowerResponse.Parameters
+            $Arguments | Foreach-Object { $global:PowerResponse.Parameters.Remove($PSItem) | Out-Null }
 
             # Write parameter removal log
             Write-Log ('Removed Parameter(s): ''{0}''' -f ($Arguments -Join ''', '''))
@@ -352,31 +354,31 @@ function Invoke-RunCommand {
     )
 
     process {
-        # If we have selected a file $script:Location
-        if ($script:Location -and !$script:Location.PSIsContainer) {
+        # If we have selected a file $global:PowerResponse.Location
+        if ($global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
             Write-Host 'Executing Plugin, please wait...'
 
-            # Gather to $script:Location's $CommandParameters
-            $CommandParameters = Get-Command -Name $script:Location | Select-Object -ExpandProperty Parameters
+            # Gather to $global:PowerResponse.Location's $CommandParameters
+            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
 
             # Initialize $ReleventParameters Hashtable
             $ReleventParameters = @{}
 
-            # Parse the $ReleventParameters from $script:Parameters
-            $script:Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
+            # Parse the $ReleventParameters from $global:PowerResponse.Parameters
+            $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
             # Initialize $OutputParameters Hashtable
             $OutputParameters = @{}
 
-            # Parse the $OutputParameters from $script:Parameters
-            $script:Parameters.GetEnumerator() | Where-Object { @('OutputType') -Contains $PSItem.Key } | Foreach-Object { $OutputParameters.($PSItem.Key) = $PSItem.Value }
+            # Parse the $OutputParameters from $global:PowerResponse.Parameters
+            $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { @('OutputType') -Contains $PSItem.Key } | Foreach-Object { $OutputParameters.($PSItem.Key) = $PSItem.Value }
 
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
             try {
-                # Execute the $script:Location with the $ReleventParameters
-                & $script:Location.FullName @ReleventParameters | Out-PRFile @OutputParameters
+                # Execute the $global:PowerResponse.Location with the $ReleventParameters
+                & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile @OutputParameters
 
                 # Write execution success log
                 Write-Log -Message 'Plugin execution succeeded'
@@ -386,10 +388,12 @@ function Invoke-RunCommand {
                 Start-Sleep -s 2
                 Invoke-ClearCommand
             } catch {
-                Write-Warning ('Plugin execution error: {0}' -f $PSItem)
+                $Message = 'Plugin execution error, are you running as admin?: {0}' -f $PSItem
+
+                Write-Warning -Message $Message
 
                 # Write execution error log
-                Write-Log -Message ('Plugin execution error: {0}' -f $PSItem)
+                Write-Log -Message $Message
             }
         } else {
             Write-Warning 'No plugin selected for execution'
@@ -422,19 +426,19 @@ function Invoke-SetCommand {
             return Invoke-HelpCommand -Arguments 'set'
         }
 
-        # Set the $script:Parameters key and value specified by $Arguments
-        $script:Parameters.($Arguments[0]) = [UserInput](($Arguments | Select-Object -Skip 1) -Join ' ')
+        # Set the $global:PowerResponse.Parameters key and value specified by $Arguments
+        $global:PowerResponse.Parameters.($Arguments[0]) = [UserInput](($Arguments | Select-Object -Skip 1) -Join ' ')
 
-        # If we are provided a blank set command, remove the key from $script:Parameters
-        if ($script:Parameters.($Arguments[0]) -eq '') {
+        # If we are provided a blank set command, remove the key from $global:PowerResponse.Parameters
+        if ($global:PowerResponse.Parameters.($Arguments[0]) -eq '') {
             return Invoke-RemoveCommand -Arguments $Arguments
         }
 
         # Write a set parameter log
-        Write-Log -Message ('Set Parameter: ''{0}'' = ''{1}''' -f $Arguments[0], $script:Parameters.($Arguments[0]))
+        Write-Log -Message ('Set Parameter: ''{0}'' = ''{1}''' -f $Arguments[0], $global:PowerResponse.Parameters.($Arguments[0]))
 
-        # If we have a file $script:Location, format the $script:Parameters
-        if (!$script:Location.PSIsContainer) {
+        # If we have a file $global:PowerResponse.Location, format the $global:PowerResponse.Parameters
+        if (!$global:PowerResponse.Location.PSIsContainer) {
             Format-Parameter -Arguments $Arguments[0]
         }
 
@@ -449,10 +453,10 @@ function Invoke-ShowCommand {
     )
 
     process {
-        # If we have selected a file $script:Location
-        if (!$script:Location.PSIsContainer) {
-            # Gather to $script:Location's $CommandParameters
-            $CommandParameters = Get-Command -Name $script:Location | Select-Object -ExpandProperty Parameters
+        # If we have selected a file $global:PowerResponse.Location
+        if (!$global:PowerResponse.Location.PSIsContainer) {
+            # Gather to $global:PowerResponse.Location's $CommandParameters
+            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
 
             # Filter $Arguments to remove invalid $CommandParameters.Keys
             $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem }
@@ -463,7 +467,7 @@ function Invoke-ShowCommand {
                 $System = @('WarningAction','Debug','InformationAction','ErrorVariable','InformationVariable','WarningVariable','Verbose','ErrorAction','OutVariable','OutBuffer','PipelineVariable')
 
                 # Get all $UserCommandParameters (non-system generated parameters)
-                $UserCommandParameters = $CommandParameters.GetEnumerator() | Where-Object { $System -NotContains $PSItem.Key -or $script:Parameters.($PSItem.Key) }
+                $UserCommandParameters = $CommandParameters.GetEnumerator() | Where-Object { $System -NotContains $PSItem.Key -or $global:PowerResponse.Parameters.($PSItem.Key) }
 
                 # Set $Arguments to $UserCommandParameters.Key to return full list
                 $Arguments = $UserCommandParameters.Key
@@ -474,8 +478,8 @@ function Invoke-ShowCommand {
 
             # If $Arguments array is empty
             if ($Arguments.Count -eq 0) {
-                # Set $Arguments to all Keys of $script:Parameters
-                $Arguments = $script:Parameters.Keys
+                # Set $Arguments to all Keys of $global:PowerResponse.Parameters
+                $Arguments = $global:PowerResponse.Parameters.Keys
             }
         }
 
@@ -483,15 +487,15 @@ function Invoke-ShowCommand {
         $Param = @{}
         
         #For plugins with no parameters, write-host to run plugin
-        if ($CommandParameters.Count -eq 0 -and !$script:Location.PSIsContainer) {
+        if ($CommandParameters.Count -eq 0 -and !$global:PowerResponse.Location.PSIsContainer) {
             Write-Host "`r`nNo parameters detected. Type run to execute plugin."
         }
         elseif ($CommandParameters.Count -gt 0) {
-            # Set $Param.[Type]$Key to the $script:Parameters.$Key value
-            $Arguments | Sort-Object | Foreach-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$script:Parameters.$PSItem }
+            # Set $Param.[Type]$Key to the $global:PowerResponse.Parameters.$Key value
+            $Arguments | Sort-Object | Foreach-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$global:PowerResponse.Parameters.$PSItem }
         } else {
-            # Set $Param.$Key to the $script:Parameters.$Key value
-            $Arguments | Sort-Object | Foreach-Object { $Param.$PSItem=$script:Parameters.$PSItem }
+            # Set $Param.$Key to the $global:PowerResponse.Parameters.$Key value
+            $Arguments | Sort-Object | Foreach-Object { $Param.$PSItem=$global:PowerResponse.Parameters.$PSItem }
         }
 
         # Cast the HashTable to a PSCustomObject and format as an alphabetical-order list object
@@ -511,8 +515,8 @@ function Invoke-PRCommand {
         # $Arguments will be any following words
         $Arguments = $UserInput -Split ' ' | Select-Object -Skip 1
 
-        # If no $Keyword is not provided or we have no $script:Location and were provided a number return early
-        if (!$Keyword -or ($script:Location.PSIsContainer -and $Keyword -Match '^[0-9]$')) {
+        # If no $Keyword is not provided or we have no $global:PowerResponse.Location and were provided a number return early
+        if (!$Keyword -or ($global:PowerResponse.Location.PSIsContainer -and $Keyword -Match '^[0-9]$')) {
             return
         }
 
@@ -532,7 +536,7 @@ function Out-PRFile {
         [PSObject]$InputObject,
 
         [ValidateSet('CSV','XML')]
-        [String[]]$OutputType = $script:Config.OutputType
+        [String[]]$OutputType = $global:PowerResponse.Config.OutputType
     )
 
     begin {
@@ -540,10 +544,10 @@ function Out-PRFile {
         $Date = (Get-Date).ToUniversalTime()
 
         # Create the destination file $BaseName: {UTC TIMESTAMP}_{PLUGIN}
-        $BaseName = '{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}' -f $Date, $script:Location.BaseName.ToLower()
+        $BaseName = '{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower()
 
         # Set up $Path based on $BaseName and $OutputType
-        $Path = '{0}\{1}' -f $script:Config.Path.Output, $BaseName
+        $Path = '{0}\{1}' -f $global:PowerResponse.Config.Path.Output, $BaseName
 
         # Initialize $Objects array for pipeline handling
         $Objects = @()
@@ -587,14 +591,14 @@ function Out-PRFile {
         Set-ItemProperty -Path $Paths -Name 'IsReadOnly' -Value $true
 
         # Write the new output file log with Hash for each entity in $Paths
-        Get-FileHash -Algorithm $script:Config.HashAlgorithm -Path $Paths | Foreach-Object { Write-Log -Message ('Created output file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $script:Regex.Output), $PSItem.Algorithm, $PSItem.Hash) }
+        Get-FileHash -Algorithm $global:PowerResponse.Config.HashAlgorithm -Path $Paths | Foreach-Object { Write-Log -Message ('Created output file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $global:PowerResponse.Regex.Output), $PSItem.Algorithm, $PSItem.Hash) }
     }
 }
 
 function Read-PRHost {
     process {
         # Set up $Prompt text
-        $Prompt = '{0}> ' -f $script:Config.PromptText
+        $Prompt = '{0}> ' -f $global:PowerResponse.Config.PromptText
 
         # Write the $Prompt to the host
         Write-Host $Prompt -NoNewLine
@@ -615,13 +619,13 @@ function Write-Log {
         $Date = (Get-Date).ToUniversalTime()
 
         # Build the $LogPath
-        $LogPath = '{0}\{1:yyyy-MM-dd}.csv' -f $script:Config.Path.Logs, $Date
+        $LogPath = '{0}\{1:yyyy-MM-dd}.csv' -f $global:PowerResponse.Config.Path.Logs, $Date
 
         # Determine Plugin or Menu context
-        if (!$script:Location -or $script:Location.PSIsContainer) {
+        if (!$global:PowerResponse.Location -or $global:PowerResponse.Location.PSIsContainer) {
             $Context = 'Menu'
         } else {
-            $Context = $script:Location.FullName -Replace $script:Regex.Plugins
+            $Context = $global:PowerResponse.Location.FullName -Replace $global:PowerResponse.Regex.Plugins
         }
 
         # Build $LogLine
@@ -673,7 +677,10 @@ Authors: 5ynax | 5k33tz | Valrkey
 
         Write-Host $Banner
 
-        # Import $script:Config from data file
+        # Initialize $globalPowerResponse hashtable
+        $global:PowerResponse = @{}
+
+        # Import $global:PowerResponse.Config from data file
         Import-Config
 
         # Write a log to indicate framework startup
@@ -683,54 +690,54 @@ Authors: 5ynax | 5k33tz | Valrkey
         $SavedLocation = Get-Location
 
         # Set the location to Bin folder to allow easy asset access
-        Set-Location $script:Config.Path.Bin
+        Set-Location $global:PowerResponse.Config.Path.Bin
 
         # Get the $Plugins directory item
-        $Plugins = Get-Item -Path $script:Config.Path.Plugins
+        $Plugins = Get-Item -Path $global:PowerResponse.Config.Path.Plugins
 
-        # Initialize the current $script:Location to the $script:Config.Path.Plugins directory item
-        $script:Location = $Plugins
+        # Initialize the current $global:PowerResponse.Location to the $global:PowerResponse.Config.Path.Plugins directory item
+        $global:PowerResponse.Location = $Plugins
 
         # Ensure we have at least one plugin installed
-        if (!(Get-ChildItem $script:Location)) {
+        if (!(Get-ChildItem $global:PowerResponse.Location)) {
             Write-Error 'No Power-Response plugins detected'
             Read-Host 'Press Enter to Exit'
             exit
         }
 
-        # Initialize tracked $script:Parameters to $script:Config data
-        $script:Parameters = @{ OutputType = $script:Config.OutputType }
+        # Initialize tracked $global:PowerResponse.Parameters to $global:PowerResponse.Config data
+        $global:PowerResponse.Parameters = @{ OutputType = $global:PowerResponse.Config.OutputType }
 
         # Trap 'exit's and Ctrl-C interrupts
         try {
             # Loop through searching for a script file and setting parameters
             do {
-                # While the $script:Location is a directory
-                while ($script:Location.PSIsContainer) {
+                # While the $global:PowerResponse.Location is a directory
+                while ($global:PowerResponse.Location.PSIsContainer) {
                     # Compute $Title - Power-Response\CurrentPath
-                    $Title = $script:Location.FullName -Replace $script:Regex.Plugins
+                    $Title = $global:PowerResponse.Location.FullName -Replace $global:PowerResponse.Regex.Plugins
 
                     # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
-                    $Choice = Get-ChildItem -Path $script:Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
+                    $Choice = Get-ChildItem -Path $global:PowerResponse.Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
 
-                    #Compute $Back - ensure we are not at the $script:Config.Path.Plugins
-                    $Back = $Plugins.FullName -NotMatch [Regex]::Escape($script:Location.FullName)
+                    #Compute $Back - ensure we are not at the $global:PowerResponse.Config.Path.Plugins
+                    $Back = $Plugins.FullName -NotMatch [Regex]::Escape($global:PowerResponse.Location.FullName)
 
-                    # Get the next directory selection from the user, showing the back option if anywhere but the $script:Config.Path.Plugins
+                    # Get the next directory selection from the user, showing the back option if anywhere but the $global:PowerResponse.Config.Path.Plugins
                     $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
 
-                    # Get the selected $script:Location item
+                    # Get the selected $global:PowerResponse.Location item
                     try {
-                        $script:Location = Get-Item ('{0}\{1}' -f $script:Location.FullName,$Selection) -ErrorAction Stop
+                        $global:PowerResponse.Location = Get-Item ('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -ErrorAction Stop
                     } catch {
                         Write-Warning 'Something went wrong, please try again'
                     }
                 }
 
-                # Format all the $script:Parameters to form to the selected $script:Location
+                # Format all the $global:PowerResponse.Parameters to form to the selected $global:PowerResponse.Location
                 Format-Parameter
 
-                # Show all of the $script:Parameters relevent to the selected $CommandParameters
+                # Show all of the $global:PowerResponse.Parameters relevent to the selected $CommandParameters
                 Invoke-ShowCommand
 
                 # Until the user specifies to 'run' the program or go 'back', interpret $UserInput as commands
@@ -738,14 +745,14 @@ Authors: 5ynax | 5k33tz | Valrkey
                     # Get $UserInput
                     $UserInput = Read-PRHost
 
-                    # Interpret $UserInput as a command and pass the $script:Location
+                    # Interpret $UserInput as a command and pass the $global:PowerResponse.Location
                     if ($UserInput) {
                         Invoke-PRCommand -UserInput $UserInput | Out-Default
                     }
                 } while (@('run','back','..') -NotContains $UserInput)
 
-                # Set $script:Location to the previous directory
-                $script:Location = Get-Item -Path ($script:Location.FullName -Replace ('\\[^\\]+$'))
+                # Set $global:PowerResponse.Location to the previous directory
+                $global:PowerResponse.Location = Get-Item -Path ($global:PowerResponse.Location.FullName -Replace ('\\[^\\]+$'))
             } while ($True)
         } finally {
             # Set location back to original $SavedLocation
@@ -753,6 +760,9 @@ Authors: 5ynax | 5k33tz | Valrkey
 
             # Write a log to indicate framework exit
             Write-Log -Message 'Exited the Power-Response framework'
+
+            # Remove $global:PowerResponse hashtable
+            $global:PowerResponse = $null
 
             Write-Host "`nExiting..."
         }
