@@ -8,7 +8,7 @@
     using the autorunsc Sysinternals tool. This plugin runs autoruns with the
     following options on each host:
 
-    autorunsc64.exe -accepteula -a * -h -nobanner -v -s -t -c
+    autorunsc64.exe /accepteula -a * -h -nobanner -v -s -t -c
 
     The options that are inlcuded in this execution are:
 
@@ -19,7 +19,7 @@
     -t             Standardizes time in UTC format
     -c             Outputs in a CSV format
     -nobanner      Does not inlcude Autoruns banner
-    -accepteula    Does not prompt for EULA acceptance
+    /accepteula    Does not prompt for EULA acceptance
 
     This plugin opts for collection of all ASEPs available including:
 
@@ -42,7 +42,7 @@
     Autorunsc
 
 .EXAMPLE
-    Get-ASEP.ps1 -ComputerName Test-PC
+    Collect-ASEP.ps1 -ComputerName Test-PC
 
     PowerResponse Execution
     Set ComputerName Test-PC
