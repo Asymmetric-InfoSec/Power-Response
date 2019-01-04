@@ -13,16 +13,15 @@ level parameter set.
 Note: The CSV and TXT file must be formatted with the first row (and first column)
 being labeled as 'ComputerName'
 
-When referencing the global variable in the Power-Response framework, you will need
-to reference global:ComputerName as the value that will represent your imported 
-hosts.
-
 .EXAMPLE
 
 Script Usage
 
 Import-Hosts.ps1 -FilePath C:\Tools\Power-Response\Hosts.txt
 
+Power-Response Usage
+Set FilePath C:\Tools\Power-Response\Hosts.txt
+Run
 
 .NOTES
     Author: 5yn@x
