@@ -23,10 +23,6 @@ Script Usage
 
 Import-Hosts.ps1 -FilePath C:\Tools\Power-Response\Hosts.txt
 
-Parameter Use (In other Power-Response plugins)
-
-Set [Parameter Name from Plugin] global:ComputerName
-
 
 .NOTES
     Author: 5yn@x
@@ -46,8 +42,8 @@ param (
 
     )
 
-process{
+process {
 
-    $global:ComputerName = Import-CSV $FilePath | Select -ExpandProperty ComputerName
+    $global:PowerResponse.Parameters.ComputerName = Import-CSV $FilePath | Select -ExpandProperty ComputerName
 
     }

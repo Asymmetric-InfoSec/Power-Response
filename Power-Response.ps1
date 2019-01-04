@@ -33,8 +33,11 @@ function Format-Parameter {
                 # Convert UserInput object to String for more complex casting
                 $global:PowerResponse.Parameters.$CommandParam = $global:PowerResponse.Parameters.$CommandParam.ToString()
 
-                # Build a $Commands string to check for PowerShell expressions '[TYPE]($global:PowerResponse.Parameters.VALUE)'
-                $Commands += '[{0}]({1})' -f $ParameterType.FullName,$global:PowerResponse.Parameters.$CommandParam
+                # If the input value is not a file path, try to execute it as a PowerShell expression
+                if (!(Test-Path $global:PowerResponse.Parameters.$CommandParam)) {
+                    # Build a $Commands string to check for PowerShell expressions '[TYPE]($global:PowerResponse.Parameters.VALUE)'
+                    $Commands += '[{0}]({1})' -f $ParameterType.FullName,$global:PowerResponse.Parameters.$CommandParam
+                }
 
                 # If we have an array $ParameterType and string $ValueType
                 if ($ParameterType.BaseType.FullName -eq 'System.Array') {
@@ -367,18 +370,12 @@ function Invoke-RunCommand {
             # Parse the $ReleventParameters from $global:PowerResponse.Parameters
             $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
-            # Initialize $OutputParameters Hashtable
-            $OutputParameters = @{}
-
-            # Parse the $OutputParameters from $global:PowerResponse.Parameters
-            $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { @('OutputType') -Contains $PSItem.Key } | Foreach-Object { $OutputParameters.($PSItem.Key) = $PSItem.Value }
-
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
             try {
                 # Execute the $global:PowerResponse.Location with the $ReleventParameters
-                & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile @OutputParameters
+                & $global:PowerResponse.Location.FullName @ReleventParameters | Out-Null
 
                 # Write execution success log
                 Write-Log -Message 'Plugin execution succeeded'
@@ -536,18 +533,24 @@ function Out-PRFile {
         [PSObject]$InputObject,
 
         [ValidateSet('CSV','XML')]
-        [String[]]$OutputType = $global:PowerResponse.Config.OutputType
+        [String[]]$OutputType = $global:PowerResponse.Parameters.OutputType,
+
+        [String]$ComputerName,
+
+        [String]$Directory
     )
 
     begin {
         # Get UTC $Date
         $Date = (Get-Date).ToUniversalTime()
 
-        # Create the destination file $BaseName: {UTC TIMESTAMP}_{PLUGIN}
-        $BaseName = '{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower()
+        # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}
+        $Name = '{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower()
 
-        # Set up $Path based on $BaseName and $OutputType
-        $Path = '{0}\{1}' -f $global:PowerResponse.Config.Path.Output, $BaseName
+        $Directory = '{0}\{1:yyyy-MM-dd}\{2}\{3}' -f $global:PowerResponse.Config.Path.Output,$Date,$ComputerName,$Directory
+
+        # Set up $FullName based on $Directory and $Name
+        $FullName = '{0}\{1}' -f $Directory,$Name
 
         # Initialize $Objects array for pipeline handling
         $Objects = @()
@@ -563,35 +566,59 @@ function Out-PRFile {
             return
         }
 
+        # If the $Directory doesn't exist, create it
+        if (!(Test-Path -Path $Directory)) {
+            New-Item -Path $Directory -Type 'Directory' | Out-Null
+        }
+
         try {
             # Initialize $Paths to empty array
-            $Paths = @()
+            $Path = @()
 
             # Export the $Objects into specified format
             switch($OutputType) {
-                'CSV' { $Objects | Export-Csv -NoTypeInformation -Path ('{0}.{1}' -f $Path, $PSItem.ToLower()); $Paths += ('{0}.{1}' -f $Path, $PSItem.ToLower()) }
-                'XML' { $Objects | Export-CliXml -Path ('{0}.{1}' -f $Path, $PSItem.ToLower()); $Paths += ('{0}.{1}' -f $Path, $PSItem.ToLower()) }
+                'CSV' { $Objects | Export-Csv -NoTypeInformation -Path ('{0}.{1}' -f $FullName,$PSItem.ToLower()); $Path += ('{0}.{1}' -f $FullName,$PSItem.ToLower()) }
+                'XML' { $Objects | Export-CliXml -Path ('{0}.{1}' -f $FullName,$PSItem.ToLower()); $Path += ('{0}.{1}' -f $FullName,$PSItem.ToLower()) }
                 default { Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType); exit }
             }
         } catch {
             # Caught error exporting $Objects
-            Write-Warning ('{0} output export error: {1}' -f ($OutputType -Join ','), $PSItem)
+            $Message = '{0} output export error: {1}' -f ($OutputType -Join ','), $PSItem
+
+            # Write output object export warning
+            Write-Warning -Message $Message
 
             # Write output object export error log
-            Write-Log -Message ('{0} output export error: {1}' -f ($OutputType -Join ','), $PSItem)
+            Write-Log -Message $Message
 
             # Remove the created $Path file
             Remove-Item -Force -Path $Path
-
-            # Return early on error
-            return
         }
 
-        # Make the $Paths ReadOnly
-        Set-ItemProperty -Path $Paths -Name 'IsReadOnly' -Value $true
+        Protect-PRFile -Path $Path
+    }
+}
 
-        # Write the new output file log with Hash for each entity in $Paths
-        Get-FileHash -Algorithm $global:PowerResponse.Config.HashAlgorithm -Path $Paths | Foreach-Object { Write-Log -Message ('Created output file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $global:PowerResponse.Regex.Output), $PSItem.Algorithm, $PSItem.Hash) }
+function Protect-PRFile {
+    param (
+        [Parameter(Mandatory=$true,Position=0)]
+        [String[]]$Path,
+
+        [ValidateSet('SHA1','SHA256','SHA384','SHA512','MACTripleDES','MD5','RIPEMD160')]
+        [String]$HashAlgorithm = $global:PowerResponse.Config.HashAlgorithm
+    )
+
+    process {
+        # Make $Path items ReadOnly
+        Set-ItemProperty -Path $Path -Name 'IsReadOnly' -Value $true -ErrorAction 'SilentlyContinue'
+
+        # Write the new output file log with Hash for each entity in $Path
+        Get-FileHash -Algorithm $HashAlgorithm -Path $Path -ErrorAction 'SilentlyContinue' | Foreach-Object {
+            $Message = 'Protected file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $global:PowerResponse.Regex.Output), $PSItem.Algorithm, $PSItem.Hash
+
+            # Write protection and integrity log
+            Write-Log -Message $Message
+        }
     }
 }
 
@@ -708,6 +735,11 @@ Authors: 5ynax | 5k33tz | Valrkey
         # Initialize tracked $global:PowerResponse.Parameters to $global:PowerResponse.Config data
         $global:PowerResponse.Parameters = @{ OutputType = $global:PowerResponse.Config.OutputType }
 
+        # If we have gathered a credential object from the Config, add it to the $global:PowerResponse.Parameters hashtable
+        if ($global:PowerResponse.Credential.Windows) {
+            $global:PowerResponse.Parameters.Credential = $global:PowerResponse.Credential.Windows
+        }
+
         # Trap 'exit's and Ctrl-C interrupts
         try {
             # Loop through searching for a script file and setting parameters
@@ -762,7 +794,7 @@ Authors: 5ynax | 5k33tz | Valrkey
             Write-Log -Message 'Exited the Power-Response framework'
 
             # Remove $global:PowerResponse hashtable
-            $global:PowerResponse = $null
+            Remove-Variable -Name 'PowerResponse' -Scope 'global'
 
             Write-Host "`nExiting..."
         }
