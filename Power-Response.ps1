@@ -445,6 +445,9 @@ function Invoke-RunCommand {
                     # Write execution error log
                     Write-Log -Message $Message
                 }
+
+                # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
+                $global:PowerResponse.OutputPath = $null
             }
         } else {
             Write-Warning 'No plugin selected for execution'
