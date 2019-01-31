@@ -1,3 +1,27 @@
+[CmdletBinding()]
+param(
+    [String]$ConfigPath = ('{0}\Config.psd1' -f $PSScriptRoot),
+    [String[]]$ComputerName
+)
+
+# UserInput class is designed to separate user input strings to successfully casted string type parameters
+# Essentially acts like a string for our purposes
+$UserInputType = [System.AppDomain]::CurrentDomain.GetAssemblies() | Foreach-Object { $PSItem.GetTypes() | Where-Object { $PSItem.Name -eq 'UserInput' } }
+if (!$UserInputType) {
+    Write-Log -Message 'Creating UserInput class'
+    class UserInput {
+        [String]$Value
+
+        UserInput([String]$Value) {
+            $this.Value = $Value
+        }
+
+        [String] ToString() {
+            return $this.Value
+        }
+    }
+}
+
 function Format-Parameter {
     param (
         [String[]]$Arguments
@@ -261,6 +285,18 @@ function Invoke-BackCommand {
     }
 }
 
+function Invoke-ClearCommand {
+    [Alias("Invoke-CLSCommand")]
+    param (
+        [String[]]$Arguments
+    )
+
+    process {
+        # Clear the console
+        [System.Console]::Clear()
+    }
+}
+
 function Invoke-ExitCommand {
     [Alias('Invoke-QuitCommand')]
     param (
@@ -373,42 +409,50 @@ function Invoke-RunCommand {
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
-            try {
-                # Execute the $global:PowerResponse.Location with the $ReleventParameters
-                & $global:PowerResponse.Location.FullName @ReleventParameters | Out-Null
+            # Set up $ComputerName array to run at least once
+            $ComputerName = @('RUNONCE')
 
-                # Write execution success log
-                Write-Log -Message 'Plugin execution succeeded'
+            # if a $ReleventParameters.ComputerName is tracked as a String[], cycle through the contained array
+            if ($ReleventParameters.ComputerName -ne $null) {
+                $ComputerName = $ReleventParameters.ComputerName
+            }
 
-                # Print message to the screen, pause 2 seconds then clear the screen
-                Write-Host "The plugin has executed successfully. Go forth and forensicate!"
-                Start-Sleep -s 2
-                Invoke-ClearCommand
-            } catch {
-                $Message = 'Plugin execution error, are you running as admin?: {0}' -f $PSItem
+            foreach ($Computer in $ComputerName) {
+                # Force the current $Computer as the $ReleventParameters.ComputerName
+                if ($ReleventParameters.ComputerName -ne $null) {
+                    $ReleventParameters.ComputerName = $Computer
+                }
 
-                Write-Warning -Message $Message
+                # Set $global:PowerResponse.OutputPath for use in the plugin and Out-PRFile
+                $global:PowerResponse.OutputPath = '{0}\{1:yyyy-MM-dd}\{2}' -f $global:PowerResponse.Config.Path.Output,$Date,$Computer
 
-                # Write execution error log
-                Write-Log -Message $Message
+                try {
+                    # Execute the $global:PowerResponse.Location with the $ReleventParameters
+                    & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile
+
+                    # Write execution success log
+                    Write-Log -Message 'Plugin execution succeeded'
+
+                    # Print message to the screen, pause 2 seconds then clear the screen
+                    Write-Host "The plugin has executed successfully. Go forth and forensicate!"
+                    Start-Sleep -s 2
+                    Invoke-ClearCommand
+                } catch {
+                    $Message = 'Plugin execution error, are you running as admin?: {0}' -f $PSItem
+
+                    Write-Warning -Message $Message
+
+                    # Write execution error log
+                    Write-Log -Message $Message
+                }
+
+                # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
+                $global:PowerResponse.OutputPath = $null
             }
         } else {
             Write-Warning 'No plugin selected for execution'
         }
     }
-}
-
-function Invoke-ClearCommand {
-    [alias("Invoke-CLSCommand")]
-   param (
-        [String[]]$Arguments
-    )
-
-    process {
-        # Clear the console
-        [System.Console]::Clear()
-    }
-
 }
 
 function Invoke-SetCommand {
@@ -523,6 +567,7 @@ function Invoke-PRCommand {
         } catch {
             # Didn't understand keyword specified, write warning to screen
             Write-Warning ('Unknown Command ''{0}'', ''help'' prints a list of available commands' -f $Keyword)
+            Write-Verbose $PSItem
         }
     }
 }
@@ -535,8 +580,6 @@ function Out-PRFile {
         [ValidateSet('CSV','XML')]
         [String[]]$OutputType = $global:PowerResponse.Parameters.OutputType,
 
-        [String]$ComputerName,
-
         [String]$Directory
     )
 
@@ -547,10 +590,8 @@ function Out-PRFile {
         # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}
         $Name = '{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower()
 
-        $Directory = '{0}\{1:yyyy-MM-dd}\{2}\{3}' -f $global:PowerResponse.Config.Path.Output,$Date,$ComputerName,$Directory
-
         # Set up $FullName based on $Directory and $Name
-        $FullName = '{0}\{1}' -f $Directory,$Name
+        $DirectoryPath = '{0}\{1}' -f $global:PowerResponse.OutputPath,$Directory
 
         # Initialize $Objects array for pipeline handling
         $Objects = @()
@@ -567,8 +608,8 @@ function Out-PRFile {
         }
 
         # If the $Directory doesn't exist, create it
-        if (!(Test-Path -Path $Directory)) {
-            New-Item -Path $Directory -Type 'Directory' | Out-Null
+        if (!(Test-Path -Path $DirectoryPath)) {
+            New-Item -Path $DirectoryPath -Type 'Directory' | Out-Null
         }
 
         try {
@@ -577,8 +618,8 @@ function Out-PRFile {
 
             # Export the $Objects into specified format
             switch($OutputType) {
-                'CSV' { $Objects | Export-Csv -NoTypeInformation -Path ('{0}.{1}' -f $FullName,$PSItem.ToLower()); $Path += ('{0}.{1}' -f $FullName,$PSItem.ToLower()) }
-                'XML' { $Objects | Export-CliXml -Path ('{0}.{1}' -f $FullName,$PSItem.ToLower()); $Path += ('{0}.{1}' -f $FullName,$PSItem.ToLower()) }
+                'CSV' { $Objects | Export-Csv -NoTypeInformation -Path ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()) }
+                'XML' { $Objects | Export-CliXml -Path ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()) }
                 default { Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType); exit }
             }
         } catch {
@@ -667,30 +708,8 @@ function Write-Log {
     }
 }
 
-function Power-Response {
-    begin {
-        # UserInput class is designed to separate user input strings to successfully casted string type parameters
-        # Essentially acts like a string for our purposes
-        $UserInputType = [System.AppDomain]::CurrentDomain.GetAssemblies() | Foreach-Object { $PSItem.GetTypes() | Where-Object { $PSItem.Name -eq 'UserInput' } }
-        if (!$UserInputType) {
-            Write-Host 'Importing UserInput class'
-            class UserInput {
-                [String]$Value
-
-                UserInput([String]$Value) {
-                    $this.Value = $Value
-                }
-
-                [String] ToString() {
-                    return $this.Value
-                }
-            }
-        }
-    }
-
-    process {
-        # $Banner for Power-Response
-        $Banner = @'
+# $Banner for Power-Response
+$Banner = @'
     ____                                ____                                      
    / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________ 
   / /_/ / __ \ | /| / / _ \/ ___/_____/ /_/ / _ \/ ___/ __ \/ __ \/ __ \/ ___/ _ \
@@ -702,103 +721,99 @@ Authors: 5ynax | 5k33tz | Valrkey
 
 '@
 
-        Write-Host $Banner
+Write-Host $Banner
 
-        # Initialize $globalPowerResponse hashtable
-        $global:PowerResponse = @{}
+# Initialize $globalPowerResponse hashtable
+$global:PowerResponse = @{}
 
-        # Import $global:PowerResponse.Config from data file
-        Import-Config
+# Import $global:PowerResponse.Config from data file
+Import-Config
 
-        # Write a log to indicate framework startup
-        Write-Log -Message 'Began the Power-Response framework'
+# Write a log to indicate framework startup
+Write-Log -Message 'Began the Power-Response framework'
 
-        # Save the execution location
-        $SavedLocation = Get-Location
+# Save the execution location
+$SavedLocation = Get-Location
 
-        # Set the location to Bin folder to allow easy asset access
-        Set-Location $global:PowerResponse.Config.Path.Bin
+# Set the location to Bin folder to allow easy asset access
+Set-Location -Path $global:PowerResponse.Config.Path.Bin
 
-        # Get the $Plugins directory item
-        $Plugins = Get-Item -Path $global:PowerResponse.Config.Path.Plugins
+# Get the $Plugins directory item
+$Plugins = Get-Item -Path $global:PowerResponse.Config.Path.Plugins
 
-        # Initialize the current $global:PowerResponse.Location to the $global:PowerResponse.Config.Path.Plugins directory item
-        $global:PowerResponse.Location = $Plugins
+# Initialize the current $global:PowerResponse.Location to the $global:PowerResponse.Config.Path.Plugins directory item
+$global:PowerResponse.Location = $Plugins
 
-        # Ensure we have at least one plugin installed
-        if (!(Get-ChildItem $global:PowerResponse.Location)) {
-            Write-Error 'No Power-Response plugins detected'
-            Read-Host 'Press Enter to Exit'
-            exit
-        }
-
-        # Initialize tracked $global:PowerResponse.Parameters to $global:PowerResponse.Config data
-        $global:PowerResponse.Parameters = @{ OutputType = $global:PowerResponse.Config.OutputType }
-
-        # If we have gathered a credential object from the Config, add it to the $global:PowerResponse.Parameters hashtable
-        if ($global:PowerResponse.Credential.Windows) {
-            $global:PowerResponse.Parameters.Credential = $global:PowerResponse.Credential.Windows
-        }
-
-        # Trap 'exit's and Ctrl-C interrupts
-        try {
-            # Loop through searching for a script file and setting parameters
-            do {
-                # While the $global:PowerResponse.Location is a directory
-                while ($global:PowerResponse.Location.PSIsContainer) {
-                    # Compute $Title - Power-Response\CurrentPath
-                    $Title = $global:PowerResponse.Location.FullName -Replace $global:PowerResponse.Regex.Plugins
-
-                    # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
-                    $Choice = Get-ChildItem -Path $global:PowerResponse.Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
-
-                    #Compute $Back - ensure we are not at the $global:PowerResponse.Config.Path.Plugins
-                    $Back = $Plugins.FullName -NotMatch [Regex]::Escape($global:PowerResponse.Location.FullName)
-
-                    # Get the next directory selection from the user, showing the back option if anywhere but the $global:PowerResponse.Config.Path.Plugins
-                    $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
-
-                    # Get the selected $global:PowerResponse.Location item
-                    try {
-                        $global:PowerResponse.Location = Get-Item ('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -ErrorAction Stop
-                    } catch {
-                        Write-Warning 'Something went wrong, please try again'
-                    }
-                }
-
-                # Format all the $global:PowerResponse.Parameters to form to the selected $global:PowerResponse.Location
-                Format-Parameter
-
-                # Show all of the $global:PowerResponse.Parameters relevent to the selected $CommandParameters
-                Invoke-ShowCommand
-
-                # Until the user specifies to 'run' the program or go 'back', interpret $UserInput as commands
-                do {
-                    # Get $UserInput
-                    $UserInput = Read-PRHost
-
-                    # Interpret $UserInput as a command and pass the $global:PowerResponse.Location
-                    if ($UserInput) {
-                        Invoke-PRCommand -UserInput $UserInput | Out-Default
-                    }
-                } while (@('run','back','..') -NotContains $UserInput)
-
-                # Set $global:PowerResponse.Location to the previous directory
-                $global:PowerResponse.Location = Get-Item -Path ($global:PowerResponse.Location.FullName -Replace ('\\[^\\]+$'))
-            } while ($True)
-        } finally {
-            # Set location back to original $SavedLocation
-            Set-Location -Path $SavedLocation
-
-            # Write a log to indicate framework exit
-            Write-Log -Message 'Exited the Power-Response framework'
-
-            # Remove $global:PowerResponse hashtable
-            Remove-Variable -Name 'PowerResponse' -Scope 'global'
-
-            Write-Host "`nExiting..."
-        }
-    }
+# Ensure we have at least one plugin installed
+if (!(Get-ChildItem $global:PowerResponse.Location)) {
+    Write-Error 'No Power-Response plugins detected'
+    Read-Host 'Press Enter to Exit'
+    exit
 }
 
-Power-Response
+# Initialize tracked $global:PowerResponse.Parameters to $global:PowerResponse.Config data
+$global:PowerResponse.Parameters = @{ OutputType = $global:PowerResponse.Config.OutputType; ComputerName = $ComputerName }
+
+# If we have gathered a credential object from the Config, add it to the $global:PowerResponse.Parameters hashtable
+if ($global:PowerResponse.Credential.Windows) {
+    $global:PowerResponse.Parameters.Credential = $global:PowerResponse.Credential.Windows
+}
+
+# Trap 'exit's and Ctrl-C interrupts
+try {
+    # Loop through searching for a script file and setting parameters
+    do {
+        # While the $global:PowerResponse.Location is a directory
+        while ($global:PowerResponse.Location.PSIsContainer) {
+            # Compute $Title - Power-Response\CurrentPath
+            $Title = $global:PowerResponse.Location.FullName -Replace $global:PowerResponse.Regex.Plugins
+
+            # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
+            $Choice = Get-ChildItem -Path $global:PowerResponse.Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
+
+            #Compute $Back - ensure we are not at the $global:PowerResponse.Config.Path.Plugins
+            $Back = $Plugins.FullName -NotMatch [Regex]::Escape($global:PowerResponse.Location.FullName)
+
+            # Get the next directory selection from the user, showing the back option if anywhere but the $global:PowerResponse.Config.Path.Plugins
+            $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
+
+            # Get the selected $global:PowerResponse.Location item
+            try {
+                $global:PowerResponse.Location = Get-Item ('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -ErrorAction Stop
+            } catch {
+                Write-Warning 'Something went wrong, please try again'
+            }
+        }
+
+        # Format all the $global:PowerResponse.Parameters to form to the selected $global:PowerResponse.Location
+        Format-Parameter
+
+        # Show all of the $global:PowerResponse.Parameters relevent to the selected $CommandParameters
+        Invoke-ShowCommand
+
+        # Until the user specifies to 'run' the program or go 'back', interpret $UserInput as commands
+        do {
+            # Get $UserInput
+            $UserInput = Read-PRHost
+
+            # Interpret $UserInput as a command and pass the $global:PowerResponse.Location
+            if ($UserInput) {
+                Invoke-PRCommand -UserInput $UserInput | Out-Default
+            }
+        } while (@('run','back','..') -NotContains $UserInput)
+
+        # Set $global:PowerResponse.Location to the previous directory
+        $global:PowerResponse.Location = Get-Item -Path ($global:PowerResponse.Location.FullName -Replace ('\\[^\\]+$'))
+    } while ($True)
+} finally {
+    # Set location back to original $SavedLocation
+    Set-Location -Path $SavedLocation
+
+    # Write a log to indicate framework exit
+    Write-Log -Message 'Exited the Power-Response framework'
+
+    # Remove $global:PowerResponse hashtable
+    Remove-Variable -Name 'PowerResponse' -Scope 'global'
+
+    Write-Host "`nExiting..."
+}
