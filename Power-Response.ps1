@@ -395,8 +395,7 @@ function Invoke-RunCommand {
     process {
         # If we have selected a file $global:PowerResponse.Location
         if ($global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
-            Write-Host 'Executing Plugin, please wait...'
-            Write-Host 'Plugin Execution Started at' $(Get-Date)
+            Write-Host -Object ('Plugin Execution Started at {0:u}' -f (Get-Date).ToUniversalTime())
 
             # Gather to $global:PowerResponse.Location's $CommandParameters
             $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
@@ -419,9 +418,15 @@ function Invoke-RunCommand {
             }
 
             foreach ($Computer in $ComputerName) {
-                # Force the current $Computer as the $ReleventParameters.ComputerName
                 if ($ReleventParameters.ComputerName -ne $null) {
+                    # Force the current $Computer as the $ReleventParameters.ComputerName
                     $ReleventParameters.ComputerName = $Computer
+
+                    # Format $Computer into $ComputerText for future $Message composition
+                    $ComputerText = ' for {0}' -f $Computer
+                } else {
+                    # Format $Computer into $ComputerText as null for future $Message
+                    $ComputerText = ''
                 }
 
                 # Set $global:PowerResponse.OutputPath for use in the plugin and Out-PRFile
@@ -431,40 +436,21 @@ function Invoke-RunCommand {
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
                     & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile
 
-                    if ($Computer -eq "RUNONCE") {
-                        
-                        $Success_Message = "Plugin Execution Succeeded!"
-                        
-                    } else {
-                        
-                        $Success_Message = "Plugin Execution Succeeded for {0}" -f $Computer                   
-
-                    }
-
-                    # Write execution success to log
-                    Write-Log -Message $Success_Message
+                    $Message = "Plugin Execution Succeeded{0}" -f $ComputerText
 
                     # Write execution success message
-                    Write-Host $Success_Message
+                    Write-Host -Object $Message
                     
                 } catch {
+                    # Format warning $Message
+                    $Message = 'Plugin execution error{0}: {1}' -f $ComputerText,$PSItem
                     
-                    if ($Computer -eq "RUNONCE"){
-
-                        $Message = 'Plugin execution error, are you running as admin?: {0}' -f $PSItem
-
-                    } else {
-
-                        $Message = 'Plugin execution error for {0}, are you running as admin?: {1}' -f $Computer, $PSItem
-
-                    }
-                    
-                    #Write warning to screen
-                    Write-Warning -Message $Message
-
-                    # Write execution error log
-                    Write-Log -Message $Message
+                    # Write warning $Message to screen along with an admin
+                    Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
                 }
+
+                # Write execution $Message to log
+                Write-Log -Message $Message
 
                 # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
                 $global:PowerResponse.OutputPath = $null
