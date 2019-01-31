@@ -455,18 +455,18 @@ function Invoke-RunCommand {
                 # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
                 $global:PowerResponse.OutputPath = $null
 
+                # Write plugin execution completion message and verify with input prior to clearing
+                Write-Host ("Plugin execution complete. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating") -ForegroundColor Cyan -Backgroundcolor Black
+
+                # Somewhat janky way of being able to have a message acknowledged and still have it show in color
+                Read-Host | Out-Null
+
+                # Clear screen once completion acknowledged
+                Invoke-ClearCommand
             }
         } else {
             Write-Warning 'No plugin selected for execution'
         }
-
-        # Write plugin execution completion message and verify with input prior to clearing
-        Write-Host ("Plugin execution complete. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating") -ForegroundColor Cyan -Backgroundcolor Black
-        # Somewhat janky way of being able to have a message acknowledged and still have it show in color
-        $input = Read-host 
-
-        #Clear screen once completion acknowledged
-        Invoke-ClearCommand
     }
 }
 
