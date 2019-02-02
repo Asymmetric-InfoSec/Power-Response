@@ -395,7 +395,7 @@ function Invoke-RunCommand {
     process {
         # If we have selected a file $global:PowerResponse.Location
         if ($global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
-            Write-Host 'Executing Plugin, please wait...'
+            Write-Host -Object ('Plugin Execution Started at {0:u}' -f (Get-Date).ToUniversalTime())
 
             # Gather to $global:PowerResponse.Location's $CommandParameters
             $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
@@ -418,9 +418,15 @@ function Invoke-RunCommand {
             }
 
             foreach ($Computer in $ComputerName) {
-                # Force the current $Computer as the $ReleventParameters.ComputerName
                 if ($ReleventParameters.ComputerName -ne $null) {
+                    # Force the current $Computer as the $ReleventParameters.ComputerName
                     $ReleventParameters.ComputerName = $Computer
+
+                    # Format $Computer into $ComputerText for future $Message composition
+                    $ComputerText = ' for {0}' -f $Computer
+                } else {
+                    # Format $Computer into $ComputerText as null for future $Message
+                    $ComputerText = ''
                 }
 
                 # Set $global:PowerResponse.OutputPath for use in the plugin and Out-PRFile
@@ -430,24 +436,33 @@ function Invoke-RunCommand {
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
                     & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile
 
-                    # Write execution success log
-                    Write-Log -Message 'Plugin execution succeeded'
+                    $Message = "Plugin Execution Succeeded{0}" -f $ComputerText
 
-                    # Print message to the screen, pause 2 seconds then clear the screen
-                    Write-Host "The plugin has executed successfully. Go forth and forensicate!"
-                    Start-Sleep -s 2
-                    Invoke-ClearCommand
+                    # Write execution success message
+                    Write-Host -Object $Message
+                    
                 } catch {
-                    $Message = 'Plugin execution error, are you running as admin?: {0}' -f $PSItem
-
-                    Write-Warning -Message $Message
-
-                    # Write execution error log
-                    Write-Log -Message $Message
+                    # Format warning $Message
+                    $Message = 'Plugin execution error{0}: {1}' -f $ComputerText,$PSItem
+                    
+                    # Write warning $Message to screen along with an admin
+                    Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
                 }
+
+                # Write execution $Message to log
+                Write-Log -Message $Message
 
                 # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
                 $global:PowerResponse.OutputPath = $null
+
+                # Write plugin execution completion message and verify with input prior to clearing
+                Write-Host ("Plugin execution complete. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating") -ForegroundColor Cyan -Backgroundcolor Black
+
+                # Somewhat janky way of being able to have a message acknowledged and still have it show in color
+                Read-Host | Out-Null
+
+                # Clear screen once completion acknowledged
+                Invoke-ClearCommand
             }
         } else {
             Write-Warning 'No plugin selected for execution'
