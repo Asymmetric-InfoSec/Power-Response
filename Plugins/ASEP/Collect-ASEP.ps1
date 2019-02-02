@@ -8,13 +8,13 @@
     using the autorunsc Sysinternals tool. This plugin runs autoruns with the
     following options on each host:
 
-    autorunsc64.exe /accepteula -a * -h -nobanner -v -s -t -c
+    autorunsc64.exe /accepteula -a * -h -nobanner -vt -s -t -c
 
     The options that are inlcuded in this execution are:
 
     -a             Specifies the ASEP type to collect (See below)
     -h             Collects several hashes of each ASEP
-    -v             Queries VirusTotal based on hash only
+    -vt            Queries VirusTotal based on hash only, but does not require explicit acceptance of EULA for VT
     -s             Verifies signatures of all ASEPs
     -t             Standardizes time in UTC format
     -c             Outputs in a CSV format
@@ -49,7 +49,7 @@
     Run
 
 .NOTES
-    Author: 5yn@x
+    Author: Drew Schmitt
     Date Created: 12/29/2018
     Twitter: @5ynax
     
@@ -149,9 +149,10 @@ process{
 
 
     #Run Autorunsc on the remote host and collect ASEP data
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} /accepteula -a * -h -nobanner -v -s -t -c") -f (Split-Path -Path $Installexe -Leaf))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} /accepteula -a * -h -nobanner -vt -s -t -c") -f (Split-Path -Path $Installexe -Leaf))
     
-    Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
+    Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock | ConvertFrom-CSV
+
     
     #Remove Autorunsc from remote host
     try {
