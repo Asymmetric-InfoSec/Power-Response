@@ -1,4 +1,6 @@
 ![alt text](https://github.com/Asymmetric-InfoSec/Power-Response/blob/master/Extras/PR_Logo.PNG "Sweet Power-Response Logo")
+
+Drew Schmitt | Matt Weikert | Gavin Prentice
 ________________________________________________________________________________________________
 
 Please note that Power-Response is **still under active development**. We will continue to add plugins and enhancements for the foreseeable future. If you have any requests, please submit an issue above. We also accept pull requests. If you have something you would like to contribute, send up a pull request for us to take a look. Please check the wiki for details on best practices for developing plugins for Power-Response.
