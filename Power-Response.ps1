@@ -799,7 +799,7 @@ try {
 
             # Get the selected $global:PowerResponse.Location item
             try {
-                $global:PowerResponse.Location = Get-Item ('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -ErrorAction Stop
+                $global:PowerResponse.Location = Get-Item (('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -Replace '\\$') -ErrorAction Stop
             } catch {
                 Write-Warning 'Something went wrong, please try again'
             }
@@ -823,7 +823,7 @@ try {
         } while (@('run','back','..') -NotContains $UserInput)
 
         # Set $global:PowerResponse.Location to the previous directory
-        $global:PowerResponse.Location = Get-Item -Path ($global:PowerResponse.Location.FullName -Replace ('\\[^\\]+$'))
+        $global:PowerResponse.Location = Get-Item -Path ($global:PowerResponse.Location.FullName -Replace '\\[^\\]*$')
     } while ($True)
 } finally {
     # Set location back to original $SavedLocation
