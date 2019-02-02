@@ -732,7 +732,7 @@ $Banner = @'
 /_/    \____/|__/|__/\___/_/        /_/ |_|\___/____/ .___/\____/_/ /_/____/\___/ 
                                                    /_/                            
 
-Authors: 5ynax | 5k33tz | Valrkey
+Authors: Drew Schmitt | Matt Weikert | Gavin Prentice
 
 '@
 
