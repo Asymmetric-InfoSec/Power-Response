@@ -4,6 +4,9 @@ param(
     [String[]]$ComputerName
 )
 
+# $ErrorActionPreference of 'Stop'
+$ErrorActionPreference = 'Stop'
+
 # UserInput class is designed to separate user input strings to successfully casted string type parameters
 # Essentially acts like a string for our purposes
 $UserInputType = [System.AppDomain]::CurrentDomain.GetAssemblies() | Foreach-Object { $PSItem.GetTypes() | Where-Object { $PSItem.Name -eq 'UserInput' } }
@@ -237,7 +240,7 @@ function Import-Config {
         }
         if (!$Config.Path.Output) {
             $Config.Path.Output = $Default.Path.Output
-        } 
+        }
         if (!$Config.Path.Plugins) {
             $Config.Path.Plugins = $Default.Path.Plugins
         }
@@ -427,10 +430,13 @@ function Invoke-RunCommand {
                 } else {
                     # Format $Computer into $ComputerText as null for future $Message
                     $ComputerText = ''
+
+                    # Set $Computer to null for the $global:PowerResponse.OutputPath formatting
+                    $Computer = ''
                 }
 
                 # Set $global:PowerResponse.OutputPath for use in the plugin and Out-PRFile
-                $global:PowerResponse.OutputPath = '{0}\{1:yyyy-MM-dd}\{2}' -f $global:PowerResponse.Config.Path.Output,$Date,$Computer
+                $global:PowerResponse.OutputPath = ('{0}\{1:yyyy-MM-dd}\{2}' -f $global:PowerResponse.Config.Path.Output,$Date,$Computer) -Replace '\\\\$','\\'
 
                 try {
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
@@ -449,26 +455,25 @@ function Invoke-RunCommand {
                     Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
                 }
 
+                # Protect any files that were copied to this particular $global:PowerResponse.OutputPath
+                Protect-PRFile
+
                 # Write execution $Message to log
                 Write-Log -Message $Message
-
-                # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
-                $global:PowerResponse.OutputPath = $null
-
             }
-        } else {
-            Write-Warning 'No plugin selected for execution. Press Enter to Continue.'
-            Read-Host | Out-Null
-            Invoke-ClearCommand
-            break
 
+            # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
+            $global:PowerResponse.OutputPath = $null
+
+            # Write plugin execution completion message and verify with input prior to clearing
+             Write-Host ("Plugin execution complete. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating") -ForegroundColor Cyan -Backgroundcolor Black
+        } else {
+            # Write the warning for no plugin selected
+            Write-Warning 'No plugin selected for execution. Press Enter to Continue.'
         }
 
-        # Write plugin execution completion message and verify with input prior to clearing
-         Write-Host ("Plugin execution complete. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating") -ForegroundColor Cyan -Backgroundcolor Black
-
         # Somewhat janky way of being able to have a message acknowledged and still have it show in color
-         Read-Host | Out-Null
+        Read-Host | Out-Null
 
         # Clear screen once completion acknowledged
         Invoke-ClearCommand
@@ -656,29 +661,43 @@ function Out-PRFile {
             Remove-Item -Force -Path $Path
         }
 
+        # Protect the newly created output files
         Protect-PRFile -Path $Path
     }
 }
 
 function Protect-PRFile {
     param (
-        [Parameter(Mandatory=$true,Position=0)]
-        [String[]]$Path,
+        [Parameter(Position=0)]
+        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Path $global:PowerResponse.OutputPath | Select-Object -ExpandProperty 'FullName'),
 
         [ValidateSet('SHA1','SHA256','SHA384','SHA512','MACTripleDES','MD5','RIPEMD160')]
         [String]$HashAlgorithm = $global:PowerResponse.Config.HashAlgorithm
     )
 
     process {
-        # Make $Path items ReadOnly
-        Set-ItemProperty -Path $Path -Name 'IsReadOnly' -Value $true -ErrorAction 'SilentlyContinue'
+        foreach ($File in $Path) {
+            try {
+                # Make $Path items ReadOnly
+                Set-ItemProperty -Path $File -Name 'IsReadOnly' -Value $true -ErrorAction 'Stop'
 
-        # Write the new output file log with Hash for each entity in $Path
-        Get-FileHash -Algorithm $HashAlgorithm -Path $Path -ErrorAction 'SilentlyContinue' | Foreach-Object {
-            $Message = 'Protected file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $global:PowerResponse.Regex.Output), $PSItem.Algorithm, $PSItem.Hash
+                # Write the new output file log with Hash for each entity in $Path
+                Get-FileHash -Algorithm $HashAlgorithm -Path $File -ErrorAction 'Stop' | Foreach-Object {
+                    $Message = 'Protected file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $global:PowerResponse.Regex.Output), $PSItem.Algorithm, $PSItem.Hash
 
-            # Write protection and integrity log
-            Write-Log -Message $Message
+                    # Write protection and integrity log
+                    Write-Log -Message $Message
+                }
+            } catch {
+                # Format the warning $Message
+                $Message = 'Encountered error protecting file ''{0}'': {1}' -f $File,$PSItem
+
+                # Print the warning $Message
+                Write-Warning -Message $Message
+
+                # Write the log $Message
+                Write-Log -Message $Message
+            }
         }
     }
 }
