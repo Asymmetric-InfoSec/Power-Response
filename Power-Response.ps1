@@ -605,15 +605,17 @@ function Out-PRFile {
         [ValidateSet('CSV','XML')]
         [String[]]$OutputType = $global:PowerResponse.Parameters.OutputType,
 
-        [String]$Directory
+        [String]$Directory,
+
+        [String]$Append
     )
 
     begin {
         # Get UTC $Date
         $Date = (Get-Date).ToUniversalTime()
 
-        # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}
-        $Name = '{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower()
+        # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}_{Append}
+        $Name = ('{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}_{2}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower(),$Append) -Replace '_$'
 
         # Set up $FullName based on $Directory and $Name
         $DirectoryPath = '{0}\{1}' -f $global:PowerResponse.OutputPath,$Directory
