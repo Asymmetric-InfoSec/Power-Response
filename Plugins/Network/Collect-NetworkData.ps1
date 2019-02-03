@@ -14,6 +14,7 @@
     DNS Client Cache
     Routing Information
     Shares Information
+    ARP Information
 
     Note: When running this plugin, all data will be stored in separate CSV files with a name 
     similar to [Date]_Collect-NetworkData_[Data Type]
@@ -83,7 +84,7 @@ process {
 
         # Get Routing Information
 
-        $ScriptBlock_Route = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-NATRoute')
+        $ScriptBlock_Route = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-NETRoute')
     
         Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Route | Out-PRFile -Append "RouteTable"
 
@@ -92,6 +93,12 @@ process {
         $ScriptBlock_PSDrive = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-PSDrive')
     
         Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_PSDrive | Out-PRFile -Append "Shares"
+
+        # Get ARP Information
+
+        $ScriptBlock_ARP = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-NetNeighbor')
+    
+        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_ARP | Out-PRFile -Append "ARP"
 
     }
 
