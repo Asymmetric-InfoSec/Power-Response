@@ -41,9 +41,24 @@ process{
     foreach ($Computer in $ComputerName) {
 
         #Run Autorunsc on the remote host and collect ASEP data
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock('(Get-Process).Modules')
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(@'
+Get-Process | Select-Object "ID", "Name", "Modules" | Sort-Object "ID" | Foreach-Object {
+    $ProcessID = $PSItem.ID
+    $ProcessName = $PSItem.Name
+    $PSItem.Modules | Foreach-Object {
+        [PSCustomObject]@{
+            ProcessID=$ProcessID
+            ProcessName=$ProcessName
+            ModuleName=$PSItem.FileName
+            ModuleBaseAddress=$PSItem.BaseAddress
+            ModuleMemorySize=$PSItem.ModuleMemorySize
+            ModuleEntryPointAddress=$PSItem.EntryPointAddress
+        }
+    }
+}
+'@)
     
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
+        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock | Select-Object "ProcessID", "ProcessName", "ModuleName", "ModuleBaseAddress", "ModuleMemorySize", "ModuleEntryPointAddress"
 
 
     }
