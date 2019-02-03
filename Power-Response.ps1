@@ -9,8 +9,8 @@ $ErrorActionPreference = 'Stop'
 
 # UserInput class is designed to separate user input strings to successfully casted string type parameters
 # Essentially acts like a string for our purposes
-$UserInputType = [System.AppDomain]::CurrentDomain.GetAssemblies() | Foreach-Object { $PSItem.GetTypes() | Where-Object { $PSItem.Name -eq 'UserInput' } }
-if (!$UserInputType) {
+[Object[]]$UserInputType = [System.AppDomain]::CurrentDomain.GetAssemblies() | Foreach-Object { $PSItem.GetTypes() | Where-Object { $PSItem.Name -eq 'UserInput' } }
+if ($UserInputType.Count -eq 0) {
     Write-Log -Message 'Creating UserInput class'
     class UserInput {
         [String]$Value
@@ -32,7 +32,7 @@ function Format-Parameter {
 
     process {
         # Gather to $global:PowerResponse.Location's $CommandParameters
-        $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
+        $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters'
 
         # If we are passed no $Arguments, assume full $Parameter format check
         if ($Arguments.Count -eq 0) {
@@ -44,7 +44,7 @@ function Format-Parameter {
 
         # Foreach $CommandParam listed in $Arguments
         foreach ($CommandParam in $Arguments) {
-            # Gather the $CommandParameter $ParameterType
+            # Gather the $CommandParameters $ParameterType
             $ParameterType = $CommandParameters.$CommandParam.ParameterType
 
             # Gather the $global:PowerResponse.Parameters.$CommandParameter $ValueType
@@ -56,7 +56,7 @@ function Format-Parameter {
             $i = 0
 
             # If we have a UserInput object, attempt expression and array expansion
-            if ($ValueType.FullName -eq 'Power-Response.UserInput') {
+            if ($ValueType.FullName -Like '*UserInput') {
                 # Convert UserInput object to String for more complex casting
                 $global:PowerResponse.Parameters.$CommandParam = $global:PowerResponse.Parameters.$CommandParam.ToString()
 
@@ -614,7 +614,7 @@ function Out-PRFile {
         # Get UTC $Date
         $Date = (Get-Date).ToUniversalTime()
 
-        # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}_{Append}
+        # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}_{APPEND}
         $Name = ('{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}_{2}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower(),$Append) -Replace '_$'
 
         # Set up $FullName based on $Directory and $Name
