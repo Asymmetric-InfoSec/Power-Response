@@ -645,7 +645,7 @@ function Out-PRFile {
 
             # Export the $Objects into specified format
             switch($OutputType) {
-                'CSV' { $Objects | Export-Csv -NoTypeInformation -Path ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()) }
+                'CSV' { $Objects | Export-Csv -Path ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()) }
                 'XML' { $Objects | Export-CliXml -Path ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()) }
                 default { Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType); exit }
             }
