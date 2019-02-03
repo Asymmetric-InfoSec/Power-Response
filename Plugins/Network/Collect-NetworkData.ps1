@@ -83,7 +83,7 @@ process {
 
         # Get Routing Information
 
-        $ScriptBlock_Route = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-Route')
+        $ScriptBlock_Route = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-NATRoute')
     
         Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Route | Out-PRFile -Append "RouteTable"
 
