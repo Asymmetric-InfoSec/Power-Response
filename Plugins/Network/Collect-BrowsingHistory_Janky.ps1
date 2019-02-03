@@ -12,7 +12,10 @@
     the processes accordingly. Users *should* not lose any data. 
 
     Honestly, I wouldn't recommend running this unless absolutely necessary. Or you're a bit crazy.
-
+    
+    The better way would be to use the Collect-WindowsArtifacts plugin with a specified filter file that
+    will pull these files only without taking a trip to jankcity.
+    
 .EXAMPLE
 
     Stand Alone Execution: 
