@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-ASEP.ps1
+    Plugin-Name: Collect-AutoRuns.ps1
     
 .Description
     This plugin gathers Auto Start Execution Points from one or several hosts
@@ -42,7 +42,7 @@
     Autorunsc
 
 .EXAMPLE
-    Collect-ASEP.ps1 -ComputerName Test-PC
+    Collect-AutoRuns.ps1 -ComputerName Test-PC
 
     PowerResponse Execution
     Set ComputerName Test-PC
