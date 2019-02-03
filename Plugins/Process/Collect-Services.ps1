@@ -41,9 +41,15 @@ process{
     foreach ($Computer in $ComputerName) {
 
         # Collect Services Information on the remote host
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-Service | Select ServiceName, DisplayName, ServiceHandle, ServiceType, StartType, Status')
+        $ScriptBlock_Services = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-Service | Select ServiceName, DisplayName, ServiceHandle, ServiceType, StartType, Status')
     
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
+        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Services | Out-PRFile -Append "Services"
+
+        #Get Service Paths via WMI Object
+
+        $ScriptBlock_ServicePaths = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-CimInstance win32_service | Select ProcessID, Name, Pathname')
+    
+        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_ServicePaths | Out-PRFile -Append "ServicePaths"
 
     }
 
