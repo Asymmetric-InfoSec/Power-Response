@@ -44,7 +44,7 @@
     Run
 
 .NOTES
-    Author: 5yn@x
+    Author: Drew Schmitt
     Date Created: 1/2/2019
     Twitter: @5ynax
     
@@ -160,7 +160,7 @@ process{
 
          $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} /accepteula -nobanner -e -vt -h -c {1}") -f ((Split-Path -Path $Installexe -Leaf), $Location))
     
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
+        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock | ConverFrom-CSV
 
     }
     
