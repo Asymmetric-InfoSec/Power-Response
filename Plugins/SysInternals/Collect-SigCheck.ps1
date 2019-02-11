@@ -24,7 +24,7 @@
     Dependencies:
 
     PowerShell remoting
-    Sigcheck
+    Sigcheck (must be downloaded separately)
 
     Note: If using the $Recurse switch, this may take a long time 
     to complete.
@@ -69,14 +69,14 @@ param (
 
 process{
 
-    #Get the root Power-Response directory - Assumes that the plugin is located in the plugins/ASEP directory
+    # Get the root Power-Response directory - Assumes that the plugin is located in the plugins/ASEP directory
     $PRRoot = (Get-Item $PSScriptRoot).parent.parent.FullName
 
-    #Sigcheck executable locations
-    $Sigcheck64 = "$PRRoot\Bin\Sigcheck64.exe"
-    $Sigcheck32 = "$PRRoot\Bin\Sigcheck.exe"
+    # Sigcheck executable locations
+    $Sigcheck64 = ("{0}\sigcheck64.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $Sigcheck32 = ("{0}\sigcheck.exe" -f $global:PowerResponse.Config.Path.Bin)
 
-    #Verify binaries exist in Bin
+    # Verify binaries exist in Bin
     $64bitTestPath = Get-Item -Path $Sigcheck64 -ErrorAction SilentlyContinue
     $32bitTestPath = Get-Item -Path $Sigcheck32 -ErrorAction SilentlyContinue
 
@@ -90,23 +90,23 @@ process{
 
     }
 
-    #Loop through machines in $ComputerName to obtain data for each machine (if multiple machines are specified)
+    # Loop through machines in $ComputerName to obtain data for each machine (if multiple machines are specified)
     foreach ($Computer in $ComputerName) {
 
-    #Handle $ComputerName defined as localhost and not break the Plugin
+    # Handle $ComputerName defined as localhost and not break the Plugin
     if ($Computer -eq "Localhost") {
 
         $Computer = $ENV:ComputerName
     }
     
-    #Verify machine is online and ready for data collection
+    # Verify machine is online and ready for data collection
     if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
         
         Write-Error ("{0} appears to be offline. Cannot gather Sigcheck data." -f $Computer)
         Continue
     }
 
-    #Determine system architecture and select proper Sigcheck executable
+    # Determine system architecture and select proper Sigcheck executable
     try {
         $Architecture = (Get-WmiObject -ComputerName $Computer -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
         
@@ -129,7 +129,7 @@ process{
         Continue
     }
 
-    #Copy Sigcheck to remote host
+    # Copy Sigcheck to remote host
     $SmbPath = ("\\{0}\c`$\ProgramData\{1}" -f $Computer, (Split-Path -Path $Installexe -Leaf))
     try {
         
@@ -149,7 +149,7 @@ process{
     }
 
 
-    #Run Sigcheck on the remote host and collect Sigcheck data (use -s option if $Recurse -eq $true)
+    # Run Sigcheck on the remote host and collect Sigcheck data (use -s option if $Recurse -eq $true)
     if ($Recurse) {
     
         $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} /accepteula -nobanner -e -vt -h -c -s {1}") -f ((Split-Path -Path $Installexe -Leaf), $Location))
@@ -164,7 +164,7 @@ process{
 
     }
     
-    #Remove Sigcheck from remote host
+    # Remove Sigcheck from remote host
     try {
             Remove-Item -Path $SmbPath -Force -ErrorAction Stop
             
