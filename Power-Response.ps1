@@ -424,7 +424,6 @@ function Invoke-RunCommand {
             }
 
             foreach ($Computer in $ComputerName) {
-
                 # Check to ensure that the host is online and is ready for processing prior to attempting to collect data
                 $Online = Test-Connection -ComputerName $Computer -Count 1 -Quiet
 
