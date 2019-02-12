@@ -65,8 +65,13 @@ process{
 
         If ($PrefetchName){
 
-            #Copy specified prefetch file to $Output
-            Copy-Item "C:\Windows\Prefetch\$PrefetchName" -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+            # Loop through all prefetch files specified in $PrefetchName
+            foreach ($File in $PrefetchName){
+
+                #Copy specified prefetch file to $Output
+                Copy-Item "C:\Windows\Prefetch\$File" -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+
+            }
 
         }else{
 
