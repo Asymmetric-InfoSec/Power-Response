@@ -485,10 +485,10 @@ function Invoke-RunCommand {
             $global:PowerResponse.OutputPath = $null
 
             # Write plugin execution completion message and verify with input prior to clearing
-             Write-Host ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor Cyan -Backgroundcolor Black
+             Write-Host -Object ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor Cyan -Backgroundcolor Black
         } else {
             # Write the warning for no plugin selected
-            Write-Warning -Message ("No plugin selected for execution. Press Enter to Continue.")
+            Write-Warning -Message ('No plugin selected for execution. Press Enter to Continue.')
         }
 
         # Somewhat janky way of being able to have a message acknowledged and still have it show in color
