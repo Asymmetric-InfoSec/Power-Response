@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-WindowsEvents.ps1
+    Plugin-Name: Collect-WindowsEventsDetailed.ps1
     
 .Description
     This plugin retrieves Windows event log entries based on the list of entries located
@@ -15,12 +15,14 @@
     Different for XP and Server 2003 machines. I did my best to add in details on what
     each event is for ease of tuning.
 
-    For a detailed gathering of Windows Events, utilize the Collect-WindowsEventsDetailed
-    plugin
+    Note: If you plan to use this plugin with all event logs enabled there will be noise.
+    I would recommend tuning the event logs lists below to make sure they are applicable
+    to your scenario. Running this wide open is not a bad idea, but may be more difficult 
+    for newer analysts to quickly sift through the contents. I would recommend running,
+    finding a pivot point, and then search for events around your pivot point.
 
-    
 .EXAMPLE
-    .\Collect-WindowsEvents.ps1 -ComputerName Test-PC -StartDate 12/23/2018
+    .\Collect-WindowsEventsDetailed.ps1 -ComputerName Test-PC -StartDate 12/23/2018
 
     Power-Response Execution
 
@@ -62,6 +64,7 @@ $SecurityEvents = @(
         4647, #User initiated logoff (For interactive sessions)
         4648, #Logon using explicit credentials (runas)
         4672, #Account logon with superuser rights (Administrator)
+        4688, #New process created/Process exited (only applicable if you have process logging enabled - may be noisy)
         4697, #A service was installed on the system
         4698, #Scheduled task created
         4699, #Scheduled task deleted
@@ -77,6 +80,8 @@ $SecurityEvents = @(
         4735, #A security-enabled local group was changed
         4738, #A user account was changed
         4756, #A member was added to a security-enabled universal group
+        4765, #SID History was added to an account 
+        4766, #An attempt to add SID History to an account failed 
         4768, #Ticket Granting Ticket was granted (Successful Logon - Kerberos)
         4769, #Service Ticket Requested (access to server resource - Kerberos)
         4771, #Pre-Authentication Failed (failed logon - Kerberos)
@@ -86,14 +91,21 @@ $SecurityEvents = @(
         4798, #A user's local group membership was enumerated
         4799, #A security-enabled local group membership was enumerated
         4964  #Special groups have been assigned to a new logon 
-        
+
     )
 
 #System Event Log IDs to Retrieve (System)
 $SystemEvents = @(
 
+        10000,
+        10001,
+        1001,  #Windows Error Reporting (May be noisy)
+        10100,
         104,   #Audit Log Cleared
+        1056,  #DHCP credentials not configured
         20001, #Device installation
+        20002,
+        20003,
         24576, #Successful driver installation
         24577, #Encryption of volume started
         24579, #Encryption of volume completed
@@ -109,6 +121,9 @@ $SystemEvents = @(
 #Application Event Log IDs to Retrieve (Application)
 $ApplicationEvents = @(
 
+        1000,  #Application errors and hangs (may be noisy)
+        1001,  #Application errors and hangs (may be noisy)
+        1002,  #Application errors and hangs (may be noisy)
         1033,  #Installation completed (with success/failure status)
         1034,  #Application removal completed (with success/failure status)
         11707, #Installation completed successfully
@@ -181,8 +196,10 @@ $Sched_Tasks_Events = @(
 
         106, #Scheluded task created
         140, #Scheduled task updated
-        141 #Scheduled task deleted
-       
+        141, #Scheduled task deleted
+        200, #Scheduled task executed
+        201  #Scheduled task completed
+
     )
 
 #Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
