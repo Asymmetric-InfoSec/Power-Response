@@ -45,17 +45,17 @@ process{
         # Collect WMI Event Filters
         $ScriptBlock_Filter = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-WMIObject -Namespace root\Subscription -Class __EventFilter")
     
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Filter
+        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Filter | Out-PRFile -Append Filters
 
         # Collect WMI Event Consumers
         $ScriptBlock_Consumer = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-WMIObject -Namespace root\Subscription -Class __EventConsumer")
     
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Consumer
+        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Consumer | Out-PRFile -Append Consumers
 
         # Collect WMI Event to Consumer Bindings
         $ScriptBlock_Binding = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-WMIObject -Namespace root\Subscription -Class __FilterToConsumerBinding")
     
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Binding
+        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Binding | Out-PRFile -Append Bindings
 
 
     }
