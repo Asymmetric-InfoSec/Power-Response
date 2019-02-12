@@ -23,6 +23,36 @@ There is no formal installation required. Simply clone the reposity using git (g
 
 **Note:** There isn't any directory dependencies for where the root directory of Power-Response needs to live.
 
+### Dependencies
+
+#### Sysinternals Tools
+
+The following Sysinternals tools are required for the Sysinternals plugins, download them and place them into `BIN`:
+
+1. `Autorunsc.exe`
+2. `Autorunsc64.exe`
+3. `Sigcheck.exe`
+4. `Sigcheck64.exe`
+
+#### Winpmem Memory Acquisition Tool
+
+Winpmem is used for memory acquisition on Windows based machines:
+
+1. Download the most recent release of Winpmem from https://github.com/Velocidex/c-aff4/releases/
+2. Rename the executable to `winpmem.exe`
+3. Move winpmem.exe to `BIN`
+
+Big shout out to Michael Cohen for his work on winpmem!
+
+#### 7-zip Stand Alone Compression Tool
+
+PowerShell (.NET actually) has some native limitations for compression (must be less than 2GB), so we needed to bring in a stand alone tool to do compression on our behalf:
+
+1. Download `7-Zip Extra: standalone console version, 7z DLL, Plugin for Far Manager` from https://www.7-zip.org/download.html
+2. Locate the 64bit executable and rename to `7za_x64.exe`
+3. Locate the 32bit executable and rename to `7za_x86.exe`
+4. Move both executables to `BIN`
+
 ### Start Power-Response
 
 Power-Response comes with pre-built plugins in the plugins directory of the repository (we will continue to add plugins as rapidly as possible), so you should be able to get going pretty quickly. Don't worry too much about any other directories, Power-Response will generate all necessary directories on the fly as needed. 
