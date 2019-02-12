@@ -412,21 +412,39 @@ function Invoke-RunCommand {
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
+            # Store $HasComputerParams boolean for future conditional checks
+            $HasComputerParams = $ReleventParameters.ComputerName -ne $null
+
             # Set up $ComputerName array to run at least once
             $ComputerName = @('RUNONCE')
 
-            # if a $ReleventParameters.ComputerName is tracked as a String[], cycle through the contained array
-            if ($ReleventParameters.ComputerName -ne $null) {
+            # if a we $HasComputerParams, cycle through the contained array
+            if ($HasComputerParams) {
                 $ComputerName = $ReleventParameters.ComputerName
             }
 
             foreach ($Computer in $ComputerName) {
-                if ($ReleventParameters.ComputerName -ne $null) {
+                # Check to ensure that the host is online and is ready for processing prior to attempting to collect data
+                $Online = Test-Connection -ComputerName $Computer -Count 1 -Quiet
+
+                # If we $HasComputerParams and the target is $Online, set parameters up for execution
+                if ($HasComputerParams -and $Online) {
                     # Force the current $Computer as the $ReleventParameters.ComputerName
                     $ReleventParameters.ComputerName = $Computer
 
                     # Format $Computer into $ComputerText for future $Message composition
                     $ComputerText = ' for {0}' -f $Computer
+                } elseif ($HasComputerParams) {
+                    # Format $Computer offline $Message
+                    $Message = "{0} appears to be offline, skipping plugin execution." -f $Computer
+
+                    # Write offline warning $Message to screen
+                    Write-Warning -Message $Message
+
+                    # Write offline $Message to log
+                    Write-Log -Message $Message
+
+                    continue
                 } else {
                     # Format $Computer into $ComputerText as null for future $Message
                     $ComputerText = ''
@@ -442,7 +460,8 @@ function Invoke-RunCommand {
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
                     & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile
 
-                    $Message = "Plugin Execution Succeeded{0}" -f $ComputerText
+                    # Format host success $Message
+                    $Message = "Plugin Execution Succeeded{0} at {1}" -f $ComputerText, (Get-Date)
 
                     # Write execution success message
                     Write-Host -Object $Message
@@ -451,7 +470,7 @@ function Invoke-RunCommand {
                     # Format warning $Message
                     $Message = 'Plugin execution error{0}: {1}' -f $ComputerText,$PSItem
                     
-                    # Write warning $Message to screen along with an admin
+                    # Write warning $Message to screen along with some admin advice
                     Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
                 }
 
@@ -466,10 +485,10 @@ function Invoke-RunCommand {
             $global:PowerResponse.OutputPath = $null
 
             # Write plugin execution completion message and verify with input prior to clearing
-             Write-Host ("Plugin execution complete. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating") -ForegroundColor Cyan -Backgroundcolor Black
+             Write-Host -Object ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor Cyan -Backgroundcolor Black
         } else {
             # Write the warning for no plugin selected
-            Write-Warning 'No plugin selected for execution. Press Enter to Continue.'
+            Write-Warning -Message ('No plugin selected for execution. Press Enter to Continue.')
         }
 
         # Somewhat janky way of being able to have a message acknowledged and still have it show in color
