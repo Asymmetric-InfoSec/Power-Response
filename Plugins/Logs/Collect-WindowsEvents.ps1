@@ -181,7 +181,7 @@ $Sched_Tasks_Events = @(
 
         106, #Scheluded task created
         140, #Scheduled task updated
-        141, #Scheduled task deleted
+        141 #Scheduled task deleted
        
     )
 
