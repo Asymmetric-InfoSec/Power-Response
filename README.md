@@ -53,6 +53,16 @@ PowerShell (.NET actually) has some native limitations for compression (must be 
 3. Locate the 32bit executable and rename to `7za_x86.exe`
 4. Move both executables to `BIN`
 
+#### Velociraptor Stand Alone Tool
+
+To get around locked files, we decided to use the default binary from the Velociraptor project:
+
+1. Download `velociraptor-v0.2.7-windows-4.0-amd64.exe` from https://github.com/Velocidex/velociraptor/releases
+2. Rename the file to `velociraptor-amd64.exe`
+3. Move executable to `BIN`
+
+Another big shout out to Michael Cohen for his work on Velociraptor!
+
 ### Start Power-Response
 
 Power-Response comes with pre-built plugins in the plugins directory of the repository (we will continue to add plugins as rapidly as possible), so you should be able to get going pretty quickly. Don't worry too much about any other directories, Power-Response will generate all necessary directories on the fly as needed. 
