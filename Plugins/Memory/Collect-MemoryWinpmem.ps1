@@ -115,7 +115,7 @@ process{
 
         #Establish PS Session criteria
 
-        $Session = New-PSSession -ComputerName "$Computer"
+        $Session = New-PSSession -ComputerName "$Computer" -SessionOption (New-PSSessionOption -NoMachineProfile)
          
         #Copy winpmem to remote host
         $SmbPathWinpmem = ("\\{0}\c`$\ProgramData\{1}" -f $Computer, (Split-Path -Path $Winpmem -Leaf))

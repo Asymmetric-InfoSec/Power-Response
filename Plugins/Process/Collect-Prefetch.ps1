@@ -61,7 +61,7 @@ process{
     foreach ($Computer in $ComputerName) {
 
         # Create session on remote host
-        $Session = New-PSSession -ComputerName "$Computer"
+        $Session = New-PSSession -ComputerName "$Computer" -SessionOption (New-PSSessionOption -NoMachineProfile)
 
         If ($PrefetchName){
 
