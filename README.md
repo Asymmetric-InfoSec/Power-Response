@@ -79,16 +79,16 @@ You will be able to navigate through the framework by making selections (pick a 
 
 As you navigate the framework, you may end up having questions about what you can and cannot do. At any given time, invoke the `help` command and you will be provided with commands that you can execute at your current position in the framework. The available commands will be all, or some, of the following:
 
-**Name   ->   Description**
+**Name:   Description**
 
-back     ->   de-select a script file and move back to menu context  
-exit     ->   exits Power Response  
-help     ->   displays the help for all or specified commands  
-remove   ->   removes all or a specified parameter values  
-run      ->   runs the selected script with parameters set in environment  
-set      ->   sets a parameter to a value  
-show     ->   shows a list of all or specified parameters and values  
-clear    ->   clears the screen of clutter while running plugins  
+`back`: de-select a script file and move back to menu context  
+`exit`: exits Power Response  
+`help`: displays the help for all or specified commands  
+`remove`: removes all or a specified parameter values  
+`run`: runs the selected script with parameters set in environment  
+`set`: sets a parameter to a value  
+`show`: shows a list of all or specified parameters and values  
+`clear`: clears the screen of clutter while running plugins  
 
 ### Data Collection and Plugin Execution with Power-Response
 
