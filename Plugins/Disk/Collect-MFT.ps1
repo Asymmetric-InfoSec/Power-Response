@@ -1,55 +1,21 @@
 ﻿<#
 
 .SYNOPSIS
-    Plugin-Name: Collect-WindowsArtifacts.ps1
+    Plugin-Name: Collect-MFT.ps1
     
 .Description
-    This plugin collects windows artifacts (including locked files) from the 
-    preset list below. The file are copied by pushing the Velociraptor binary to 
-    the the remote system, where it copies the files to C:\ProgramData\%COMPUTERNAME%.
-    7za.exe is also copied to the system, to then zip the directory of artifacts 
-    before moving them back to your local system for further analysis. This plugin 
-    will remove the Velociraptor, 7zip PE, and all locally created files after 
-    successfully pulling the artifacts back to the output destination in Power-Response.
-
-    System Artifacts:
-    %SystemDrive%\$MFT
-    %SYSTEMROOT%\Tasks
-    %SYSTEMROOT%\System32\Tasks
-    %SYSTEMROOT%\Prefetch
-    %SYSTEMROOT%\System32\config\SAM
-    %SYSTEMROOT%\System32\config\SAM.LOG1
-    %SYSTEMROOT%\System32\config\SAM.LOG2
-    %SYSTEMROOT%\System32\config\SYSTEM
-    %SYSTEMROOT%\System32\config\SYSTEM.LOG1
-    %SYSTEMROOT%\System32\config\SYSTEM.LOG2
-    %SYSTEMROOT%\System32\config\SOFTWARE
-    %SYSTEMROOT%\System32\config\SOFTWARE.LOG1
-    %SYSTEMROOT%\System32\config\SOFTWARE.LOG2
-    %SYSTEMROOT%\System32\config\SECURITY
-    %SYSTEMROOT%\System32\config\SECURITY.LOG1
-    %SYSTEMROOT%\System32\config\SECURITY.LOG2
-    %SYSTEMROOT%\Appcompat\Programs
-    %SYSTEMROOT%\System32\drivers\etc\hosts
-    %SYSTEMROOT%\System32\winevt\logs
-    %PROGRAMDATA%\Microsoft\Search\Data\Applications\Windows
-    %PROGRAMDATA%\Microsoft\Windows\Start Menu\Programs\Startup
-
-    User Artifacts:
-    %UserProfile%\NTUSER.DAT
-    %UserProfile%\NTUSER.DAT.LOG1
-    %UserProfile%\NTUSER.DAT.LOG2
-    %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat
-    %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1
-    %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2
-    %UserProfile%\AppData\Roaming\Microsoft\Windows\Recent
-    %UserProfile%\AppData\Local\Google\Chrome\User Data\Default\History
-    %UserProfile%\AppData\Local\Microsoft\Windows\WebCache
+    This plugin collects the $MFT from a remote system. The file is copied by pushing 
+    the Velociraptor binary to the the remote system, where it copies the files to 
+    C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied to the system, to then zip 
+    the directory containing the MFT before moving them back to your local system for 
+    further analysis and processing. This plugin will remove the Velociraptor, 7zip PE, 
+    and all locally created files after successfully pulling the artifacts back to the 
+    output destination in Power-Response.
 
 .EXAMPLE
     Stand Alone 
 
-    .\Collect-WindowsArtifacts.ps1 -ComputerName Test-PC
+    .\Collect-MFT.ps1 -ComputerName Test-PC
 
     Power-Response Execution
 
@@ -58,7 +24,7 @@
 
 .NOTES
     Author: Matt Weikert
-    Date Created: 2/12/2019
+    Date Created: 2/18/2019
     Twitter: @5k33tz
     
     Last Modified By:
