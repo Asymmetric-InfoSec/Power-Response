@@ -45,6 +45,7 @@
     %UserProfile%\AppData\Roaming\Microsoft\Windows\Recent
     %UserProfile%\AppData\Local\Google\Chrome\User Data\Default\History
     %UserProfile%\AppData\Local\Microsoft\Windows\WebCache
+    %UserProfile%\AppData\Roaming\Mozilla\Firefox\Profiles\*.default\places.sqlite
 
 .EXAMPLE
     Stand Alone 
@@ -295,6 +296,11 @@ process{
             # Collect %UserProfile%\AppData\Local\Microsoft\Windows\WebCache\*
             Write-Host ("Collecting {0}\AppData\Local\Microsoft\Windows\WebCache\*" -f $User)
             $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& {0}\{1} fs --accessor ntfs cp \\.\{2}\AppData\Local\Microsoft\Windows\WebCache\* {0}\{3}') -f ($env:ProgramData, (Split-Path -Path $Velociraptor -Leaf), $User, $Computer))
+            Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
+
+            # Collect %UserProfile%\AppData\Roaming\Mozilla\Firefox\Profiles\*.default\places.sqlite
+            Write-Host ("Collecting {0}\AppData\Roaming\Mozilla\Firefox\Profiles\*.default\places.sqlite" -f $User)
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& {0}\{1} fs --accessor ntfs cp \\.\{2}\AppData\Roaming\Mozilla\Firefox\Profiles\*.default\places.sqlite {0}\{3}') -f ($env:ProgramData, (Split-Path -Path $Velociraptor -Leaf), $User, $Computer))
             Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
         }
         
