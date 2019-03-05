@@ -78,7 +78,12 @@ $SecurityEvents = @(
         4728, #A member was added to a security-enabled global group
         4732, #A member was added to a security-enabled local group
         4735, #A security-enabled local group was changed
-        4738, #A user account was changed
+        4738 #A user account was changed
+        
+    )
+
+$SecurityEvents2 = @(
+
         4756, #A member was added to a security-enabled universal group
         4765, #SID History was added to an account 
         4766, #An attempt to add SID History to an account failed 
@@ -90,9 +95,10 @@ $SecurityEvents = @(
         4779, #Session disconnected (RDP)
         4798, #A user's local group membership was enumerated
         4799, #A security-enabled local group membership was enumerated
-        4964  #Special groups have been assigned to a new logon 
-
+        4964  #Special groups have been assigned to a new logon
+        
     )
+  
 
 #Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
 
@@ -109,7 +115,7 @@ foreach ($Computer in $ComputerName) {
 
         #Get Windows Security Event Logs
         Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue      
-
+        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents2} -ComputerName $Computer -ErrorAction SilentlyContinue
         }
     }
 
