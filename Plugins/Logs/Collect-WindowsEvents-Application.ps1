@@ -82,7 +82,7 @@ foreach ($Computer in $ComputerName) {
         } else {
 
         #Get Windows Application Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Application"; StartTime=$StartDate; ID=$ApplicationEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         }
     }
