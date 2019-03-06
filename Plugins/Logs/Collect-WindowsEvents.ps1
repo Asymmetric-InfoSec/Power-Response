@@ -62,6 +62,7 @@ $SecurityEvents = @(
         4647, #User initiated logoff (For interactive sessions)
         4648, #Logon using explicit credentials (runas)
         4672, #Account logon with superuser rights (Administrator)
+        4688, #New process created/Process exited (only applicable if you have process logging enabled - may be noisy)
         4697, #A service was installed on the system
         4698, #Scheduled task created
         4699, #Scheduled task deleted
@@ -75,8 +76,15 @@ $SecurityEvents = @(
         4728, #A member was added to a security-enabled global group
         4732, #A member was added to a security-enabled local group
         4735, #A security-enabled local group was changed
-        4738, #A user account was changed
+        4738 #A user account was changed
+        
+    )
+
+$SecurityEvents2 = @(
+
         4756, #A member was added to a security-enabled universal group
+        4765, #SID History was added to an account 
+        4766, #An attempt to add SID History to an account failed 
         4768, #Ticket Granting Ticket was granted (Successful Logon - Kerberos)
         4769, #Service Ticket Requested (access to server resource - Kerberos)
         4771, #Pre-Authentication Failed (failed logon - Kerberos)
@@ -85,7 +93,7 @@ $SecurityEvents = @(
         4779, #Session disconnected (RDP)
         4798, #A user's local group membership was enumerated
         4799, #A security-enabled local group membership was enumerated
-        4964  #Special groups have been assigned to a new logon 
+        4964  #Special groups have been assigned to a new logon
         
     )
 
@@ -200,12 +208,13 @@ foreach ($Computer in $ComputerName) {
 
         #Get Windows Security Event Logs
         Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents2} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get Windows System Event Logs
         Get-WinEvent -FilterHashtable @{LogName="System"; StartTime=$StartDate; ID=$SystemEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get Windows Application Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+        Get-WinEvent -FilterHashtable @{LogName="Application"; StartTime=$StartDate; ID=$ApplicationEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
 
         #Get Windows Firewall Event Logs
         Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-Windows Firewall With Advanced Security/Firewall"; StartTime=$StartDate; ID=$WinFirewallEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
