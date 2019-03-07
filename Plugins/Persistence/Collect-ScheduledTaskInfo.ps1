@@ -43,11 +43,19 @@ process{
 
 
     foreach ($Computer in $ComputerName) {
+        #For machines that have the PowerShell Scheduled Tasks Module
+        try {
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-ScheduledTask | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns")
-    
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-ScheduledTask | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns")
+            Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
 
+         #For machines that do not have the PowerShell Scheduled Tasks Module   
+        }catch{
+
+            $CimSession = New-CimSession -ComputerName $Computer
+            Get-ScheduledTask -CimSession $CimSession | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns
+
+        }
     }
 
 }
