@@ -195,7 +195,7 @@ process {
                     $GUID = Rot-13 -RotText ($Value.Split("\")[0].Trim('{}'))
                     $ROTValue = ROT-13 -RotText $Value
                     $EFEHash =@{ Type = 'Executable File Execution'; SID = $SID; UserAssist = $ROTValue ; GUID = $FolderGuids.Item($GUID)}
-                    [PSCustomObject]$EFEHash
+                    [PSCustomObject]$EFEHash | Select Type, SID, UserAssist, GUID
 
                 }
 
@@ -207,7 +207,7 @@ process {
                     $GUID = Rot-13 -RotText ($Value.Split("\")[0].Trim('{}'))
                     $ROTValue = ROT-13 -RotText $Value
                     $EFEHash =@{ Type = 'Shortcut File Execution'; SID = $SID; UserAssist = $ROTValue ; GUID = $FolderGuids.Item($GUID)}
-                    [PSCustomObject]$EFEHash
+                    [PSCustomObject]$EFEHash | Select Type, SID, UserAssist, GUID
 
                 }
 
@@ -216,6 +216,7 @@ process {
         
         }
         
+        $Session | Remove-PSSession
 
     }
 
