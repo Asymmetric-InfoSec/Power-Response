@@ -63,20 +63,25 @@ process{
         # Create session on remote host
         $Session = New-PSSession -ComputerName "$Computer" -SessionOption (New-PSSessionOption -NoMachineProfile)
 
-        If ($PrefetchName){
+        #Scope $PrefetchName
+        If (!$PrefetchName){
 
-            # Loop through all prefetch files specified in $PrefetchName
-            foreach ($File in $PrefetchName){
+            #Get Prefetch File Names
+            $PrefetchName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Windows\Prefetch"} 
 
-                #Copy specified prefetch file to $Output
-                Copy-Item "C:\Windows\Prefetch\$File" -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+        }
 
-            }
+        #Collect Prefetch Files
+        foreach ($File in $PrefetchName){
 
-        }else{
+            #Get Prefetch File Attributes
+            $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item C:\Windows\Prefetch\$($args[0])).CreationTime} -ArgumentList $File 
 
-            # Recursively copy all prefetch files to $Output
-            Copy-Item "C:\Windows\Prefetch\" -Recurse -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+            #Copy specified prefetch file to $Output
+            Copy-Item "C:\Windows\Prefetch\$File" -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+
+            #Set original creation time on copied prefetch file
+            (Get-Item "$Output\$File").CreationTime = $CreationTime
 
         }
 
