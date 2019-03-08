@@ -4,13 +4,22 @@
     Plugin-Name: Collect-UserAssist.ps1
     
 .Description
+    Collects the User Assist data for all users for Executable and Shortcut executions
 
 .EXAMPLE
+    Stand Alone Execution
+
+    .\Collect-UserAssist.ps1 -ComputerName Test-PC
+
+    Power-Response Execution
+
+    set ComputerName Test-PC
+    run
 
 .NOTES
-    Author:
-    Date Created:
-    Twitter: 
+    Author: Drew Schmitt
+    Date Created: 3/7/2019
+    Twitter: @5ynax
     
     Last Modified By:
     Last Modified Date:
