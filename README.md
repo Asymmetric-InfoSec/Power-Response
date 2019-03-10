@@ -25,9 +25,11 @@ There is no formal installation required. Simply clone the reposity using git (g
 
 ### Dependencies
 
+Download and/or place the follwing dependencies into `BIN`
+
 #### Sysinternals Tools
 
-The following Sysinternals tools are required for the Sysinternals plugins, download them and place them into `BIN`:
+The following Sysinternals tools are required for Sysinternals based plugins:
 
 1. `Autorunsc.exe`
 2. `Autorunsc64.exe`
@@ -62,6 +64,15 @@ To get around locked files, we decided to use the default binary from the Veloci
 3. Move executable to `BIN`
 
 Another big shout out to Michael Cohen for his work on Velociraptor!
+
+#### Eric Zimmerman's Tools
+
+We use the following executables from Eric's tools that can be found at https://ericzimmerman.github.io/#!index.md
+
+1. `PECmd`
+1. `JLECmd`
+
+Huge shout out to Eric and his tools! They make easy analysis work of the data that Power-Response collects.
 
 ### Start Power-Response
 
