@@ -454,7 +454,7 @@ function Invoke-RunCommand {
                 }
 
                 # Set $global:PowerResponse.OutputPath for use in the plugin and Out-PRFile
-                $global:PowerResponse.OutputPath = ('{0}\{1:yyyy-MM-dd}\{2}' -f $global:PowerResponse.Config.Path.Output,$Date,$Computer) -Replace '\\\\$','\\'
+                $global:PowerResponse.OutputPath = ('{0}\{1}\{2:yyyy-MM-dd}' -f $global:PowerResponse.Config.Path.Output,$Computer,(Get-Date)) -Replace '\\\\','\\'
 
                 try {
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
@@ -469,7 +469,7 @@ function Invoke-RunCommand {
                 } catch {
                     # Format warning $Message
                     $Message = 'Plugin execution error{0}: {1}' -f $ComputerText,$PSItem
-                    
+
                     # Write warning $Message to screen along with some admin advice
                     Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
                 }
