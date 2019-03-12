@@ -121,7 +121,9 @@ process {
                 "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell",
                 "HKLM:\Software\Microsoft\Active Setup\Installed Components\KeyName",
                 "HKLM:\Software\Microsoft\Windows\CurrentVersion\explorer\User Shell Folders",
-                "HKLM:\Software\Microsoft\Windows\CurrentVersion\explorer\Shell Folders"
+                "HKLM:\Software\Microsoft\Windows\CurrentVersion\explorer\Shell Folders",
+                "HKLM\SOFTWARE\WOW6432NODE\MICROSOFT\WINDOWS\CURRENTVERSION\RUNONCE",
+                "HKLM\SOFTWARE\WOW6432NODE\MICROSOFT\WINDOWS\CURRENTVERSION\RUN"
 
                 ) 
 
