@@ -45,7 +45,15 @@ param (
 process{
 
     #Format String Properly for use
-    $AnalysisDate = ($AnalyzeDate.ToString('yyyyMMdd'))
+    $AnalysisDate = ($AnalyzeDate.ToString('yyyy-MM-dd'))
+
+    #Verify that bin dependencies are met
+    $TestBin = Test-Path "{0}\PEcmd.exe" -f $global:PowerResponse.Config.Path.Bin
+
+    if (!$TestBin){
+
+        Throw "PECmd not found in {0}. Place executable in binary directory and try again." -f $global:PowerResponse.Config.Path.Bin
+    }
 
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem $global:PowerResponse.OutputPath
@@ -53,10 +61,10 @@ process{
     #Loop through and analyze prefetch files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
         #Path to verify for existence before processing prefetch
-        $PrefetchPath = ("{0}\{1}\Prefetch\{2}\") -f $global:PowerResponse.OutputPath,$Machine,$AnalysisDate
+        $PrefetchPath = ("{0}\{1}\{2}\Prefetch\") -f $global:PowerResponse.OutputPath,$Machine,$AnalysisDate
         
         #Determine if prefetch output directory exists
-        if ((Test-Path $PrefetchPath)){
+        if (Test-Path $PrefetchPath){
 
             #Verify that prefetch has not already been analyzed
             $PrefetchProcessed = "$PrefetchPath\Analysis\"

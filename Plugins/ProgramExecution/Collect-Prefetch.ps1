@@ -49,11 +49,9 @@ param (
     )
 
 process{
-    #Set current date for use in output
-    $Date = '{0:yyyyMMdd}' -f $(Get-Date)
-
+    
     # Set $Output for where to store recovered prefetch files
-    $Output= ("{0}\Prefetch\{1}" -f $global:PowerResponse.OutputPath,$Date)
+    $Output= ("{0}\Prefetch\" -f $global:PowerResponse.OutputPath)
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
     If (-not (Test-Path $Output)) {
