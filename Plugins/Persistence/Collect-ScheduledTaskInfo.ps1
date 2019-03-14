@@ -24,7 +24,7 @@
 .NOTES
     Author: Drew Schmitt
     Date Created: 2/8/2019
-    Twitter: @%ynax
+    Twitter: @5ynax
     
     Last Modified By:
     Last Modified Date:
@@ -53,9 +53,8 @@ process{
         }catch{
 
             $CimSession = New-CimSession -ComputerName $Computer
-            Get-ScheduledTask -CimSession $CimSession | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns
+            Get-ScheduledTask -CimSession $CimSession | Get-ScheduledTaskInfo -CimSession $CimSession | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns
 
         }
     }
-
 }
