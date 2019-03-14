@@ -4,7 +4,7 @@
     Plugin-Name: Collect-RecentItems.ps1
     
 .Description
-    Collects shortcuts from Recent Items (%UserProfile\AppData\Roaming\Microsoft\Windows\Recent)
+    Collects shortcuts (lnk files) from Recent Items (%UserProfile\AppData\Roaming\Microsoft\Windows\Recent)
 
 .EXAMPLE
     Stand Alone Execution
@@ -30,51 +30,65 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
+    [string[]]$ComputerName,
+    [Parameter(Mandatory=$false,Position=1)]
+    [string[]]$RecentItemName
     
     )
 
 process {
 
+    #Set $Output for where to store recovered prefetch files
+    $Output= ("{0}\RecentItems\" -f $global:PowerResponse.OutputPath)
+
+    #Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
+    If (-not (Test-Path $Output)) {
+        New-Item -Type Directory -Path $Output | Out-Null
+    }   
+
     foreach ($Comptuer in $ComputerName){
 
-        # Create persistent Powershell Session
+        #Create persistent Powershell Session
 
         $Session = New-PSSession -ComputerName $Computer -SessionOption (New-PSSessionOption -NoMachineProfile)
 
-        # Get list of users that exist on this process
+        #Get list of users that exist on this process
 
-        Invoke-Command -Session $Session -Scriptblock{
+        $Users = Invoke-Command -Session $Session -Scriptblock{Get-ChildItem "C:\Users\" | ? {$_.name -ne "Public" -and $_.name -ne "Default"}}
 
-            $Users = Get-ChildItem "C:\Users\"
+        #For each user, create directory for storing recent files
 
-            #For each user, get contents of recent files (lnk files)
+        foreach ($User in $Users){
 
-            foreach ($User in $Users){
+            $UserOutput = "$Output\$User"
 
-                $RecentItems = Get-ChildItem "C:\Users\$User\AppData\Roaming\Microsoft\Windows\Recent" -ErrorAction SilentlyContinue
-
-                foreach ($Item in $RecentItems) {
-
-                    $OutHash = @{
-
-                        "User" = $User
-                        "Name" = $Item.Name
-                        "Mode" = $Item.Mode
-                        "CreationTime" = $Item.CreationTimeUtc
-                        "ModificationTime" = $Item.LastWriteTimeUtc
-                    }
-
-                    [PSCustomObject]$OutHash | Select User, Name, Mode, CreationTime, ModificationTime
-
-                }
+            #Create User subdirectory 
+            if (-not (Test-Path $UserOutput)) {
+                
+                New-Item -Type Directory -Path $UserOutput | Out-Null
 
             }
 
-        } 
+            #Get all recent files for user
+            if (!$RecentItemName){
+
+                $RecentItemName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent" | ? {$_.PSISContainer -eq $false}} -ArgumentList $User -ErrorAction SilentlyContinue
+
+            }
+
+            foreach ($File in $RecentItemName){
+
+                #Get recent items file Attributes
+                $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\$($args[1])").CreationTime} -ArgumentList $User,$File
+
+                #Copy specified file to $Output
+                Copy-Item "C:\Users\$User\AppData\Roaming\Microsoft\Windows\Recent\$File" -Destination "$UserOutput\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+
+                #Set original creation time on copied recent items lnk file
+                (Get-Item "$UserOutput\$File").CreationTime = $CreationTime
+            }
+        }
 
         $Session | Remove-PSSession   
-
     }
-
 }
