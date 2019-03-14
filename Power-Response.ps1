@@ -601,7 +601,7 @@ function Invoke-PRCommand {
         $Arguments = $UserInput -Split ' ' | Select-Object -Skip 1
 
         # If no $Keyword is not provided or we have no $global:PowerResponse.Location and were provided a number return early
-        if (!$Keyword -or ($global:PowerResponse.Location.PSIsContainer -and $Keyword -Match '^[0-9]$')) {
+        if (!$Keyword -or ($global:PowerResponse.Location.PSIsContainer -and $Keyword -Match '^[0-9]+$')) {
             return
         }
 
