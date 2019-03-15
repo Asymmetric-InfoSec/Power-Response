@@ -46,7 +46,7 @@ process {
         New-Item -Type Directory -Path $Output | Out-Null
     }   
 
-    foreach ($Comptuer in $ComputerName){
+    foreach ($Computer in $ComputerName){
 
         #Create persistent Powershell Session
 
@@ -54,7 +54,7 @@ process {
 
         #Get list of users that exist on this process
 
-        $Users = Invoke-Command -Session $Session -Scriptblock{Get-ChildItem "C:\Users\" | ? {$_.name -ne "Public" -and $_.name -ne "Default"}}
+        $Users = Invoke-Command -Session $Session -Scriptblock{Get-ChildItem "C:\Users\" | ? {@("Public","Default") -NotContains $_.name}}
 
         #For each user, create directory for storing recent files
 
@@ -72,7 +72,7 @@ process {
             #Get all recent files for user
             if (!$RecentItemName){
 
-                $RecentItemName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent" | ? {$_.PSISContainer -eq $false}} -ArgumentList $User -ErrorAction SilentlyContinue
+                $RecentItemName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent" | ? {!$_.PSISContainer}} -ArgumentList $User -ErrorAction SilentlyContinue
 
             }
 

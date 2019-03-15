@@ -36,7 +36,7 @@ param (
 
 process {
 
-    foreach ($Comptuer in $ComputerName){
+    foreach ($Computer in $ComputerName){
 
         # Create persistent Powershell Session
 
