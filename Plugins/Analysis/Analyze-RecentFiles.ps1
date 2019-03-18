@@ -48,7 +48,7 @@ process{
     $AnalysisDate = ($AnalyzeDate.ToString('yyyy-MM-dd'))
 
     #Verify that bin dependencies are met
-    $TestBin = Test-Path "{0}\LECmd.exe" -f $global:PowerResponse.Config.Path.Bin
+    $TestBin = Test-Path ("{0}\LECmd.exe" -f $global:PowerResponse.Config.Path.Bin)
 
     if (!$TestBin){
 
