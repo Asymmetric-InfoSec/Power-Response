@@ -66,8 +66,8 @@ process{
         #Scope $PrefetchName
         If (!$PrefetchName){
 
-            #Get Prefetch File Names
-            $PrefetchName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Windows\Prefetch"} 
+            #Get Prefetch File Names - get only files that have a .pf extension
+            $PrefetchName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Windows\Prefetch" -Filter "*.pf"} 
 
         }
 
