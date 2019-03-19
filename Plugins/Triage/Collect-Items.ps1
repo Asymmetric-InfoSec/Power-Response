@@ -138,7 +138,7 @@ process{
         foreach ($Item in $Items){
 
             #Verify that file exists on remote system, if not skip and continue
-            $PathVerify = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $Item
+            $PathVerify = Invoke-Command -Session $Session -ScriptBlock {Get-Item $($args[0]) -ErrorAction SilentlyContinue} -ArgumentList $Item 
 
             if (!$PathVerify) {
                
@@ -146,32 +146,65 @@ process{
                 Continue
             }
 
-            #Get Item Attributes, create metadata file, and compress files
+            if (!$PathVerify.PSIsContainer){
+
+                #Get Item Attributes, create metadata file, and compress files
+                Invoke-Command -Session $Session -ScriptBlock {
+
+                    $MetaData = @{
+
+                        Item = $($args[0])
+                        CreationTimeUTC = (Get-Item $($args[0])).CreationTimeUtc
+                        ModifiedTimeUTC = (Get-Item $($args[0])).LastWriteTimeUtc
+                        AccessTimeUTC = (Get-Item $($args[0])).LastAccessTimeUtc
+                        MD5 = (Get-FileHash -Path $($args[0]) -Algorithm MD5).Hash
+                    } 
+
+                    $ExportPath = "C:\ProgramData\{0}_Metadata.csv" -f (Split-Path $($args[0]) -Leaf)
+
+                    [PSCustomObject]$MetaData | Select Item, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath
+                
+                } -ArgumentList $Item
+            }
+
+            if ($PathVerify.PSIsContainer){
+
+                Invoke-Command -Session $Session -ScriptBlock {
+
+                    $DirItems = Get-ChildItem -Path $($args[0]) -File -Recurse | Select -ExpandProperty FullName
+
+                    foreach ($DirItem in $DirItems){
+
+                        $MetaData = @{
+
+                            Item = $DirItem
+                            Directory = (Get-Item $DirItem).Directory
+                            CreationTimeUTC = (Get-Item $DirItem).CreationTimeUtc
+                            ModifiedTimeUTC = (Get-Item $DirItem).LastWriteTimeUtc
+                            AccessTimeUTC = (Get-Item $DirItem).LastAccessTimeUtc
+                            MD5 = (Get-FileHash -Path $DirItem -Algorithm MD5).Hash
+                        } 
+
+                        $ExportPath = "C:\ProgramData\{0}_Metadata.csv" -f (Split-Path $($args[0]) -Leaf)
+
+                        [PSCustomObject]$MetaData | Select Item, Directory, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath -Append
+
+                    }
+
+                } -ArgumentList $Item
+            } 
+
             Invoke-Command -Session $Session -ScriptBlock {
 
-                $MetaData = @{
-
-                    Item = $($args[0])
-                    CreationTimeUTC = (Get-Item $($args[0])).CreationTimeUtc
-                    ModifiedTime = (Get-Item $($args[0])).LastWriteTimeUtc
-                    AccessTime = (Get-Item $($args[0])).LastAccessTimeUtc
-                } 
-
-                $ExportPath = "C:\ProgramData\{0}_Metadata.csv" -f (Split-Path $($args[0]) -Leaf)
-
-                [PSCustomObject]$MetaData | Export-CSV $ExportPath
-
-                #Create archive of Item and MetaData
-
-                $ArchivePath = "C:\ProgramData\{0}.zip" -f (Split-Path $($args[0]) -Leaf)
-                $Command_Compress = "C:\ProgramData\{0} a -pinfected -tzip {1} {2} {3}" -f ($($args[1]), $ArchivePath, $ExportPath, ($($args[0])))
+                #Create archive of Item and MetaData (separately)
+                $ArchivePath = "C:\ProgramData\{0}.zip" -f (Split-Path $($args[1]) -Leaf)
+                $Command_Compress = "C:\ProgramData\{0} a -pinfected -tzip {1} {2} {3}" -f ($($args[0]), $ArchivePath, $ExportPath, ($($args[1])))
 
                 Invoke-Expression -Command $Command_Compress | Out-Null
 
-            } -ArgumentList $Item, (Split-Path $Installexe -Leaf)
+            } -ArgumentList (Split-Path $Installexe -Leaf), $Item
 
             #Copy specified archive to $Output
-
             $ItemPath = "C:\ProgramData\{0}.zip" -f (Split-Path $Item -Leaf)
 
             Copy-Item -Path $ItemPath -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
@@ -188,7 +221,7 @@ process{
 
                 Remove-Item -Path $ExportPath -Force  
 
-            } -ArgumentList (Split-Path $Installexe -Leaf)
+            } 
 
         }
 
