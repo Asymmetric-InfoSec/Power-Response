@@ -35,6 +35,8 @@ The following Sysinternals tools are required for Sysinternals based plugins:
 2. `Autorunsc64.exe`
 3. `Sigcheck.exe`
 4. `Sigcheck64.exe`
+5. `Handle.exe`
+6. `Handle64.exe`
 
 #### Winpmem Memory Acquisition Tool
 
