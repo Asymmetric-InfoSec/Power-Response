@@ -4,8 +4,9 @@ param(
     [String[]]$ComputerName
 )
 
-# $ErrorActionPreference of 'Stop'
+# $ErrorActionPreference of 'Stop' and $ProgressPreference of 'SilentlyContinue'
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 
 # UserInput class is designed to separate user input strings to successfully casted string type parameters
 # Essentially acts like a string for our purposes
@@ -155,7 +156,7 @@ function Get-Menu {
 function Import-Config {
     param (
         [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
-        [String[]]$RootKeys = @('HashAlgorithm', 'OutputType', 'PromptText', 'Path', 'UserName')
+        [String[]]$RootKeys = @('AdminUserName','HashAlgorithm', 'OutputType', 'PromptText', 'Path', 'PSSession')
     )
 
     process {
@@ -163,6 +164,7 @@ function Import-Config {
 
         # Default 'Config' values
         $Default = @{
+            AdminUserName = $ENV:UserName
             HashAlgorithm = 'SHA256'
             OutputType = @('XML','CSV')
             PromptText = 'power-response'
@@ -176,8 +178,8 @@ function Import-Config {
             }
 
             # Executing UserName
-            UserName = @{
-                Windows = $ENV:UserName
+            PSSession = @{
+                NoMachineProfile = $true
             }
         }
 
@@ -216,6 +218,9 @@ function Import-Config {
         }
 
         # If no value is provided in the config file, set the default values
+        if (!$Config.AdminUserName) {
+            $Config.AdminUserName = $Default.AdminUserName
+        }
         if (!$Config.HashAlgorithm) {
             $Config.HashAlgorithm = $Default.HashAlgorithm
         }
@@ -228,8 +233,8 @@ function Import-Config {
         if (!$Config.Path) {
             $Config.Path = $Default.Path
         }
-        if (!$Config.UserName) {
-            $Config.UserName = $Default.UserName
+        if (!$Config.PSSession) {
+            $Config.PSSession = $Default.PSSession
         }
 
         if (!$Config.Path.Bin) {
@@ -245,12 +250,12 @@ function Import-Config {
             $Config.Path.Plugins = $Default.Path.Plugins
         }
 
-        if (!$Config.UserName.Windows) {
-            $Config.UserName.Windows = $Default.UserName.Windows
+        if (!$Config.PSSession.NoMachineProfile) {
+            $Config.PSSession.NoMachineProfile = $Default.PSSession.NoMachineProfile
         }
 
         # Check for required $Config value existence (sanity check - should never fail with default values)
-        if (!$Config.HashAlgorithm -or !$Config.Path -or !$Config.UserName -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.UserName.Windows) {
+        if (!$Config.AdminUserName -or !$Config.HashAlgorithm -or !$Config.Path -or !$Config.PSSession -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.PSSession.NoMachineProfile) {
             throw 'Missing required configuration value'
         }
 
@@ -266,14 +271,6 @@ function Import-Config {
 
             # Store each path as a regular expressions for string replacing later
             $global:PowerResponse.Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}$' -f $DirPath.Key))
-        }
-
-        # Gather credentials for non-sessioned $UserName
-        $global:PowerResponse.Credential = @{}
-        foreach ($UserName in $Config.UserName.GetEnumerator()) {
-            if ($UserName.Value -ne $ENV:UserName) {
-                $global:PowerResponse.Credential.($UserName.Key) = Get-Credential -UserName $UserName.Value -Message ('Please enter {0} credentials' -f $UserName.Key)
-            }
         }
     }
 }
@@ -812,11 +809,11 @@ if (!(Get-ChildItem $global:PowerResponse.Location)) {
 }
 
 # Initialize tracked $global:PowerResponse.Parameters to $global:PowerResponse.Config data
-$global:PowerResponse.Parameters = @{ OutputType = $global:PowerResponse.Config.OutputType; ComputerName = $ComputerName }
+$global:PowerResponse.Parameters = @{ ComputerName = $ComputerName; OutputType = $global:PowerResponse.Config.OutputType;  }
 
-# If we have gathered a credential object from the Config, add it to the $global:PowerResponse.Parameters hashtable
-if ($global:PowerResponse.Credential.Windows) {
-    $global:PowerResponse.Parameters.Credential = $global:PowerResponse.Credential.Windows
+# If we have have a executing-admin user name mismatch, gather the credential object and store it in the $global:PowerResponse.Parameters hashtable
+if ($ENV:UserName -ne $global:PowerResponse.Config.AdminUserName) {
+    $global:PowerResponse.Parameters.Credential = Get-Credential -UserName $global:PowerResponse.Config.AdminUserName -Message 'Enter administrative credentials'
 }
 
 # Trap 'exit's and Ctrl-C interrupts
