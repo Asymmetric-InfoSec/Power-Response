@@ -406,52 +406,87 @@ function Invoke-RunCommand {
             # Parse the $ReleventParameters from $global:PowerResponse.Parameters
             $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
-            # Write execution log
-            Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
+            # Set up $Items array to run at least once
+            $Items = @('RUNONCE')
+
+            # Store $HasSessionParams boolean for future conditional checks
+            $HasSessionParams = $CommandParameters.Keys -Contains 'Session' -and $global:PowerResponse.Parameters.Keys -Contains 'ComputerName'
 
             # Store $HasComputerParams boolean for future conditional checks
             $HasComputerParams = $ReleventParameters.ComputerName -ne $null
 
-            # Set up $ComputerName array to run at least once
-            $ComputerName = @('RUNONCE')
+            # Either loop through created (PS)Session's or online ComputerName's 
+            if ($HasSessionParams) {
+                # Gather the $SessionOption from $global:PowerResponse.Config.PSSession
+                $SessionOption = $global:PowerResponse.Config.PSSession
+                # Create the PSSessions
+                $Items = New-PSSession -ComputerName $global:PowerResponse.Parameters.ComputerName -SessionOption (New-PSSessionOption @SessionOption) -ErrorAction 'SilentlyContinue'
+
+                # Designate $ItemKey as 'Session'
+                $ItemKey = 'Session'
+            } elseif ($HasComputerParams) {
+                # Remove any $ReleventParameters.ComputerName that are offline
+                $Items = $ReleventParameters.ComputerName | Where-Object { Test-Connection -ComputerName $PSItem -Count 1 -Quiet }
+
+                # Designate $ItemKey as 'ComputerName'
+                $ItemKey = 'ComputerName'
+            }
+
+            # Write execution log
+            Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
+
+            # Store $HasSessionParams boolean for future conditional checks
+            $CommandHasSessionParams = $CommandParameters.Keys -Contains 'Session'
+
+            # Store $HasComputerParams boolean for future conditional checks
+            $HasComputerParams = $ReleventParameters.ComputerName -ne $null -or ($CommandHasSessionParams -and $global:PowerResponse.Parameters.Keys -Contains 'ComputerName')
 
             # if a we $HasComputerParams, cycle through the contained array
             if ($HasComputerParams) {
-                $ComputerName = $ReleventParameters.ComputerName
+                $ComputerName = $global:PowerResponse.Parameters.ComputerName
             }
 
-            foreach ($Computer in $ComputerName) {
-                # Check to ensure that the host is online and is ready for processing prior to attempting to collect data
-                $Online = Test-Connection -ComputerName $Computer -Count 1 -Quiet
+            foreach ($Item in $Items) {
+                # # If we $HasSessionParams $HasComputerParams and the target is $Online, set parameters up for execution
+                # if ($HasComputerParams -and $Online -and $CommandHasSessionParams) {
+                #     # Create the PSSession for the current $Computer and add it to $ReleventParameters
+                #     $ReleventParameters.Session = New-PSSession -
+                # } elseif ($HasComputerParams -and $Online) {
+                #     # Force the current $Computer as the $ReleventParameters.ComputerName
+                #     $ReleventParameters.ComputerName = $Computer
 
-                # If we $HasComputerParams and the target is $Online, set parameters up for execution
-                if ($HasComputerParams -and $Online) {
-                    # Force the current $Computer as the $ReleventParameters.ComputerName
-                    $ReleventParameters.ComputerName = $Computer
+                #     # Format $Computer into $ComputerText for future $Message composition
+                #     $ComputerText = ' for {0}' -f $Computer
+                # } elseif ($HasComputerParams) {
+                #     # Format $Computer offline $Message
+                #     $Message = "{0} appears to be offline, skipping plugin execution." -f $Computer
 
-                    # Format $Computer into $ComputerText for future $Message composition
-                    $ComputerText = ' for {0}' -f $Computer
+                #     # Write offline warning $Message to screen
+                #     Write-Warning -Message $Message
+
+                #     # Write offline $Message to log
+                #     Write-Log -Message $Message
+
+                #     continue
+                # } else {
+                #     # Format $Computer into $ComputerText as null for future $Message
+                #     $ComputerText = ''
+
+                #     # Set $Computer to null for the $global:PowerResponse.OutputPath formatting
+                #     $Computer = ''
+                # }
+                if ($HasSessionParams) {
+                    $ComputerText = ' for {0}' -f $Item.ComputerName
                 } elseif ($HasComputerParams) {
-                    # Format $Computer offline $Message
-                    $Message = "{0} appears to be offline, skipping plugin execution." -f $Computer
-
-                    # Write offline warning $Message to screen
-                    Write-Warning -Message $Message
-
-                    # Write offline $Message to log
-                    Write-Log -Message $Message
-
-                    continue
+                    $ComputerText = ' for {0}' -f $Item
                 } else {
-                    # Format $Computer into $ComputerText as null for future $Message
                     $ComputerText = ''
-
-                    # Set $Computer to null for the $global:PowerResponse.OutputPath formatting
-                    $Computer = ''
                 }
 
+                $ReleventParameters.$ItemKey = $Item
+
                 # Set $global:PowerResponse.OutputPath for use in the plugin and Out-PRFile
-                $global:PowerResponse.OutputPath = ('{0}\{1}\{2:yyyy-MM-dd}' -f $global:PowerResponse.Config.Path.Output,$Computer,(Get-Date)) -Replace '\\\\','\\'
+                $global:PowerResponse.OutputPath = ('{0}\{1}\{2:yyyy-MM-dd}' -f $global:PowerResponse.Config.Path.Output,($ComputerText -Replace '^ for '),(Get-Date)) -Replace '\\\\','\\'
 
                 try {
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
@@ -486,6 +521,11 @@ function Invoke-RunCommand {
         } else {
             # Write the warning for no plugin selected
             Write-Warning -Message ('No plugin selected for execution. Press Enter to Continue.')
+        }
+
+        # If we $HasSessionParams, make sure to clean them up
+        if ($HasSessionParams) {
+            Remove-PSSession -Session $Items
         }
 
         # Somewhat janky way of being able to have a message acknowledged and still have it show in color
