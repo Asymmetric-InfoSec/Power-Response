@@ -406,24 +406,28 @@ function Invoke-RunCommand {
             # Parse the $ReleventParameters from $global:PowerResponse.Parameters
             $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
-            # Set up $Items array to run at least once
-            $Items = @('RUNONCE')
-
             # Store $HasSessionParams boolean for future conditional checks
             $HasSessionParams = $CommandParameters.Keys -Contains 'Session' -and $global:PowerResponse.Parameters.Keys -Contains 'ComputerName'
 
             # Store $HasComputerParams boolean for future conditional checks
             $HasComputerParams = $ReleventParameters.ComputerName -ne $null
 
-            # Either loop through created (PS)Session's or online ComputerName's 
+            # Set up $Items array to run at least once
+            $Items = @('RUNONCE')
+
+            # Either loop through created PSSessions or online ComputerNames 
             if ($HasSessionParams) {
                 # Gather the $SessionOption from $global:PowerResponse.Config.PSSession
                 $SessionOption = $global:PowerResponse.Config.PSSession
+
                 # Create the PSSessions
                 $Items = New-PSSession -ComputerName $global:PowerResponse.Parameters.ComputerName -SessionOption (New-PSSessionOption @SessionOption) -ErrorAction 'SilentlyContinue'
 
                 # Designate $ItemKey as 'Session'
                 $ItemKey = 'Session'
+
+                # Remove $ReleventParameters.ComputerName to avoid ambiguity
+                $ReleventParameters.Remove('ComputerName') | Out-Null
             } elseif ($HasComputerParams) {
                 # Remove any $ReleventParameters.ComputerName that are offline
                 $Items = $ReleventParameters.ComputerName | Where-Object { Test-Connection -ComputerName $PSItem -Count 1 -Quiet }
@@ -435,46 +439,19 @@ function Invoke-RunCommand {
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
-            # Store $HasSessionParams boolean for future conditional checks
-            $CommandHasSessionParams = $CommandParameters.Keys -Contains 'Session'
+            # # Store $HasSessionParams boolean for future conditional checks
+            # $CommandHasSessionParams = $CommandParameters.Keys -Contains 'Session'
 
-            # Store $HasComputerParams boolean for future conditional checks
-            $HasComputerParams = $ReleventParameters.ComputerName -ne $null -or ($CommandHasSessionParams -and $global:PowerResponse.Parameters.Keys -Contains 'ComputerName')
+            # # Store $HasComputerParams boolean for future conditional checks
+            # $HasComputerParams = $ReleventParameters.ComputerName -ne $null -or ($CommandHasSessionParams -and $global:PowerResponse.Parameters.Keys -Contains 'ComputerName')
 
-            # if a we $HasComputerParams, cycle through the contained array
-            if ($HasComputerParams) {
-                $ComputerName = $global:PowerResponse.Parameters.ComputerName
-            }
+            # # if a we $HasComputerParams, cycle through the contained array
+            # if ($HasComputerParams) {
+            #     $ComputerName = $global:PowerResponse.Parameters.ComputerName
+            # }
 
             foreach ($Item in $Items) {
-                # # If we $HasSessionParams $HasComputerParams and the target is $Online, set parameters up for execution
-                # if ($HasComputerParams -and $Online -and $CommandHasSessionParams) {
-                #     # Create the PSSession for the current $Computer and add it to $ReleventParameters
-                #     $ReleventParameters.Session = New-PSSession -
-                # } elseif ($HasComputerParams -and $Online) {
-                #     # Force the current $Computer as the $ReleventParameters.ComputerName
-                #     $ReleventParameters.ComputerName = $Computer
-
-                #     # Format $Computer into $ComputerText for future $Message composition
-                #     $ComputerText = ' for {0}' -f $Computer
-                # } elseif ($HasComputerParams) {
-                #     # Format $Computer offline $Message
-                #     $Message = "{0} appears to be offline, skipping plugin execution." -f $Computer
-
-                #     # Write offline warning $Message to screen
-                #     Write-Warning -Message $Message
-
-                #     # Write offline $Message to log
-                #     Write-Log -Message $Message
-
-                #     continue
-                # } else {
-                #     # Format $Computer into $ComputerText as null for future $Message
-                #     $ComputerText = ''
-
-                #     # Set $Computer to null for the $global:PowerResponse.OutputPath formatting
-                #     $Computer = ''
-                # }
+                # Format a consistent $ComputerText for future message passing
                 if ($HasSessionParams) {
                     $ComputerText = ' for {0}' -f $Item.ComputerName
                 } elseif ($HasComputerParams) {
@@ -483,12 +460,19 @@ function Invoke-RunCommand {
                     $ComputerText = ''
                 }
 
-                $ReleventParameters.$ItemKey = $Item
+                # Strip off leading ' for ' to get the $ComputerName
+                $ComputerName = $ComputerText -Replace '^ for '
+
+                # If we $HasSessionParams or $HasComputerParams, add it to tracked $ReleventParameters
+                if ($HasSessionParams -or $HasComputerParams) {
+                    $ReleventParameters.$ItemKey = $Item
+                }
 
                 # Set $global:PowerResponse.OutputPath for use in the plugin and Out-PRFile
                 $global:PowerResponse.OutputPath = ('{0}\{1}\{2:yyyy-MM-dd}' -f $global:PowerResponse.Config.Path.Output,($ComputerText -Replace '^ for '),(Get-Date)) -Replace '\\\\','\\'
 
                 try {
+                    Write-Debug 'About to execute plugin'
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
                     & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile
 
@@ -727,7 +711,7 @@ function Out-PRFile {
 function Protect-PRFile {
     param (
         [Parameter(Position=0)]
-        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Path $global:PowerResponse.OutputPath | Select-Object -ExpandProperty 'FullName'),
+        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Path $global:PowerResponse.OutputPath -ErrorAction 'SilentlyContinue' | Select-Object -ExpandProperty 'FullName'),
 
         [ValidateSet('SHA1','SHA256','SHA384','SHA512','MACTripleDES','MD5','RIPEMD160')]
         [String]$HashAlgorithm = $global:PowerResponse.Config.HashAlgorithm
