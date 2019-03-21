@@ -439,17 +439,6 @@ function Invoke-RunCommand {
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
-            # # Store $HasSessionParams boolean for future conditional checks
-            # $CommandHasSessionParams = $CommandParameters.Keys -Contains 'Session'
-
-            # # Store $HasComputerParams boolean for future conditional checks
-            # $HasComputerParams = $ReleventParameters.ComputerName -ne $null -or ($CommandHasSessionParams -and $global:PowerResponse.Parameters.Keys -Contains 'ComputerName')
-
-            # # if a we $HasComputerParams, cycle through the contained array
-            # if ($HasComputerParams) {
-            #     $ComputerName = $global:PowerResponse.Parameters.ComputerName
-            # }
-
             foreach ($Item in $Items) {
                 # Format a consistent $ComputerText for future message passing
                 if ($HasSessionParams) {
@@ -472,7 +461,6 @@ function Invoke-RunCommand {
                 $global:PowerResponse.OutputPath = ('{0}\{1}\{2:yyyy-MM-dd}' -f $global:PowerResponse.Config.Path.Output,($ComputerText -Replace '^ for '),(Get-Date)) -Replace '\\\\','\\'
 
                 try {
-                    Write-Debug 'About to execute plugin'
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
                     & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile
 
