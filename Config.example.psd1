@@ -1,13 +1,16 @@
 @{
     # --------- Begin General Section --------
     ####   AdminUserName - Administrative user name (defaults to $ENV:UserName)
+    ####   AutoAnalyze - Automatically analyze data collections (defaults to $true)
     ####   HashAlgorithm - Hash algorithm to use for file integrity log (defaults to SHA256)
     ####   OutputType - Default output type for plugins (defaults to XML,CSV)
     ####   PromptText - Text to show with your prompt (defaults to power-response)
     # AdminUserName = $ENV:UserName
+    # AutoAnalyze = $true
     # HashAlgorithm = 'SHA256'
     # OutputType = 'XML','CSV'
     # PromptText = 'power-response'
+    # AutoAnalyze = $true
     # --------- End General Section ----------
 
     # ---------- Begin Path Section ----------

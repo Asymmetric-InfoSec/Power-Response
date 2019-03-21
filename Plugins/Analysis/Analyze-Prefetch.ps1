@@ -56,12 +56,12 @@ process{
     }
 
     #Build list of hosts that have been analyzed with Power-Response
-    $Machines = Get-ChildItem $global:PowerResponse.OutputPath
+    $Machines = Get-ChildItem $global:PowerResponse.Config.Path.Output
 
     #Loop through and analyze prefetch files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
         #Path to verify for existence before processing prefetch
-        $PrefetchPath = ("{0}\{1}\{2}\Prefetch\") -f $global:PowerResponse.OutputPath,$Machine,$AnalysisDate
+        $PrefetchPath = ("{0}\{1}\{2}\Prefetch\") -f $global:PowerResponse.Config.Path.Output,$Machine,$AnalysisDate
         
         #Determine if prefetch output directory exists
         if (Test-Path $PrefetchPath){

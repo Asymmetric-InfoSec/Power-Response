@@ -105,7 +105,7 @@ function Format-Parameter {
                 Write-Log -Message $Warning
 
                 # Remove the $CommandParam key from $global:PowerResponse.Parameters
-                $global:PowerResponse.Parameters.Remove($CommandParam) | Out-Null
+                $null = $global:PowerResponse.Parameters.Remove($CommandParam)
             }
         }
     }
@@ -156,11 +156,11 @@ function Get-Menu {
 function Import-Config {
     param (
         [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
-        [String[]]$RootKeys = @('AdminUserName','HashAlgorithm', 'OutputType', 'PromptText', 'Path', 'PSSession')
+        [String[]]$RootKeys = @('AdminUserName','HashAlgorithm', 'OutputType', 'PromptText', 'AutoAnalyze', 'Path', 'UserName')
     )
 
     process {
-        Write-Verbose 'Begin Get-ConfigData'
+        Write-Verbose 'Begin Import-Config'
 
         # Default 'Config' values
         $Default = @{
@@ -168,6 +168,7 @@ function Import-Config {
             HashAlgorithm = 'SHA256'
             OutputType = @('XML','CSV')
             PromptText = 'power-response'
+            AutoAnalyze = $true
 
             # C:\Path\To\Power-Response\{FolderName}
             Path = @{
@@ -213,7 +214,7 @@ function Import-Config {
                 Write-Warning  'Removing these values from the Config hashtable'
 
                 # Remove any detected unexpected keys from $Config
-                $UnexpectedRootKeys | % { $Config.Remove($PSItem) | Out-Null }
+                $null = $UnexpectedRootKeys | % { $Config.Remove($PSItem) }
             }
         }
 
@@ -229,6 +230,9 @@ function Import-Config {
         }
         if (!$Config.PromptText) {
             $Config.PromptText = $Default.PromptText
+        }
+        if (!$Config.AutoAnalyze) {
+            $Config.AutoAnalyze = $Default.AutoAnalyze
         }
         if (!$Config.Path) {
             $Config.Path = $Default.Path
@@ -266,7 +270,7 @@ function Import-Config {
         foreach ($DirPath in $Config.Path.GetEnumerator()) {
             # If the $DirPath doesn't exist, create it and get rid of the output
             if (!(Test-Path $DirPath.Key)) {
-                New-Item -Path $DirPath.Key -ItemType Directory | Out-Null
+                $null = New-Item -Path $DirPath.Key -ItemType Directory
             }
 
             # Store each path as a regular expressions for string replacing later
@@ -376,7 +380,7 @@ function Invoke-RemoveCommand {
         # If we have $Arguments to remove
         if ($Arguments.Count -ne 0) {
             # Remove $Arguments from $global:PowerResponse.Parameters
-            $Arguments | Foreach-Object { $global:PowerResponse.Parameters.Remove($PSItem) | Out-Null }
+            $null = $Arguments | Foreach-Object { $global:PowerResponse.Parameters.Remove($PSItem) }
 
             # Write parameter removal log
             Write-Log ('Removed Parameter(s): ''{0}''' -f ($Arguments -Join ''', '''))
@@ -460,6 +464,11 @@ function Invoke-RunCommand {
                 # Set $global:PowerResponse.OutputPath for use in the plugin and Out-PRFile
                 $global:PowerResponse.OutputPath = ('{0}\{1}\{2:yyyy-MM-dd}' -f $global:PowerResponse.Config.Path.Output,($ComputerText -Replace '^ for '),(Get-Date)) -Replace '\\\\','\\'
 
+                # If $global:PowerResponse.OutputPath doesn't exist, create it
+                if (!(Test-Path -Path $global:PowerResponse.OutputPath)) {
+                    $null = New-Item -Type 'Directory' -Path $global:PowerResponse.OutputPath
+                }
+
                 try {
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
                     & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile
@@ -483,6 +492,44 @@ function Invoke-RunCommand {
 
                 # Write execution $Message to log
                 Write-Log -Message $Message
+
+                # Compute $AnalysisPath
+                $AnalysisPath = '{0}\Analysis\{1}' -f $global:PowerResponse.Config.Path.Plugins,($global:PowerResponse.Location.Name -Replace 'Collect-','Analyze-')
+
+                # If auto execution of analysis plugins is set
+                if ($global:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $global:PowerResponse.Location.FullName -and (Test-Path -Path $AnalysisPath)) {
+                    Write-Host -Object ('Analysis Plugin Execution Started at {0}' -f (Get-Date))
+
+                    # Gather to $AnalysisPath's $AnalysisParameters
+                    $AnalysisParameters = Get-Command -Name $AnalysisPath | Select-Object -ExpandProperty Parameters
+
+                    # Initialize $AnalysisParametersParameters Hashtable
+                    $ReleventParameters = @{}
+
+                    # Parse the $AnalysisParameters from $global:PowerResponse.Parameters
+                    $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $AnalysisParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
+
+                    try {
+                        # Execute the plugin at $AnalysisPath
+                        & $AnalysisPath @ReleventParameters | Out-PRFile
+
+                        # Format $Message
+                        $Message = 'Automatically executed analysis plugin {0} for collection plugin {1}' -f $AnalysisPath,$global:PowerResponse.Location.FullName
+
+                        # Write execution $Message to verbose stream
+                        Write-Verbose -Message $Message
+
+                    } catch {
+                        # Format warning $Message
+                        $Message = 'Analysis plugin execution error{0}: {1}' -f $ComputerText,$PSItem
+
+                        # Write warning $Message to screen
+                        Write-Warning -Message $Message
+                    }
+
+                    # Write execution $Message to log
+                    Write-Log -Message $Message
+                }
             }
 
             # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
@@ -492,7 +539,7 @@ function Invoke-RunCommand {
              Write-Host -Object ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor Cyan -Backgroundcolor Black
         } else {
             # Write the warning for no plugin selected
-            Write-Warning -Message ('No plugin selected for execution. Press Enter to Continue.')
+            Write-Warning -Message 'No plugin selected for execution. Press Enter to Continue.'
         }
 
         # If we $HasSessionParams, make sure to clean them up
@@ -501,7 +548,7 @@ function Invoke-RunCommand {
         }
 
         # Somewhat janky way of being able to have a message acknowledged and still have it show in color
-        Read-Host | Out-Null
+        $null = Read-Host
 
         # Clear screen once completion acknowledged
         Invoke-ClearCommand
@@ -664,7 +711,7 @@ function Out-PRFile {
 
         # If the $Directory doesn't exist, create it
         if (!(Test-Path -Path $DirectoryPath)) {
-            New-Item -Path $DirectoryPath -Type 'Directory' | Out-Null
+            $null = New-Item -Path $DirectoryPath -Type 'Directory'
         }
 
         try {
