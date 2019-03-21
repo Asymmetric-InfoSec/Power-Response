@@ -493,7 +493,7 @@ function Invoke-RunCommand {
                 $AnalysisPath = '{0}\Analysis\{1}' -f $global:PowerResponse.Config.Path.Plugins,($global:PowerResponse.Location.Name -Replace 'Collect-','Analyze-')
 
                 # If auto execution of analysis plugins is set
-                if ($global:PowerResponse.Config.AutoAnalyze -and (Test-Path -Path $AnalysisPath)) {
+                if ($global:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $global:PowerResponse.Location.FullName -and (Test-Path -Path $AnalysisPath)) {
                     Write-Host -Object ('Analysis Plugin Execution Started at {0}' -f (Get-Date))
 
                     # Gather to $AnalysisPath's $AnalysisParameters
@@ -513,10 +513,14 @@ function Invoke-RunCommand {
                         $Message = 'Automatically executed analysis plugin {0} for collection plugin {1}' -f $AnalysisPath,$global:PowerResponse.Location.FullName
 
                         # Write execution $Message to verbose stream
-                        Write-Host -Message $Message
+                        Write-Verbose -Message $Message
 
                     } catch {
-                        Write-Error $PSItem
+                        # Format warning $Message
+                        $Message = 'Analysis plugin execution error{0}: {1}' -f $ComputerText,$PSItem
+
+                        # Write warning $Message to screen
+                        Write-Warning -Message $Message
                     }
 
                     # Write execution $Message to log
@@ -531,7 +535,7 @@ function Invoke-RunCommand {
              Write-Host -Object ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor Cyan -Backgroundcolor Black
         } else {
             # Write the warning for no plugin selected
-            Write-Warning -Message ('No plugin selected for execution. Press Enter to Continue.')
+            Write-Warning -Message 'No plugin selected for execution. Press Enter to Continue.'
         }
 
         # Somewhat janky way of being able to have a message acknowledged and still have it show in color
