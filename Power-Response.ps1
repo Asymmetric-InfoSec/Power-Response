@@ -601,6 +601,12 @@ function Invoke-ShowCommand {
             # Gather to $global:PowerResponse.Location's $CommandParameters
             $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters'
 
+            # If $CommandParameters does not contain a 'ComputerName' entry
+            if ($CommandParameters.Keys -NotContains 'ComputerName') {
+                # Add a fake 'ComputerName' parameter to $CommandParameters
+                $CommandParameters.Add('ComputerName',(New-Object -TypeName 'System.Management.Automation.ParameterMetadata' -ArgumentList 'ComputerName',([String[]])))
+            }
+
             # Filter $Arguments to remove invalid $CommandParameters.Keys
             $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem }
 
@@ -620,13 +626,17 @@ function Invoke-ShowCommand {
             $Arguments = $global:PowerResponse.Parameters.Keys
         }
 
+        # If we weren't provided specific $Arguments and $Arguments doesn't contain ComputerName
+        if (!$PSBoundParameters.Arguments -and $Arguments -NotContains 'ComputerName') {
+            # Add 'ComputerName' to the front of the list
+            $Arguments = @('ComputerName') + $Arguments
+        }
+
         # Initialize empty $Param(eter) return HashTable
         $Param = @{}
         
-        #For plugins with no parameters, write-host to run plugin
-        if ($CommandParameters.Count -eq 0 -and !$global:PowerResponse.Location.PSIsContainer) {
-            Write-Host "`r`nNo parameters detected. Type run to execute plugin."
-        } elseif ($CommandParameters.Count -gt 0) {
+        # For plugins with no parameters, write-host to run plugin
+        if ($CommandParameters.Count -gt 0) {
             # Set $Param.[Type]$Key to the $global:PowerResponse.Parameters.$Key value
             $Arguments | Sort-Object | Foreach-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$global:PowerResponse.Parameters.$PSItem }
         } else {
