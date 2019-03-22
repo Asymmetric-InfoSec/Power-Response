@@ -156,7 +156,7 @@ function Get-Menu {
 function Import-Config {
     param (
         [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
-        [String[]]$RootKeys = @('AdminUserName','HashAlgorithm', 'OutputType', 'PromptText', 'AutoAnalyze', 'Path', 'UserName')
+        [String[]]$RootKeys = @('AdminUserName','HashAlgorithm', 'OutputType', 'PromptText', 'AutoAnalyze', 'Path', 'PSSession')
     )
 
     process {
@@ -165,10 +165,10 @@ function Import-Config {
         # Default 'Config' values
         $Default = @{
             AdminUserName = $ENV:UserName
+            AutoAnalyze = $true
             HashAlgorithm = 'SHA256'
             OutputType = @('XML','CSV')
             PromptText = 'power-response'
-            AutoAnalyze = $true
 
             # C:\Path\To\Power-Response\{FolderName}
             Path = @{
@@ -195,7 +195,7 @@ function Import-Config {
             $File = Get-Item -Path $Path
 
             # Import the Config data file and bind it to the $Config variable
-            Import-LocalizedData -BindingVariable 'Config' -BaseDirectory $File.PSParentPath -FileName $File.Name -ErrorAction Stop
+            Import-LocalizedData -BindingVariable 'Config' -BaseDirectory $File.PSParentPath -FileName $File.Name
         } catch {
             # Either intentionally threw an error on file absense, or Import-LocalizedData failed
             Write-Verbose ('Unable to import config on ''Path'': ''{0}''' -f $Path)
@@ -270,7 +270,7 @@ function Import-Config {
         foreach ($DirPath in $Config.Path.GetEnumerator()) {
             # If the $DirPath doesn't exist, create it and get rid of the output
             if (!(Test-Path $DirPath.Key)) {
-                $null = New-Item -Path $DirPath.Key -ItemType Directory
+                $null = New-Item -Path $DirPath.Key -ItemType 'Directory'
             }
 
             # Store each path as a regular expressions for string replacing later
@@ -368,10 +368,10 @@ function Invoke-RemoveCommand {
         # If $Arguments are blank and we have selected a file $global:PowerResponse.Location
         if ($Arguments.Count -eq 0 -and !$global:PowerResponse.Location.PSIsContainer) {
             # Assume 'remove' all tracked command parameters
-            $Arguments = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters | Select-Object -ExpandProperty Keys
+            $Arguments = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters' | Select-Object -ExpandProperty 'Keys'
         } elseif ($Arguments.Count -eq 0) {
             # Assume 'remove' all tracked $global:PowerResponse.Parameters
-            $Arguments = $global:PowerResponse.Parameters | Select-Object -ExpandProperty Keys
+            $Arguments = $global:PowerResponse.Parameters | Select-Object -ExpandProperty 'Keys'
         }
 
         # Filter $Arguments to remove invalid $global:PowerResponse.Parameters.Keys
@@ -402,7 +402,7 @@ function Invoke-RunCommand {
             Write-Host -Object ('Plugin Execution Started at {0}' -f (Get-Date))
 
             # Gather to $global:PowerResponse.Location's $CommandParameters
-            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
+            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters'
 
             # Initialize $ReleventParameters Hashtable
             $ReleventParameters = @{}
@@ -431,7 +431,7 @@ function Invoke-RunCommand {
                 $ItemKey = 'Session'
 
                 # Remove $ReleventParameters.ComputerName to avoid ambiguity
-                $ReleventParameters.Remove('ComputerName') | Out-Null
+                $null = $ReleventParameters.Remove('ComputerName')
             } elseif ($HasComputerParams) {
                 # Remove any $ReleventParameters.ComputerName that are offline
                 $Items = $ReleventParameters.ComputerName | Where-Object { Test-Connection -ComputerName $PSItem -Count 1 -Quiet }
@@ -478,7 +478,6 @@ function Invoke-RunCommand {
 
                     # Write execution success message
                     Write-Host -Object $Message
-                    
                 } catch {
                     # Format warning $Message
                     $Message = 'Plugin execution error{0}: {1}' -f $ComputerText,$PSItem
@@ -501,7 +500,7 @@ function Invoke-RunCommand {
                     Write-Host -Object ('Analysis Plugin Execution Started at {0}' -f (Get-Date))
 
                     # Gather to $AnalysisPath's $AnalysisParameters
-                    $AnalysisParameters = Get-Command -Name $AnalysisPath | Select-Object -ExpandProperty Parameters
+                    $AnalysisParameters = Get-Command -Name $AnalysisPath | Select-Object -ExpandProperty 'Parameters'
 
                     # Initialize $AnalysisParametersParameters Hashtable
                     $ReleventParameters = @{}
@@ -536,7 +535,7 @@ function Invoke-RunCommand {
             $global:PowerResponse.OutputPath = $null
 
             # Write plugin execution completion message and verify with input prior to clearing
-             Write-Host -Object ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor Cyan -Backgroundcolor Black
+             Write-Host -Object ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor 'Cyan' -Backgroundcolor 'Black'
         } else {
             # Write the warning for no plugin selected
             Write-Warning -Message 'No plugin selected for execution. Press Enter to Continue.'
@@ -594,34 +593,31 @@ function Invoke-ShowCommand {
     )
 
     process {
+        # Initialize $CommandParameters HashTable
+        $CommandParameters = @{}
+
         # If we have selected a file $global:PowerResponse.Location
         if (!$global:PowerResponse.Location.PSIsContainer) {
             # Gather to $global:PowerResponse.Location's $CommandParameters
-            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
+            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters'
 
             # Filter $Arguments to remove invalid $CommandParameters.Keys
             $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem }
 
             # If $Arguments array is empty
             if ($Arguments.Count -eq 0) {
+                # Create stub cmdlet function to parse $System parameters
+                function stub { [CmdletBinding()] param() process{} }
+
                 # List of $System scoped parameters
-                $System = @('WarningAction','Debug','InformationAction','ErrorVariable','InformationVariable','WarningVariable','Verbose','ErrorAction','OutVariable','OutBuffer','PipelineVariable')
+                $System = Get-Command -Name 'stub' | Select-Object -ExpandProperty 'Parameters' | Select-Object -ExpandProperty 'Keys'
 
-                # Get all $UserCommandParameters (non-system generated parameters)
-                $UserCommandParameters = $CommandParameters.GetEnumerator() | Where-Object { $System -NotContains $PSItem.Key -or $global:PowerResponse.Parameters.($PSItem.Key) }
-
-                # Set $Arguments to $UserCommandParameters.Key to return full list
-                $Arguments = $UserCommandParameters.Key
+                # Set $Arguments to all non-$System keys of $global:PowerResponse.Parmeters
+                $Arguments = $CommandParameters.GetEnumerator() | Where-Object { $System -NotContains $PSItem.Key -or $global:PowerResponse.Parameters.($PSItem.Key) } | Select-Object -ExpandProperty 'Key'
             }
-        } else {
-            # Ensure $CommandParameters is blank
-            $CommandParameters = @{}
-
-            # If $Arguments array is empty
-            if ($Arguments.Count -eq 0) {
-                # Set $Arguments to all Keys of $global:PowerResponse.Parameters
-                $Arguments = $global:PowerResponse.Parameters.Keys
-            }
+        } elseif ($Arguments.Count -eq 0) {
+            # Set $Arguments to all Keys of $global:PowerResponse.Parameters
+            $Arguments = $global:PowerResponse.Parameters.Keys
         }
 
         # Initialize empty $Param(eter) return HashTable
@@ -630,8 +626,7 @@ function Invoke-ShowCommand {
         #For plugins with no parameters, write-host to run plugin
         if ($CommandParameters.Count -eq 0 -and !$global:PowerResponse.Location.PSIsContainer) {
             Write-Host "`r`nNo parameters detected. Type run to execute plugin."
-        }
-        elseif ($CommandParameters.Count -gt 0) {
+        } elseif ($CommandParameters.Count -gt 0) {
             # Set $Param.[Type]$Key to the $global:PowerResponse.Parameters.$Key value
             $Arguments | Sort-Object | Foreach-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$global:PowerResponse.Parameters.$PSItem }
         } else {
@@ -885,7 +880,7 @@ try {
             $Title = $global:PowerResponse.Location.FullName -Replace $global:PowerResponse.Regex.Plugins
 
             # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
-            $Choice = Get-ChildItem -Path $global:PowerResponse.Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
+            $Choice = Get-ChildItem -Path $global:PowerResponse.Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property 'PSIsContainer','Name'
 
             #Compute $Back - ensure we are not at the $global:PowerResponse.Config.Path.Plugins
             $Back = $Plugins.FullName -NotMatch [Regex]::Escape($global:PowerResponse.Location.FullName)
@@ -895,7 +890,7 @@ try {
 
             # Get the selected $global:PowerResponse.Location item
             try {
-                $global:PowerResponse.Location = Get-Item (('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -Replace '\\$') -ErrorAction Stop
+                $global:PowerResponse.Location = Get-Item (('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -Replace '\\$')
             } catch {
                 Write-Warning 'Something went wrong, please try again'
             }
