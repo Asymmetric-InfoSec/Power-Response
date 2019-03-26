@@ -194,7 +194,7 @@ function Get-OnlineComputer {
 function Import-Config {
     param (
         [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
-        [String[]]$RootKeys = @('AdminUserName','HashAlgorithm', 'OutputType', 'PromptText', 'AutoAnalyze', 'Path', 'UserName')
+        [String[]]$RootKeys = @('AdminUserName','HashAlgorithm', 'OutputType', 'PromptText', 'AutoAnalyze', 'Path', 'PSSession')
     )
 
     process {
