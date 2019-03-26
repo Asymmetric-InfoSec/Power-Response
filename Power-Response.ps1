@@ -476,7 +476,7 @@ function Invoke-RunCommand {
                 $SessionOption = $global:PowerResponse.Config.PSSession
 
                 # Create the PSSessions
-                $Items = New-PSSession -ComputerName $OnlineComputer -SessionOption (New-PSSessionOption @SessionOption) -ErrorAction 'SilentlyContinue'
+                $Items = New-PSSession -ComputerName $OnlineComputer.ToUpper() -SessionOption (New-PSSessionOption @SessionOption) -ErrorAction 'SilentlyContinue'
 
                 # Designate $ItemKey as 'Session'
                 $ItemKey = 'Session'
@@ -485,7 +485,7 @@ function Invoke-RunCommand {
                 $null = $ReleventParameters.Remove('ComputerName')
             } elseif ($HasComputerParams) {
                 # Remove any $ReleventParameters.ComputerName that are offline
-                $Items = $OnlineComputer
+                $Items = $OnlineComputer.ToUpper()
 
                 # Designate $ItemKey as 'ComputerName'
                 $ItemKey = 'ComputerName'
