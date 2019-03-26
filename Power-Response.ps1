@@ -153,6 +153,44 @@ function Get-Menu {
     }
 }
 
+function Get-OnlineComputer {
+    param (
+        [String[]]$ComputerName
+    )
+
+    process {
+        # Initialize $OnlineComputers array
+        $OnlineComputer = @()
+
+        # Loop through tracked $global:PowerResponse.Parameters.ComputerName
+        foreach ($Computer in $ComputerName) {
+            # If the $ComputerName is online
+            if (Test-Connection -ComputerName $Computer -Count 1 -Quiet) {
+                # Add $ComputerName to $ReleventParameters.ComputerName
+                $OnlineComputer += $Computer
+
+                # Format the online $Message
+                $Message = 'Machine: {0} is online and ready for processing' -f $Computer
+
+                # Write the $Message to verbose
+                Write-Verbose -Message $Message
+            } else {
+                # Format the offline $Message
+                $Message = 'Skipping offline machine: {0}' -f $Computer
+
+                # Write $Message to host
+                Write-Host -Object $Message
+            }
+
+            # Write the $Message to log
+            Write-Log -Message $Message
+        }
+
+        # Return $OnlineComputer array
+        return $OnlineComputer
+    }
+}
+
 function Import-Config {
     param (
         [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
@@ -399,8 +437,6 @@ function Invoke-RunCommand {
     process {
         # If we have selected a file $global:PowerResponse.Location
         if ($global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
-            Write-Host -Object ('Plugin Execution Started at {0}' -f (Get-Date))
-
             # Gather to $global:PowerResponse.Location's $CommandParameters
             $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
 
@@ -410,11 +446,26 @@ function Invoke-RunCommand {
             # Parse the $ReleventParameters from $global:PowerResponse.Parameters
             $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
+            # Gather $OnlineComputer array
+            $OnlineComputer = Get-OnlineComputer -ComputerName $global:PowerResponse.Parameters.ComputerName
+
+            # If we have filtered out all tracked ComputerNames as offline
+            if (!$OnlineComputer -and $global:PowerResponse.Parameters.ComputerName) {
+                # Format all computers offline $Message
+                $Message = 'All tracked computers are offline, skipping plugin execution'
+
+                # Write warning $Message
+                Write-Warning -Message $Message
+
+                # Return early
+                return
+            }
+
             # Store $HasSessionParams boolean for future conditional checks
-            $HasSessionParams = $CommandParameters.Keys -Contains 'Session' -and $global:PowerResponse.Parameters.Keys -Contains 'ComputerName'
+            $HasSessionParams = $CommandParameters.Keys -Contains 'Session' -and $OnlineComputer
 
             # Store $HasComputerParams boolean for future conditional checks
-            $HasComputerParams = $ReleventParameters.ComputerName -ne $null
+            $HasComputerParams = $CommandParameters.Keys -Contains 'ComputerName' -and $OnlineComputer
 
             # Set up $Items array to run at least once
             $Items = @('RUNONCE')
@@ -425,32 +476,37 @@ function Invoke-RunCommand {
                 $SessionOption = $global:PowerResponse.Config.PSSession
 
                 # Create the PSSessions
-                $Items = New-PSSession -ComputerName $global:PowerResponse.Parameters.ComputerName -SessionOption (New-PSSessionOption @SessionOption) -ErrorAction 'SilentlyContinue'
+                $Items = New-PSSession -ComputerName $OnlineComputer -SessionOption (New-PSSessionOption @SessionOption) -ErrorAction 'SilentlyContinue'
 
                 # Designate $ItemKey as 'Session'
                 $ItemKey = 'Session'
 
                 # Remove $ReleventParameters.ComputerName to avoid ambiguity
-                $ReleventParameters.Remove('ComputerName') | Out-Null
+                $null = $ReleventParameters.Remove('ComputerName')
             } elseif ($HasComputerParams) {
                 # Remove any $ReleventParameters.ComputerName that are offline
-                $Items = $ReleventParameters.ComputerName | Where-Object { Test-Connection -ComputerName $PSItem -Count 1 -Quiet }
+                $Items = $OnlineComputer
 
                 # Designate $ItemKey as 'ComputerName'
                 $ItemKey = 'ComputerName'
             }
 
+            # Write execution to host
+            Write-Host -Object ('Plugin Execution Started at {0}' -f (Get-Date))
+
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
+            # Loop through tracked $Items
             foreach ($Item in $Items) {
+                # Ensure $ComputerText is blank to begin
+                $ComputerText = ''
+
                 # Format a consistent $ComputerText for future message passing
                 if ($HasSessionParams) {
                     $ComputerText = ' for {0}' -f $Item.ComputerName
                 } elseif ($HasComputerParams) {
                     $ComputerText = ' for {0}' -f $Item
-                } else {
-                    $ComputerText = ''
                 }
 
                 # Strip off leading ' for ' to get the $ComputerName
@@ -472,26 +528,31 @@ function Invoke-RunCommand {
                 try {
                     # Execute the $global:PowerResponse.Location with the $ReleventParameters
                     & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile
-
-                    # Format host success $Message
-                    $Message = "Plugin Execution Succeeded{0} at {1}" -f $ComputerText, (Get-Date)
-
-                    # Write execution success message
-                    Write-Host -Object $Message
-                    
                 } catch {
                     # Format warning $Message
                     $Message = 'Plugin execution error{0}: {1}' -f $ComputerText,$PSItem
 
                     # Write warning $Message to screen along with some admin advice
                     Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
+
+                    # Write execution $Message to log
+                    Write-Log -Message $Message
+
+                    # Skip Analysis plugin execution
+                    continue
                 }
 
-                # Protect any files that were copied to this particular $global:PowerResponse.OutputPath
-                Protect-PRFile
+                # Format host success $Message
+                $Message = "Plugin Execution Succeeded{0} at {1}" -f $ComputerText, (Get-Date)
+
+                # Write execution success message
+                Write-Host -Object $Message
 
                 # Write execution $Message to log
                 Write-Log -Message $Message
+
+                # Protect any files that were copied to this particular $global:PowerResponse.OutputPath
+                Protect-PRFile
 
                 # Compute $AnalysisPath
                 $AnalysisPath = '{0}\Analysis\{1}' -f $global:PowerResponse.Config.Path.Plugins,($global:PowerResponse.Location.Name -Replace 'Collect-','Analyze-')
@@ -535,16 +596,16 @@ function Invoke-RunCommand {
             # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
             $global:PowerResponse.OutputPath = $null
 
+            # If we $HasSessionParams, make sure to clean them up
+            if ($HasSessionParams) {
+                Remove-PSSession -Session $Items
+            }
+
             # Write plugin execution completion message and verify with input prior to clearing
              Write-Host -Object ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor Cyan -Backgroundcolor Black
         } else {
             # Write the warning for no plugin selected
             Write-Warning -Message 'No plugin selected for execution. Press Enter to Continue.'
-        }
-
-        # If we $HasSessionParams, make sure to clean them up
-        if ($HasSessionParams) {
-            Remove-PSSession -Session $Items
         }
 
         # Somewhat janky way of being able to have a message acknowledged and still have it show in color
