@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [String]$ConfigPath = ('{0}\Config.psd1' -f $PSScriptRoot),
-    [String[]]$ComputerName = $ENV:ComputerName
+    [String[]]$ComputerName = 'LOCALHOST',
+    [PSCredential]$Credential
 )
 
 # $ErrorActionPreference of 'Stop' and $ProgressPreference of 'SilentlyContinue'
@@ -206,7 +207,7 @@ function Get-OnlineComputer {
 function Import-Config {
     param (
         [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
-        [String[]]$RootKeys = @('AdminUserName','HashAlgorithm', 'OutputType', 'PromptText', 'AutoAnalyze', 'Path', 'PSSession')
+        [String[]]$RootKeys
     )
 
     process {
@@ -216,9 +217,11 @@ function Import-Config {
         $Default = @{
             AdminUserName = $ENV:UserName
             AutoAnalyze = $true
+            AutoClear = $true
             HashAlgorithm = 'SHA256'
             OutputType = @('XML','CSV')
             PromptText = 'power-response'
+            ThrottleLimit = 32
 
             # C:\Path\To\Power-Response\{FolderName}
             Path = @{
@@ -272,6 +275,12 @@ function Import-Config {
         if (!$Config.AdminUserName) {
             $Config.AdminUserName = $Default.AdminUserName
         }
+        if (!$Config.AutoAnalyze) {
+            $Config.AutoAnalyze = $Default.AutoAnalyze
+        }
+        if (!$Config.AutoClear) {
+            $Config.AutoClear = $Default.AutoClear
+        }
         if (!$Config.HashAlgorithm) {
             $Config.HashAlgorithm = $Default.HashAlgorithm
         }
@@ -281,14 +290,14 @@ function Import-Config {
         if (!$Config.PromptText) {
             $Config.PromptText = $Default.PromptText
         }
-        if (!$Config.AutoAnalyze) {
-            $Config.AutoAnalyze = $Default.AutoAnalyze
-        }
         if (!$Config.Path) {
             $Config.Path = $Default.Path
         }
         if (!$Config.PSSession) {
             $Config.PSSession = $Default.PSSession
+        }
+        if (!$Config.ThrottleLimit) {
+            $Config.ThrottleLimit = $Default.ThrottleLimit
         }
 
         if (!$Config.Path.Bin) {
@@ -452,7 +461,7 @@ function Invoke-RemoveCommand {
         # If ComputerName parameter got removed
         if (!$global:PowerResponse.Parameters.ComputerName) {
             # Set it back to LOCALHOST
-            $global:PowerResponse.Parameters.ComputerName = $ENV:ComputerName
+            $global:PowerResponse.Parameters.ComputerName = 'LOCALHOST'
         }
 
         # If OutputType parameter got removed
@@ -483,8 +492,21 @@ function Invoke-RunCommand {
             # Gather the $SessionOption from $global:PowerResponse.Config.PSSession
             $SessionOption = $global:PowerResponse.Config.PSSession
 
+            # Gather $SessionParameters
+            $SessionParameters = @{
+                ComputerName = $OnlineComputers.ToUpper()
+                ErrorAction = 'SilentlyContinue'
+                Name = $OnlineComputers.ToUpper()
+                SessionOption = New-PSSessionOption @SessionOption
+            }
+
+            # Add Credential parameter if we are tracking one
+            if ($global:PowerResponse.Parameters.Credential) {
+                $SessionParameters.Credential = $global:PowerResponse.Parameters.Credential
+            }
+
             # Create the $Sessions array
-            $Sessions = New-PSSession -Name $OnlineComputers.ToUpper() -ComputerName $OnlineComputers.ToUpper() -SessionOption (New-PSSessionOption @SessionOption) -ErrorAction 'SilentlyContinue'
+            $Sessions = New-PSSession @SessionParameters
 
             # Write execution to host
             Write-Host -Object ('Plugin Execution Started at {0}' -f (Get-Date))
@@ -494,16 +516,22 @@ function Invoke-RunCommand {
 
             # If $CommandParameters doesn't contain 'Session'
             if ($CommandParameters.Keys -NotContains 'Session') {
-                Write-Debug 'Entered new section'
                 # Clear $Error log
                 $Error.Clear()
 
-                # Create $ArgumentList from $CommandParameters
-                $ArgumentList = $CommandParameters.Keys | Foreach-Object { $global:PowerResponse.Parameters.$PSItem }
+                # Compile $InvokeCommandParameters HashTable
+                $InvokeCommandParameters = @{
+                    ArgumentList = $CommandParameters.Keys | Foreach-Object { $global:PowerResponse.Parameters.$PSItem }
+                    AsJob = $true
+                    FilePath = $global:PowerResponse.Location.FullName
+                    JobName = $global:PowerResponse.Location.BaseName
+                    Session = $Sessions
+                    ThrottleLimit = $global:PowerResponse.Config.ThrottleLimit
+                }
 
                 try {
                     # Invoke the script file as a $Job with the $ArgumentList
-                    $Job = Invoke-Command -AsJob -JobName $global:PowerResponse.Location.BaseName -Session $Sessions -FilePath $global:PowerResponse.Location -ArgumentList $ArgumentList
+                    $Job = Invoke-Command @InvokeCommandParameters
                 } catch {
                     # Format remoting warning $Message
                     $Message = 'Plugin Job Creation Error: {0}' -f $PSItem
@@ -634,7 +662,7 @@ function Invoke-RunCommand {
             Remove-PSSession -Session $Sessions
 
             # Write plugin execution completion message and verify with input prior to clearing
-             Write-Host -Object ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor 'Cyan' -Backgroundcolor 'Black'
+             Write-Host -Object ('Plugin execution complete at {0}' -f (Get-Date))
         } elseif (!$OnlineComputers) {
             # Format all computers offline $Message
             $Message = 'All tracked computers are offline, skipping plugin execution'
@@ -646,11 +674,16 @@ function Invoke-RunCommand {
             Write-Warning -Message 'No plugin selected for execution. Press Enter to Continue.'
         }
 
-        # Somewhat janky way of being able to have a message acknowledged and still have it show in color
-        $null = Read-Host
+        if ($global:PowerResponse.Config.AutoClear) {
+            # Prompt for message acknowledgment
+            Write-Host -Object "Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -ForegroundColor 'Cyan' -Backgroundcolor 'Black'
 
-        # Clear screen once completion acknowledged
-        Invoke-ClearCommand
+            # Somewhat janky way of being able to have a message acknowledged and still have it show in color
+            $null = Read-Host
+
+            # Clear screen once completion acknowledged
+            Invoke-ClearCommand
+        }
     }
 }
 
@@ -959,7 +992,7 @@ Authors: Drew Schmitt | Matt Weikert | Gavin Prentice
 
 Write-Host $Banner
 
-# Initialize $globalPowerResponse hashtable
+# Initialize $global:PowerResponse hashtable
 $global:PowerResponse = @{}
 
 # Import $global:PowerResponse.Config from data file
@@ -988,10 +1021,14 @@ if (!(Get-ChildItem $global:PowerResponse.Location)) {
 }
 
 # Initialize tracked $global:PowerResponse.Parameters to $global:PowerResponse.Config data
-$global:PowerResponse.Parameters = @{ ComputerName = $ComputerName; OutputType = $global:PowerResponse.Config.OutputType;  }
+$global:PowerResponse.Parameters = @{
+    ComputerName = $ComputerName
+    Credential = $Credential
+    OutputType = $global:PowerResponse.Config.OutputType
+}
 
 # If we have have a executing-admin user name mismatch, gather the credential object and store it in the $global:PowerResponse.Parameters hashtable
-if ($ENV:UserName -ne $global:PowerResponse.Config.AdminUserName) {
+if ($ENV:UserName -ne $global:PowerResponse.Config.AdminUserName -and $Credential.UserName -ne $global:PowerResponse.Config.AdminUserName) {
     $global:PowerResponse.Parameters.Credential = Get-Credential -UserName $global:PowerResponse.Config.AdminUserName -Message 'Enter administrative credentials'
 }
 
