@@ -35,6 +35,18 @@ function Format-Parameter {
         # Gather to $global:PowerResponse.Location's $CommandParameters
         $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters'
 
+        # If $CommandParameters does not contain a 'ComputerName' entry
+        if ($CommandParameters.Keys -NotContains 'ComputerName') {
+            # Add a fake 'ComputerName' parameter to $CommandParameters
+            $CommandParameters.Add('ComputerName',(New-Object -TypeName 'System.Management.Automation.ParameterMetadata' -ArgumentList 'ComputerName',([String[]])))
+        }
+
+        # If $CommandParameters does not contain a 'ComputerName' entry
+        if ($CommandParameters.Keys -NotContains 'OutputType') {
+            # Add a fake 'ComputerName' parameter to $CommandParameters
+            $CommandParameters.Add('OutputType',(New-Object -TypeName 'System.Management.Automation.ParameterMetadata' -ArgumentList 'OutputType',([String[]])))
+        }
+
         # If we are passed no $Arguments, assume full $Parameter format check
         if ($Arguments.Count -eq 0) {
             $Arguments = $CommandParameters.Keys
@@ -222,7 +234,7 @@ function Import-Config {
             }
         }
 
-        # Try to import the data, on failure set to default 
+        # Try to import the data, on failure set to default
         try {
             # If the Config file $Path does not exist, throw an error to skip to catch block
             if (!(Test-Path $Path)) {
@@ -242,7 +254,7 @@ function Import-Config {
 
         # Check for unexpected values in Config file
         if ($RootKeys) {
-            # Iterate through Config.Keys and keep any values not contained in expected $RootKeys 
+            # Iterate through Config.Keys and keep any values not contained in expected $RootKeys
             $UnexpectedRootKeys = $Config.Keys | Where-Object { $RootKeys -NotContains $PSItem }
 
             # If we found unexpected keys, print a warning message
@@ -281,7 +293,7 @@ function Import-Config {
 
         if (!$Config.Path.Bin) {
             $Config.Path.Bin = $Default.Path.Bin
-        } 
+        }
         if (!$Config.Path.Logs) {
             $Config.Path.Logs = $Default.Path.Logs
         }
@@ -314,6 +326,19 @@ function Import-Config {
             # Store each path as a regular expressions for string replacing later
             $global:PowerResponse.Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}$' -f $DirPath.Key))
         }
+    }
+}
+
+function Get-PROutputPath {
+    param (
+        [Parameter(Mandatory=$true)]
+        [String]$ComputerName,
+        [String]$Directory
+    )
+
+    process {
+        # Format the returned path as $global:PowerResponse.Config.Path.Output\$ComputerName\{yyyy-MM-dd}\$Directory
+        return '{0}\{1}\{2:yyyy-MM-dd}\{3}' -f $global:PowerResponse.Config.Path.Output,$ComputerName.ToUpper(),(Get-Date),$Directory -Replace '\\+','\' -Replace '\\$'
     }
 }
 
@@ -467,24 +492,68 @@ function Invoke-RunCommand {
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
-            # If we don't $HasSessionParams 
+            # If $CommandParameters doesn't contain 'Session'
             if ($CommandParameters.Keys -NotContains 'Session') {
+                Write-Debug 'Entered new section'
+                # Clear $Error log
+                $Error.Clear()
+
                 # Create $ArgumentList from $CommandParameters
                 $ArgumentList = $CommandParameters.Keys | Foreach-Object { $global:PowerResponse.Parameters.$PSItem }
 
-                # Invoke the script file as a $Job with the $ArgumentList
-                $Job = Invoke-Command -AsJob -Session $Sessions -FilePath $global:PowerResponse.Location -ArgumentList $ArgumentList
+                try {
+                    # Invoke the script file as a $Job with the $ArgumentList
+                    $Job = Invoke-Command -AsJob -JobName $global:PowerResponse.Location.BaseName -Session $Sessions -FilePath $global:PowerResponse.Location -ArgumentList $ArgumentList
+                } catch {
+                    # Format remoting warning $Message
+                    $Message = 'Plugin Job Creation Error: {0}' -f $PSItem
 
-                # Wait for the $Job to complete
-                Wait-Job -Job $Job
+                    # Write warning $Message
+                    Write-Warning -Message $Message
 
-                # Receive the $Results of the $Job and group them by PSComputerName
-                $Results = Receive-Job -Job $Job | Group-Object -Property 'PSComputerName'
+                    # Write log $Message
+                    Write-Log -Message $Message
+                }
 
-                # Loop through $Result groups
-                foreach ($Result in $Results) {
-                    # Send each $Result to it's specific PR output file based on ComputerName
-                    $Result.Group | Out-PRFile -ComputerName $Result.Name
+                # If we successfully created the $Job
+                if ($Job) {
+                    # Wait for the $Job to complete
+                    $null = Wait-Job -Job $Job
+
+                    # Receive the $Results of the $Job and group them by PSComputerName
+                    $Results = Receive-Job -Job $Job -ErrorAction 'SilentlyContinue' | Group-Object -Property 'PSComputerName'
+
+                    # Loop through $Result groups
+                    foreach ($Result in $Results) {
+                        # Send each $Result to it's specific PR output file based on ComputerName
+                        $Result.Group | Out-PRFile -ComputerName $Result.Name
+
+                        # Format the remote execution success $Message
+                        $Message = 'Plugin Execution Succeeded for {0}' -f $Result.Name
+
+                        # Write host $Message
+                        Write-Host -Object $Message
+
+                        # Write log $Message
+                        Write-Log -Message $Message
+                    }
+
+                    # Gather the $RemoteError
+                    $RemoteErrors = $Error | Where-Object { $PSItem -is [System.Management.Automation.Runspaces.RemotingErrorRecord] }
+
+                    foreach ($RemoteError in $RemoteErrors) {
+                        # Format the remote error $Message
+                        $Message = 'Plugin Execution Error for {0}: {1}' -f $RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
+
+                        # Write warning $Message
+                        Write-Warning -Message $Message
+
+                        # Write log $Message
+                        Write-Log -Message $Message
+                    }
+
+                    # Remove the $Job
+                    Remove-Job -Job $Job
                 }
             } else {
                 # Initialize $ReleventParameters Hashtable
@@ -501,25 +570,19 @@ function Invoke-RunCommand {
                     try {
                         # Execute the $global:PowerResponse.Location with the $ReleventParameters
                         & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile -ComputerName $Session.ComputerName
+
+                        # Format host success $Message
+                        $Message = 'Plugin Execution Succeeded for {0} at {1}' -f $Session.ComputerName, (Get-Date)
+
+                        # Write execution success message
+                        Write-Host -Object $Message
                     } catch {
                         # Format warning $Message
-                        $Message = 'Plugin execution error for {0}: {1}' -f $Session.ComputerName,$PSItem
+                        $Message = 'Plugin Execution Error for {0}: {1}' -f $Session.ComputerName,$PSItem
 
                         # Write warning $Message to screen along with some admin advice
                         Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
-
-                        # Write execution $Message to log
-                        Write-Log -Message $Message
-
-                        # Skip Analysis plugin execution
-                        continue
                     }
-
-                    # Format host success $Message
-                    $Message = "Plugin Execution Succeeded for {0} at {1}" -f $Session.ComputerName, (Get-Date)
-
-                    # Write execution success message
-                    Write-Host -Object $Message
 
                     # Write execution $Message to log
                     Write-Log -Message $Message
@@ -683,7 +746,7 @@ function Invoke-ShowCommand {
 
         # Initialize empty $Param(eter) return HashTable
         $Param = @{}
-        
+
         # For plugins with no parameters, write-host to run plugin
         if ($CommandParameters.Count -gt 0) {
             # Set $Param.[Type]$Key to the $global:PowerResponse.Parameters.$Key value
@@ -723,19 +786,6 @@ function Invoke-PRCommand {
             Write-Warning ('Unknown Command ''{0}'', ''help'' prints a list of available commands' -f $Keyword)
             Write-Verbose $PSItem
         }
-    }
-}
-
-function Get-PROutputPath {
-    param (
-        [Parameter(Mandatory=$true)]
-        [String]$ComputerName,
-        [String]$Directory
-    )
-
-    process {
-        # Format the returned path as $global:PowerResponse.Config.Path.Output\$ComputerName\{yyyy-MM-dd}\$Directory
-        return '{0}\{1}\{2:yyyy-MM-dd}\{3}' -f $global:PowerResponse.Config.Path.Output,$ComputerName.ToUpper(),(Get-Date),$Directory -Replace '\\+','\' -Replace '\\$'
     }
 }
 
@@ -896,12 +946,12 @@ function Write-Log {
 
 # $Banner for Power-Response
 $Banner = @'
-    ____                                ____                                      
-   / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________ 
+    ____                                ____
+   / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________
   / /_/ / __ \ | /| / / _ \/ ___/_____/ /_/ / _ \/ ___/ __ \/ __ \/ __ \/ ___/ _ \
  / ____/ /_/ / |/ |/ /  __/ /  /_____/ _, _/  __(__  ) /_/ / /_/ / / / (__  )  __/
-/_/    \____/|__/|__/\___/_/        /_/ |_|\___/____/ .___/\____/_/ /_/____/\___/ 
-                                                   /_/                            
+/_/    \____/|__/|__/\___/_/        /_/ |_|\___/____/ .___/\____/_/ /_/____/\___/
+                                                   /_/
 
 Authors: Drew Schmitt | Matt Weikert | Gavin Prentice
 
