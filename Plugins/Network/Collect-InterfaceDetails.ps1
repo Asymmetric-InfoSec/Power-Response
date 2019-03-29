@@ -9,10 +9,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-InterfaceDetails.ps1 -ComputerName Test-PC
-
     Power-Response Execution:
 
     Set ComputerName Test-PC
@@ -31,20 +27,13 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
+   
     )
 
 process {
 
-    foreach ($Computer in $ComputerName) {
+    # Get Interface Information
 
-        # Get Interface Information
+    Get-NetIPConfiguration
 
-        $ScriptBlock_NetConfig = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-NetIPConfiguration')
-    
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_NetConfig -SessionOption (New-PSSessionOption -NoMachineProfile)
-
-    }
 }

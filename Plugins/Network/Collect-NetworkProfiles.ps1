@@ -9,10 +9,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-NetworkProfiles.ps1 -ComputerName Test-PC
-
     Power-Response Execution:
 
     Set ComputerName Test-PC
@@ -31,20 +27,12 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
     )
 
 process {
 
-    foreach ($Computer in $ComputerName) {
+    # Get Network Connection Profile(s)
 
-        # Get Network Connection Profile(s)
+    Get-NetConnectionProfile
 
-        $ScriptBlock_NetProfile = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-NetConnectionProfile')
-    
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_NetProfile -SessionOption (New-PSSessionOption -NoMachineProfile)
-
-    }
 }
