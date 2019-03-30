@@ -73,7 +73,7 @@ process{
     }
 
     # Set $Output for where to store recovered prefetch files
-    $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'CollectedItems')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'CollectedItems')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
     If (-not (Test-Path $Output)) {

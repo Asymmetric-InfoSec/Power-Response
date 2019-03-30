@@ -338,16 +338,27 @@ function Import-Config {
     }
 }
 
-function Get-PROutputPath {
+function Get-PRPath {
+    [CmdletBinding(DefaultParameterSetName='Output-Specific')]
     param (
-        [Parameter(Mandatory=$true)]
+        [Parameter(ParameterSetName='Bin',Mandatory=$true)]
+        [Switch]$Bin,
+
+        [Parameter(ParameterSetName='Output',Mandatory=$true)]
+        [Switch]$Output,
+
+        [Parameter(ParameterSetName='Output-Specific',Mandatory=$true)]
         [String]$ComputerName,
+        [Parameter(ParameterSetName='Output-Specific')]
         [String]$Directory
     )
 
     process {
-        # Format the returned path as $global:PowerResponse.Config.Path.Output\$ComputerName\{yyyy-MM-dd}\$Directory
-        return '{0}\{1}\{2:yyyy-MM-dd}\{3}' -f $global:PowerResponse.Config.Path.Output,$ComputerName.ToUpper(),(Get-Date),$Directory -Replace '\\+','\' -Replace '\\$'
+        switch ($PSCmdlet.ParameterSetName) {
+            'Bin' { $global:PowerResponse.Config.Bin }
+            'Output' { $global:PowerResponse.Config.Path.Output }
+            'Output-Specific' { '{0}\{1}\{2:yyyy-MM-dd}\{3}' -f $global:PowerResponse.Config.Path.Output,$ComputerName.ToUpper(),(Get-Date),$Directory -Replace '\\+','\' -Replace '\\$' }
+        }
     }
 }
 
