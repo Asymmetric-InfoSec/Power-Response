@@ -22,7 +22,6 @@
     finding a pivot point, and then search for events around your pivot point.
 
 .EXAMPLE
-    .\Collect-WindowsEvents-Firewall.ps1 -ComputerName Test-PC -StartDate 12/23/2018
 
     Power-Response Execution
 
@@ -43,41 +42,20 @@
 
 param (
 
-    [Parameter(Mandatory=$true, Position=0)]
-    [string[]]$ComputerName,
-
-    #If no date is supplied, the default is the current date minus 90 days (average dwell time of an adversary)
-    [Parameter(Mandatory=$false, Position=1)]
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
-
     )
 
 process {
 
-#Windows Firewall Event Log IDs to Retrieve (Microsoft-Windows-Windows Firewall With Advanced Security/Firewall.evtx)
-$WinFirewallEvents = @(
+    $StartDate=(Get-Date).AddDays(-90)
 
-        2003 #Windows firewall profile has been changed
+    #Windows Firewall Event Log IDs to Retrieve (Microsoft-Windows-Windows Firewall With Advanced Security/Firewall.evtx)
+    $WinFirewallEvents = @(
 
-    )
+            2003 #Windows firewall profile has been changed
 
-#Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
+        )
 
-foreach ($Computer in $ComputerName) {
-
-        #Verify Computer is online prior to processing
-
-        if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        Write-Error ("{0} appears to be offline, event logs were not collected" -f $Computer)
-        continue
-        
-        #If online, collect event logs for $Computer
-        } else {
-
-        #Get Windows Firewall Event Logs
-        Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-Windows Firewall With Advanced Security/Firewall"; StartTime=$StartDate; ID=$WinFirewallEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
-
-       }
-    }
+     #Get Windows Firewall Event Logs
+    Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-Windows Firewall With Advanced Security/Firewall"; StartTime=$StartDate; ID=$WinFirewallEvents} -ErrorAction SilentlyContinue
 
 }

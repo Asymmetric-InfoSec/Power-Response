@@ -11,11 +11,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-PSReadLine.ps1 -ComputerName Test-PC
-    Note: Output will most likely end up in C:\PSReadLine if running stand alone
-
     Power-Response Exection:
 
     Set ComputerName Test-PC
@@ -35,7 +30,7 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
+    [System.Management.Automation.Runspaces.PSSession[]]$Session
 
     )
 
@@ -48,26 +43,16 @@ process{
     If (-not (Test-Path $Output)) {
         New-Item -Type Directory -Path $Output | Out-Null
     }
-   
-    foreach ($Computer in $ComputerName) {
 
-        # Create session on remote host
-        $Session = New-PSSession -ComputerName "$Computer"
+    # Get all user profiles on the PC if default, continue if not 
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-ChildItem C:\Users")
+    $UserProfiles = Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
 
-        # Get all user profiles on the PC if default, continue if not 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-ChildItem C:\Users")
-        $UserProfiles = Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
+    # Retrieve the consolehost_history file for all users on the machine
+    Foreach ($UserProfile in $UserProfiles){
 
-        # Retrieve the consolehost_history file for all users on the machine
-        Foreach ($UserProfile in $UserProfiles){
+        # Copy the ConsoleHost_history file to $Output
+        Copy-Item "C:\Users\$UserProfile\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt" -Destination "$Output\${UserProfile}_ConsoleHost_History.txt" -FromSession $Session -Force -ErrorAction SilentlyContinue
 
-            # Copy the ConsoleHost_history file to $Output
-            Copy-Item "C:\Users\$UserProfile\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadline\ConsoleHost_history.txt" -Destination "$Output\${UserProfile}_ConsoleHost_History.txt" -FromSession $Session -Force -ErrorAction SilentlyContinue
-
-        }
-
-        #Close the PS Remoting Session for $Computer
-        $Session | Remove-PSSession
     }
-
 }    

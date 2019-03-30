@@ -7,9 +7,6 @@
     Collects shortcuts (lnk files) from Recent Items (%UserProfile\AppData\Roaming\Microsoft\Windows\Recent)
 
 .EXAMPLE
-    Stand Alone Execution
-
-    .\Collect-RecentItems.ps1 -ComputerName Test-PC
 
     Power-Response Execution
 
@@ -30,7 +27,8 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName,
+    [System.Management.Automation.Runspaces.PSSession[]]$Session,
+
     [Parameter(Mandatory=$false,Position=1)]
     [string[]]$RecentItemName
     
@@ -39,56 +37,47 @@ param (
 process {
 
     #Set $Output for where to store recovered prefetch files
-    $Output= ("{0}\RecentItems\" -f $global:PowerResponse.OutputPath)
+    $Output= ("{0}\RecentItems\" -f Get-PROutputPath)
 
     #Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
     If (-not (Test-Path $Output)) {
         New-Item -Type Directory -Path $Output | Out-Null
     }   
 
-    foreach ($Computer in $ComputerName){
+    #Get list of users that exist on this process
 
-        #Create persistent Powershell Session
+    $Users = Invoke-Command -Session $Session -Scriptblock{Get-ChildItem "C:\Users\" | ? {@("Public","Default") -NotContains $_.name}}
 
-        $Session = New-PSSession -ComputerName $Computer -SessionOption (New-PSSessionOption -NoMachineProfile)
+    #For each user, create directory for storing recent files
 
-        #Get list of users that exist on this process
+    foreach ($User in $Users){
 
-        $Users = Invoke-Command -Session $Session -Scriptblock{Get-ChildItem "C:\Users\" | ? {@("Public","Default") -NotContains $_.name}}
+        $UserOutput = "$Output\$User"
 
-        #For each user, create directory for storing recent files
+        #Create User subdirectory 
+        if (-not (Test-Path $UserOutput)) {
+            
+            New-Item -Type Directory -Path $UserOutput | Out-Null
 
-        foreach ($User in $Users){
-
-            $UserOutput = "$Output\$User"
-
-            #Create User subdirectory 
-            if (-not (Test-Path $UserOutput)) {
-                
-                New-Item -Type Directory -Path $UserOutput | Out-Null
-
-            }
-
-            #Get all recent files for user
-            if (!$RecentItemName){
-
-                $RecentItemName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent" | ? {!$_.PSISContainer}} -ArgumentList $User -ErrorAction SilentlyContinue
-
-            }
-
-            foreach ($File in $RecentItemName){
-
-                #Get recent items file Attributes
-                $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\$($args[1])").CreationTime} -ArgumentList $User,$File
-
-                #Copy specified file to $Output
-                Copy-Item "C:\Users\$User\AppData\Roaming\Microsoft\Windows\Recent\$File" -Destination "$UserOutput\" -FromSession $Session -Force -ErrorAction SilentlyContinue
-
-                #Set original creation time on copied recent items lnk file
-                (Get-Item "$UserOutput\$File").CreationTime = $CreationTime
-            }
         }
 
-        $Session | Remove-PSSession   
+        #Get all recent files for user
+        if (!$RecentItemName){
+
+            $RecentItemName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent" | ? {!$_.PSISContainer}} -ArgumentList $User -ErrorAction SilentlyContinue
+
+        }
+
+        foreach ($File in $RecentItemName){
+
+            #Get recent items file Attributes
+            $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\$($args[1])").CreationTime} -ArgumentList $User,$File
+
+            #Copy specified file to $Output
+            Copy-Item "C:\Users\$User\AppData\Roaming\Microsoft\Windows\Recent\$File" -Destination "$UserOutput\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+
+            #Set original creation time on copied recent items lnk file
+            (Get-Item "$UserOutput\$File").CreationTime = $CreationTime
+        }
     }
 }

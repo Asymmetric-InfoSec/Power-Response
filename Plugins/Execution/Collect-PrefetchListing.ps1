@@ -33,31 +33,24 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
     )
 
 process{
 
-    # Set $Output for where to store recovered prefetch files
-    $Output= ("{0}\Prefetch" -f $global:PowerResponse.OutputPath)
+    # Retrieves the child items of C:\Windows\Prefetch
+    $PrefetchFiles = Get-ChildItem -Path C:\Windows\Prefetch
 
-    # Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
-    If (-not (Test-Path $Output)) {
-        New-Item -Type Directory -Path $Output | Out-Null
+    foreach ($Prefetchfile in $PrefetchFiles) {
+
+        $PrefetchHash = @{
+
+            Name = $PrefetchFile.Name
+            CreationTimeUTC = $PrefetchFile.CreationTimeUTC
+            LastWriteTimeUTC = $PrefetchFile.LastWriteTimeUTC
+            LastAccessTimeUTC = $PrefetchFile.LastAccessTimeUTC
+            Length = $PrefetchFile.Length
+        }
+
+        [PSCustomObject]$PrefetchHash | Select Name, CreationTimeUTC, LastWriteTimeUTC, LastAccessTimeUTC, Length
     }
-
-    foreach ($Computer in $ComputerName) {
-
-        # Retrieves the child items of C:\Windows\Prefetch
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-ChildItem -Path C:\Windows\Prefetch")
-        
-        #Execute and output to a file in $global:PowerResponse.OutputPath\Prefetch\Collect-PrefetchListing.txt
-        #If the plugin was run previously, the results will be appended to $global:PowerResponse.OutputPath\Prefetch\Collect-PrefetchListing.txt
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock | Out-File "$Output\_Collect-PrefetchListing.txt" -Append -Force
-
-    }
-
-
 }

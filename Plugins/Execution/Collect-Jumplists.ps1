@@ -13,10 +13,6 @@
     
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-JumpLists.ps1 -ComputerName Test-PC
-
     Power-Response Execution
 
     Set ComputerName Test-PC
@@ -37,14 +33,14 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
+    [System.Management.Automation.Runspaces.PSSession[]]$Session
 
     )
 
 process{
 
     # Set $Output for where to store recovered prefetch files
-    $Output= ("{0}\Jumplists" -f $global:PowerResponse.OutputPath)
+    $Output= ("{0}\Jumplists" -f Get-PROutputPath)
 
     # Create jumplists subdirectory in $global:PowerResponse.OutputPath for storing jumplists
     If (-not (Test-Path $Output)) {
@@ -52,45 +48,36 @@ process{
         New-Item -Type Directory -Path $Output | Out-Null
     }   
 
-    foreach ($Computer in $ComputerName) {
+    #Get all user accounts and store them in variable
+    $UserAccts = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\"}
 
-        # Create session on remote host
-        $Session = New-PSSession -ComputerName "$Computer" -SessionOption (New-PSSessionOption -NoMachineProfile)
+    #Loop through each user and collect jumplists
+    foreach ($User in $UserAccts){
 
-        #Get all user accounts and store them in variable
-        $UserAccts = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\"}
+        #Create Subdirectories for each user account in $Output
+        if (!(Test-Path $Output\$User)){
 
-        #Loop through each user and collect jumplists
-        foreach ($User in $UserAccts){
-
-            #Create Subdirectories for each user account in $Output
-            if (!(Test-Path $Output\$User)){
-
-                New-Item -Type Directory -Path $Output\$User | Out-Null
-            }
-
-            #Collect Jumplist for specific user
-            $JumpFiles = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\ -ErrorAction SilentlyContinue} -ArgumentList $User
-
-            foreach ($File in $JumpFiles){
-
-                #Get Jumplist File Attributes
-                $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$($args[1])).CreationTime} -ArgumentList $User,$File
-                
-                #Copy specified jumplist file to $Output
-                Copy-Item "C:\users\$User\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$File" -Destination "$Output\$User" -FromSession $Session -Force -ErrorAction SilentlyContinue
-
-                #Set original creation time on copied prefetch file
-                (Get-Item "$Output\$User\$File").CreationTime = $CreationTime          
-            }
+            New-Item -Type Directory -Path $Output\$User | Out-Null
         }
 
-        #Remove empty directories from $Output
-        $JumpDirs = Get-ChildItem $Output -directory -recurse | Where { (Get-ChildItem $_.fullName).count -eq 0 } | Select -Expandproperty FullName
-        $JumpDirs | Foreach-Object { Remove-Item $_ }
+        #Collect Jumplist for specific user
+        $JumpFiles = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\ -ErrorAction SilentlyContinue} -ArgumentList $User
+
+        foreach ($File in $JumpFiles){
+
+            #Get Jumplist File Attributes
+            $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$($args[1])).CreationTime} -ArgumentList $User,$File
+            
+            #Copy specified jumplist file to $Output
+            Copy-Item "C:\users\$User\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$File" -Destination "$Output\$User" -FromSession $Session -Force -ErrorAction SilentlyContinue
+
+            #Set original creation time on copied prefetch file
+            (Get-Item "$Output\$User\$File").CreationTime = $CreationTime          
+        }
     }
 
-    #Close PS remoting session
-    $Session | Remove-PSSession  
+    #Remove empty directories from $Output
+    $JumpDirs = Get-ChildItem $Output -directory -recurse | Where { (Get-ChildItem $_.fullName).count -eq 0 } | Select -Expandproperty FullName
+    $JumpDirs | Foreach-Object { Remove-Item $_ }
 }
 

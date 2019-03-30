@@ -7,9 +7,6 @@
     Collects listing of shortcuts from Recent Items (%UserProfile\AppData\Roaming\Microsoft\Windows\Recent)
 
 .EXAMPLE
-    Stand Alone Execution
-
-    .\Collect-RecentItemsListing.ps1 -ComputerName Test-PC
 
     Power-Response Execution
 
@@ -29,52 +26,32 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-    
     )
 
 process {
 
-    foreach ($Computer in $ComputerName){
+    # Get list of users that exist on this process
 
-        # Create persistent Powershell Session
+    $Users = Get-ChildItem "C:\Users\"
 
-        $Session = New-PSSession -ComputerName $Computer -SessionOption (New-PSSessionOption -NoMachineProfile)
+    #For each user, get contents of recent files (lnk files)
 
-        # Get list of users that exist on this process
+    foreach ($User in $Users){
 
-        Invoke-Command -Session $Session -Scriptblock{
+        $RecentItems = Get-ChildItem "C:\Users\$User\AppData\Roaming\Microsoft\Windows\Recent" -ErrorAction SilentlyContinue
 
-            $Users = Get-ChildItem "C:\Users\"
+        foreach ($Item in $RecentItems) {
 
-            #For each user, get contents of recent files (lnk files)
+            $OutHash = @{
 
-            foreach ($User in $Users){
-
-                $RecentItems = Get-ChildItem "C:\Users\$User\AppData\Roaming\Microsoft\Windows\Recent" -ErrorAction SilentlyContinue
-
-                foreach ($Item in $RecentItems) {
-
-                    $OutHash = @{
-
-                        "User" = $User
-                        "Name" = $Item.Name
-                        "Mode" = $Item.Mode
-                        "CreationTime" = $Item.CreationTimeUtc
-                        "ModificationTime" = $Item.LastWriteTimeUtc
-                    }
-
-                    [PSCustomObject]$OutHash | Select User, Name, Mode, CreationTime, ModificationTime
-
-                }
-
+                "User" = $User
+                "Name" = $Item.Name
+                "Mode" = $Item.Mode
+                "CreationTime" = $Item.CreationTimeUtc
+                "ModificationTime" = $Item.LastWriteTimeUtc
             }
 
-        } 
-
-        $Session | Remove-PSSession   
-
+            [PSCustomObject]$OutHash | Select User, Name, Mode, CreationTime, ModificationTime
+        }
     }
-
-}
+} 

@@ -15,14 +15,7 @@
     being labeled as 'Path'
 
 .EXAMPLE
-    Stand Alone Execution
-
-    .\Collect-Items.ps1 -ComputerName Test-PC -ItemPath C:\Power-Response\Power-Response.ps1
-
-    OR
-
-    .\Collect-Items.ps1 -ComputerName Test-PC -ListPath C:\Tools\ItemPaths.csv
-
+   
     Power-Response Execution
 
     Set ComputerName Test-PC
@@ -50,7 +43,7 @@ param (
 
     [Parameter(ParameterSetName = "Items", Position = 0, Mandatory = $true)]
     [Parameter(ParameterSetName = "List", Position = 0, Mandatory = $true)]
-    [string[]]$ComputerName,
+    [System.Management.Automation.Runspaces.PSSession[]]$Session,
 
     [Parameter(ParameterSetName = "Items", Position = 1, Mandatory = $true)]
     [string[]]$ItemPath,
@@ -80,7 +73,7 @@ process{
     }
 
     # Set $Output for where to store recovered prefetch files
-    $Output= ("{0}\ItemCollection\" -f $global:PowerResponse.OutputPath)
+    $Output= ("{0}\ItemCollection\" -f Get-PROutputPath)
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
     If (-not (Test-Path $Output)) {
@@ -93,143 +86,135 @@ process{
         "List" {[string[]]$Items = (Import-CSV $ListPath | Select -ExpandProperty "Path")}
     }
 
-    foreach ($Computer in $ComputerName) {
+    #Determine system architecture and select proper 7za.exe executable
+    try {
+     
+        $Architecture = (Get-WmiObject -ComputerName $Computer -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
+    
+        if ($Architecture -eq "64-bit") {
 
-        # Create session on remote host (with no profile saved remotely)
-        $Session = New-PSSession -ComputerName "$Computer" -SessionOption (New-PSSessionOption -NoMachineProfile)
+            $Installexe = $7za64
 
-        #Determine system architecture and select proper 7za.exe executable
-        try {
-         
-            $Architecture = (Get-WmiObject -ComputerName $Computer -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
+        } elseif ($Architecture -eq "32-bit") {
+
+            $Installexe = $7za32
+
+        } else {
         
-            if ($Architecture -eq "64-bit") {
-
-                $Installexe = $7za64
-
-            } elseif ($Architecture -eq "32-bit") {
-
-                $Installexe = $7za32
-
-            } else {
-            
-                Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Computer)
-                Continue
-            }
-
-        } catch {
-        
-         Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Computer)
+            Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Computer)
             Continue
         }
 
-        #Copy 7zip executable to the remote machine for user
+    } catch {
+    
+     Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Computer)
+        Continue
+    }
 
-        try {
+    #Copy 7zip executable to the remote machine for user
 
-            Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
+    try {
 
-        } catch {
+        Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
 
-            Throw "Could not copy 7zip to remote machine. Quitting."
+    } catch {
+
+        Throw "Could not copy 7zip to remote machine. Quitting."
+    }
+
+    #Collect items
+    foreach ($Item in $Items){
+
+        #Verify that file exists on remote system, if not skip and continue
+        $PathVerify = Invoke-Command -Session $Session -ScriptBlock {Get-Item $($args[0]) -ErrorAction SilentlyContinue} -ArgumentList $Item 
+
+        if (!$PathVerify) {
+           
+            Write-Error "No item found at $Item. Skipping." -ErrorAction Continue
+            Continue
         }
 
-        #Collect items
-        foreach ($Item in $Items){
+        if (!$PathVerify.PSIsContainer){
 
-            #Verify that file exists on remote system, if not skip and continue
-            $PathVerify = Invoke-Command -Session $Session -ScriptBlock {Get-Item $($args[0]) -ErrorAction SilentlyContinue} -ArgumentList $Item 
+            #Get Item Attributes, create metadata file, and compress files
+            Invoke-Command -Session $Session -ScriptBlock {
 
-            if (!$PathVerify) {
-               
-                Write-Error "No item found at $Item. Skipping." -ErrorAction Continue
-                Continue
-            }
+                $MetaData = @{
 
-            if (!$PathVerify.PSIsContainer){
+                    Item = $($args[0])
+                    CreationTimeUTC = (Get-Item $($args[0])).CreationTimeUtc
+                    ModifiedTimeUTC = (Get-Item $($args[0])).LastWriteTimeUtc
+                    AccessTimeUTC = (Get-Item $($args[0])).LastAccessTimeUtc
+                    MD5 = (Get-FileHash -Path $($args[0]) -Algorithm MD5).Hash
+                } 
 
-                #Get Item Attributes, create metadata file, and compress files
-                Invoke-Command -Session $Session -ScriptBlock {
+                $ExportPath = "C:\ProgramData\{0}_Metadata.csv" -f (Split-Path $($args[0]) -Leaf)
+
+                [PSCustomObject]$MetaData | Select Item, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath
+            
+            } -ArgumentList $Item
+        }
+
+        if ($PathVerify.PSIsContainer){
+
+            Invoke-Command -Session $Session -ScriptBlock {
+
+                $DirItems = Get-ChildItem -Path $($args[0]) -File -Recurse | Select -ExpandProperty FullName
+
+                foreach ($DirItem in $DirItems){
 
                     $MetaData = @{
 
-                        Item = $($args[0])
-                        CreationTimeUTC = (Get-Item $($args[0])).CreationTimeUtc
-                        ModifiedTimeUTC = (Get-Item $($args[0])).LastWriteTimeUtc
-                        AccessTimeUTC = (Get-Item $($args[0])).LastAccessTimeUtc
-                        MD5 = (Get-FileHash -Path $($args[0]) -Algorithm MD5).Hash
+                        Item = $DirItem
+                        Directory = (Get-Item $DirItem).Directory
+                        CreationTimeUTC = (Get-Item $DirItem).CreationTimeUtc
+                        ModifiedTimeUTC = (Get-Item $DirItem).LastWriteTimeUtc
+                        AccessTimeUTC = (Get-Item $DirItem).LastAccessTimeUtc
+                        MD5 = (Get-FileHash -Path $DirItem -Algorithm MD5).Hash
                     } 
 
                     $ExportPath = "C:\ProgramData\{0}_Metadata.csv" -f (Split-Path $($args[0]) -Leaf)
 
-                    [PSCustomObject]$MetaData | Select Item, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath
+                    [PSCustomObject]$MetaData | Select Item, Directory, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath -Append
+
+                }
+
+            } -ArgumentList $Item
+        } 
+
+        Invoke-Command -Session $Session -ScriptBlock {
+
+            #Create archive of Item and MetaData (separately)
+            $ArchivePath = "C:\ProgramData\{0}.zip" -f (Split-Path $($args[1]) -Leaf)
+            $Command_Compress = "C:\ProgramData\{0} a -pinfected -tzip {1} {2} {3}" -f ($($args[0]), $ArchivePath, $ExportPath, ($($args[1])))
+
+            Invoke-Expression -Command $Command_Compress | Out-Null
+
+        } -ArgumentList (Split-Path $Installexe -Leaf), $Item
+
+        #Copy specified archive to $Output
+        $ItemPath = "C:\ProgramData\{0}.zip" -f (Split-Path $Item -Leaf)
+
+        Copy-Item -Path $ItemPath -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+
+        #Remove created files on remote machine as cleanup
+
+        Invoke-Command -Session $Session -ScriptBlock {
+
+            #Remove the archive
+
+            Remove-Item -Path $ArchivePath -Force 
                 
-                } -ArgumentList $Item
-            }
+            #Remove the Metadata file
 
-            if ($PathVerify.PSIsContainer){
+            Remove-Item -Path $ExportPath -Force  
 
-                Invoke-Command -Session $Session -ScriptBlock {
+        } 
 
-                    $DirItems = Get-ChildItem -Path $($args[0]) -File -Recurse | Select -ExpandProperty FullName
-
-                    foreach ($DirItem in $DirItems){
-
-                        $MetaData = @{
-
-                            Item = $DirItem
-                            Directory = (Get-Item $DirItem).Directory
-                            CreationTimeUTC = (Get-Item $DirItem).CreationTimeUtc
-                            ModifiedTimeUTC = (Get-Item $DirItem).LastWriteTimeUtc
-                            AccessTimeUTC = (Get-Item $DirItem).LastAccessTimeUtc
-                            MD5 = (Get-FileHash -Path $DirItem -Algorithm MD5).Hash
-                        } 
-
-                        $ExportPath = "C:\ProgramData\{0}_Metadata.csv" -f (Split-Path $($args[0]) -Leaf)
-
-                        [PSCustomObject]$MetaData | Select Item, Directory, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath -Append
-
-                    }
-
-                } -ArgumentList $Item
-            } 
-
-            Invoke-Command -Session $Session -ScriptBlock {
-
-                #Create archive of Item and MetaData (separately)
-                $ArchivePath = "C:\ProgramData\{0}.zip" -f (Split-Path $($args[1]) -Leaf)
-                $Command_Compress = "C:\ProgramData\{0} a -pinfected -tzip {1} {2} {3}" -f ($($args[0]), $ArchivePath, $ExportPath, ($($args[1])))
-
-                Invoke-Expression -Command $Command_Compress | Out-Null
-
-            } -ArgumentList (Split-Path $Installexe -Leaf), $Item
-
-            #Copy specified archive to $Output
-            $ItemPath = "C:\ProgramData\{0}.zip" -f (Split-Path $Item -Leaf)
-
-            Copy-Item -Path $ItemPath -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
-
-            #Remove created files on remote machine as cleanup
-
-            Invoke-Command -Session $Session -ScriptBlock {
-
-                #Remove the archive
-
-                Remove-Item -Path $ArchivePath -Force 
-                    
-                #Remove the Metadata file
-
-                Remove-Item -Path $ExportPath -Force  
-
-            } 
-
-        }
-
-        #Remove 7zip
-
-        Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path ("C:\ProgramData\{0}" -f ($($args[0])))} -Argumentlist (Split-Path $Installexe -Leaf)
-
-        #Close PS remoting session
-        $Session | Remove-PSSession
     }
+
+    #Remove 7zip
+
+    Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path ("C:\ProgramData\{0}" -f ($($args[0])))} -Argumentlist (Split-Path $Installexe -Leaf)
+
 }

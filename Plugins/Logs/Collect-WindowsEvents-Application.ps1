@@ -22,7 +22,6 @@
     finding a pivot point, and then search for events around your pivot point.
 
 .EXAMPLE
-    .\Collect-WindowsEvents-Application.ps1 -ComputerName Test-PC -StartDate 12/23/2018
 
     Power-Response Execution
 
@@ -43,48 +42,26 @@
 
 param (
 
-    [Parameter(Mandatory=$true, Position=0)]
-    [string[]]$ComputerName,
-
-    #If no date is supplied, the default is the current date minus 90 days (average dwell time of an adversary)
-    [Parameter(Mandatory=$false, Position=1)]
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
-
     )
 
 process {
 
-#Application Event Log IDs to Retrieve (Application)
-$ApplicationEvents = @(
+    [DateTime]$StartDate = (Get-Date).AddDays(-90)
 
-        1000,  #Application errors and hangs (may be noisy)
-        1001,  #Application errors and hangs (may be noisy)
-        1002,  #Application errors and hangs (may be noisy)
-        1033,  #Installation completed (with success/failure status)
-        1034,  #Application removal completed (with success/failure status)
-        11707, #Installation completed successfully
-        11708, #Installation operation failed
-        11724  #Application removal completed successfully
+    #Application Event Log IDs to Retrieve (Application)
+    $ApplicationEvents = @(
 
-    )
+            1000,  #Application errors and hangs (may be noisy)
+            1001,  #Application errors and hangs (may be noisy)
+            1002,  #Application errors and hangs (may be noisy)
+            1033,  #Installation completed (with success/failure status)
+            1034,  #Application removal completed (with success/failure status)
+            11707, #Installation completed successfully
+            11708, #Installation operation failed
+            11724  #Application removal completed successfully
 
-#Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
-
-foreach ($Computer in $ComputerName) {
-
-        #Verify Computer is online prior to processing
-
-        if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        Write-Error ("{0} appears to be offline, event logs were not collected" -f $Computer)
-        continue
-        
-        #If online, collect event logs for $Computer
-        } else {
+        )
 
         #Get Windows Application Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Application"; StartTime=$StartDate; ID=$ApplicationEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
-
-        }
-    }
-
+        Get-WinEvent -FilterHashtable @{LogName="Application"; StartTime=$StartDate; ID=$ApplicationEvents} -ErrorAction SilentlyContinue
 }
