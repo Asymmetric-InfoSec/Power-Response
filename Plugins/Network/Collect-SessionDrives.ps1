@@ -9,10 +9,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-SessionDrives.ps1 -ComputerName Test-PC
-
     Power-Response Execution:
 
     Set ComputerName Test-PC
@@ -31,20 +27,12 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
     )
 
 process {
 
-    foreach ($Computer in $ComputerName) {
+    # Get Share Information
 
-        # Get Share Information
+    Get-PSDrive | Select Name, Provider, Root, Description, Used, Free, PSComputerName
 
-        $ScriptBlock_PSDrive = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-PSDrive')
-    
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_PSDrive -SessionOption (New-PSSessionOption -NoMachineProfile)
-
-    }
 }

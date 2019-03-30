@@ -9,10 +9,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-NetworkRoutes.ps1 -ComputerName Test-PC
-
     Power-Response Execution:
 
     Set ComputerName Test-PC
@@ -31,20 +27,12 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
     )
 
 process {
 
-    foreach ($Computer in $ComputerName) {
+    # Get Routing Information
 
-        # Get Routing Information
+    Get-NetRoute
 
-        $ScriptBlock_Route = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-NetRoute')
-    
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_Route -SessionOption (New-PSSessionOption -NoMachineProfile)
-
-    }
 }

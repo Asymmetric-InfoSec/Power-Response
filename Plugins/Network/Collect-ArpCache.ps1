@@ -9,10 +9,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-ArpCache.ps1 -ComputerName Test-PC
-
     Power-Response Execution:
 
     Set ComputerName Test-PC
@@ -31,20 +27,13 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
+    
     )
 
 process {
 
-    foreach ($Computer in $ComputerName) {
+    # Get ARP Information
 
-        # Get ARP Information
+    Get-NetNeighbor
 
-        $ScriptBlock_ARP = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-NetNeighbor')
-    
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_ARP -SessionOption (New-PSSessionOption -NoMachineProfile)
-
-    }
 }
