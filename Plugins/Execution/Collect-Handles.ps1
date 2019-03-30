@@ -9,10 +9,6 @@
 
 .EXAMPLE
 
-	StandAlone Execution
-
-	.\Collect-Handles.ps1 -ComputerName Test-PC
-
 	Power-Response Execution
 
 	set ComputerName Test-PC
@@ -32,7 +28,7 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
+    [System.Management.Automation.Runspaces.PSSession[]]$Session
 
     )
 
@@ -52,55 +48,44 @@ process {
         Throw "handle64.exe not found in {0}. Place executable in binary directory and try again." -f $global:PowerResponse.Config.Path.Bin
     }
 
-    foreach ($Computer in $ComputerName){
+    #Determine remote system architecture
+    $OSArchitecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject Win32_OperatingSystem).OSArchitecture}
 
-        #Establish PowerShell Session
-        $Session = New-PSSession -ComputerName "$Computer" -SessionOption (New-PSSessionOption -NoMachineProfile)
+    #Select the proper EXE for OS Architecture
+    if ($OSArchitecture -eq "64-bit") {
 
-        #Determine remote system architecture
-        $OSArchitecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject Win32_OperatingSystem).OSArchitecture}
-
-        #Select the proper EXE for OS Architecture
-        if ($OSArchitecture -eq "64-bit") {
-
-            $LocalExe = $Bin_64
-            $RemoteExe = "handle64.exe"
-        }
-
-        if ($OSArchitecture -eq "32-bit") {
-
-            $LocalExe = $Bin_32
-            $RemoteExe = "handle.exe"
-        }
-
-        #Copy binary to remote machine for execution and data collection
-        try {
-
-            Copy-Item -Path $LocalExe -Destination "C:\ProgramData\$RemoteExe" -ToSession $Session -Force -ErrorAction Stop
-
-        } catch {
-
-            throw "Error copying the binary to the remote maching. Quitting."
-        }
-
-        #Collect Data from the remote machine
-
-        $HandlesRaw = Invoke-Command -Session $Session -ScriptBlock {Invoke-Expression -Command "C:\ProgramData\$($args[0]) -accepteula | Select-Object -Skip 5"} -ArgumentList $RemoteExe
-
-        #Format data for ingestion into readable Format
-
-        $Handles = $HandlesRaw | Select-Object -Property @{ N = "Process"; E = { ($_ -split '(?<!:)\s+')[0] } }, @{ N = "ID"; E = { (($_ -split '(?<!:)\s+')[1] -replace 'pid:\s*') } }, @{ N = "Type"; E = { ($_ -split '(?<!:)\s+')[2] -replace 'type:\s*' } }, @{ N = "Path"; E = { ($_ -split '(?<!:)\s+')[3] -replace '^[^ ]*: ' } }
-                                                   
-        [PSCustomObject]$Handles
-
-        #Remove handles binary
-
-        Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path "C:\ProgramData\$($args[0])" -Force} -ArgumentList $RemoteExe
-
-        #Exit PS Session
-
-        $Session | Remove-PSSession                                           
-
+        $LocalExe = $Bin_64
+        $RemoteExe = "handle64.exe"
     }
 
+    if ($OSArchitecture -eq "32-bit") {
+
+        $LocalExe = $Bin_32
+        $RemoteExe = "handle.exe"
+    }
+
+    #Copy binary to remote machine for execution and data collection
+    try {
+
+        Copy-Item -Path $LocalExe -Destination "C:\ProgramData\$RemoteExe" -ToSession $Session -Force -ErrorAction Stop
+
+    } catch {
+
+        throw "Error copying the binary to the remote maching. Quitting."
+    }
+
+    #Collect Data from the remote machine
+
+    $HandlesRaw = Invoke-Command -Session $Session -ScriptBlock {Invoke-Expression -Command "C:\ProgramData\$($args[0]) -accepteula | Select-Object -Skip 5"} -ArgumentList $RemoteExe
+
+    #Format data for ingestion into readable Format
+
+    $Handles = $HandlesRaw | Select-Object -Property @{ N = "Process"; E = { ($_ -split '(?<!:)\s+')[0] } }, @{ N = "ID"; E = { (($_ -split '(?<!:)\s+')[1] -replace 'pid:\s*') } }, @{ N = "Type"; E = { ($_ -split '(?<!:)\s+')[2] -replace 'type:\s*' } }, @{ N = "Path"; E = { ($_ -split '(?<!:)\s+')[3] -replace '^[^ ]*: ' } }
+                                               
+    [PSCustomObject]$Handles
+
+    #Remove handles binary
+
+    Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path "C:\ProgramData\$($args[0])" -Force} -ArgumentList $RemoteExe
+                                        
 }

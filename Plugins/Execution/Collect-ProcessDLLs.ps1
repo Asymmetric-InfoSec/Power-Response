@@ -1,17 +1,13 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Process_Dlls
+    Plugin-Name: Collect-Process_Dlls.ps1
     
 .Description
 
     Gets modules (processes and dlls) currently being used on the remote machine and includes path
 
 .EXAMPLE
-
-    Stand Alone:
-
-    .\Collect-Process_Dlls -ComputerName Test-PC
 
     Power-Response:
 
@@ -31,37 +27,23 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
     )
 
 process{
 
-    foreach ($Computer in $ComputerName) {
 
-        #Run Autorunsc on the remote host and collect ASEP data
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(@'
-Get-Process | Select-Object "ID", "Name", "Modules" | Sort-Object "ID" | Foreach-Object {
-    $ProcessID = $PSItem.ID
-    $ProcessName = $PSItem.Name
-    $PSItem.Modules | Foreach-Object {
-        [PSCustomObject]@{
-            ProcessID=$ProcessID
-            ProcessName=$ProcessName
-            ModuleName=$PSItem.FileName
-            ModuleBaseAddress=$PSItem.BaseAddress
-            ModuleMemorySize=$PSItem.ModuleMemorySize
-            ModuleEntryPointAddress=$PSItem.EntryPointAddress
+    Get-Process | Select-Object "ID", "Name", "Modules" | Sort-Object "ID" | Foreach-Object {
+        $ProcessID = $PSItem.ID
+        $ProcessName = $PSItem.Name
+        $PSItem.Modules | Foreach-Object {
+            [PSCustomObject]@{
+                ProcessID=$ProcessID
+                ProcessName=$ProcessName
+                ModuleName=$PSItem.FileName
+                ModuleBaseAddress=$PSItem.BaseAddress
+                ModuleMemorySize=$PSItem.ModuleMemorySize
+                ModuleEntryPointAddress=$PSItem.EntryPointAddress
+            }
         }
     }
-}
-'@)
-    
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock | Select-Object "ProcessID", "ProcessName", "ModuleName", "ModuleBaseAddress", "ModuleMemorySize", "ModuleEntryPointAddress"
-
-
-    }
-
-
 }

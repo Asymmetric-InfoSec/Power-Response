@@ -20,7 +20,6 @@
 
     
 .EXAMPLE
-    .\Collect-WindowsEvents.ps1 -ComputerName Test-PC -StartDate 12/23/2018
 
     Power-Response Execution
 
@@ -41,200 +40,179 @@
 
 param (
 
-    [Parameter(Mandatory=$true, Position=0)]
-    [string[]]$ComputerName,
-
-    #If no date is supplied, the default is the current date minus 90 days (average dwell time of an adversary)
-    [Parameter(Mandatory=$false, Position=1)]
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
-
     )
 
 process {
 
-#Security Event Log IDs to Retrieve (Security)
-$SecurityEvents = @(
+    [DateTime]$StartDate=(Get-Date).AddDays(-90)
 
-        1102, #The audit log was cleared 
-        4624, #Successful logon
-        4625, #Failed logon
-        4634, #Successful logoff (Not always reliable)
-        4647, #User initiated logoff (For interactive sessions)
-        4648, #Logon using explicit credentials (runas)
-        4672, #Account logon with superuser rights (Administrator)
-        4688, #New process created/Process exited (only applicable if you have process logging enabled - may be noisy)
-        4697, #A service was installed on the system
-        4698, #Scheduled task created
-        4699, #Scheduled task deleted
-        4700, #Scheduled task enabled
-        4701, #Scheduled task disabled
-        4702, #Scheduled task updated
-        4719, #System Audit policy was changed 
-        4720, #A user account was created 
-        4722, #A user account was enabled 
-        4724, #An attempt was made to reset an account's passowrd 
-        4728, #A member was added to a security-enabled global group
-        4732, #A member was added to a security-enabled local group
-        4735, #A security-enabled local group was changed
-        4738 #A user account was changed
-        
-    )
+    #Security Event Log IDs to Retrieve (Security)
+    $SecurityEvents = @(
 
-$SecurityEvents2 = @(
+            1102, #The audit log was cleared 
+            4624, #Successful logon
+            4625, #Failed logon
+            4634, #Successful logoff (Not always reliable)
+            4647, #User initiated logoff (For interactive sessions)
+            4648, #Logon using explicit credentials (runas)
+            4672, #Account logon with superuser rights (Administrator)
+            4688, #New process created/Process exited (only applicable if you have process logging enabled - may be noisy)
+            4697, #A service was installed on the system
+            4698, #Scheduled task created
+            4699, #Scheduled task deleted
+            4700, #Scheduled task enabled
+            4701, #Scheduled task disabled
+            4702, #Scheduled task updated
+            4719, #System Audit policy was changed 
+            4720, #A user account was created 
+            4722, #A user account was enabled 
+            4724, #An attempt was made to reset an account's passowrd 
+            4728, #A member was added to a security-enabled global group
+            4732, #A member was added to a security-enabled local group
+            4735, #A security-enabled local group was changed
+            4738 #A user account was changed
+            
+        )
 
-        4756, #A member was added to a security-enabled universal group
-        4765, #SID History was added to an account 
-        4766, #An attempt to add SID History to an account failed 
-        4768, #Ticket Granting Ticket was granted (Successful Logon - Kerberos)
-        4769, #Service Ticket Requested (access to server resource - Kerberos)
-        4771, #Pre-Authentication Failed (failed logon - Kerberos)
-        4776, #Successful/Failed account authentication (NTLM)
-        4778, #Session connected or reconnected (RDP)
-        4779, #Session disconnected (RDP)
-        4798, #A user's local group membership was enumerated
-        4799, #A security-enabled local group membership was enumerated
-        4964  #Special groups have been assigned to a new logon
-        
-    )
+    $SecurityEvents2 = @(
 
-#System Event Log IDs to Retrieve (System)
-$SystemEvents = @(
+            4756, #A member was added to a security-enabled universal group
+            4765, #SID History was added to an account 
+            4766, #An attempt to add SID History to an account failed 
+            4768, #Ticket Granting Ticket was granted (Successful Logon - Kerberos)
+            4769, #Service Ticket Requested (access to server resource - Kerberos)
+            4771, #Pre-Authentication Failed (failed logon - Kerberos)
+            4776, #Successful/Failed account authentication (NTLM)
+            4778, #Session connected or reconnected (RDP)
+            4779, #Session disconnected (RDP)
+            4798, #A user's local group membership was enumerated
+            4799, #A security-enabled local group membership was enumerated
+            4964  #Special groups have been assigned to a new logon
+            
+        )
 
-        104,   #Audit Log Cleared
-        20001, #Device installation
-        24576, #Successful driver installation
-        24577, #Encryption of volume started
-        24579, #Encryption of volume completed
-        7030,  #A service was marked as an interactive service
-        7034,  #Service crashed unexpectedly
-        7035,  #Service sent a start/stop control
-        7036,  #Service started or stopped
-        7040,  #Service start type changed (Boot | On Request | Disabled)
-        7045   #A service was installed on the system
+    #System Event Log IDs to Retrieve (System)
+    $SystemEvents = @(
 
-    )
+            104,   #Audit Log Cleared
+            20001, #Device installation
+            24576, #Successful driver installation
+            24577, #Encryption of volume started
+            24579, #Encryption of volume completed
+            7030,  #A service was marked as an interactive service
+            7034,  #Service crashed unexpectedly
+            7035,  #Service sent a start/stop control
+            7036,  #Service started or stopped
+            7040,  #Service start type changed (Boot | On Request | Disabled)
+            7045   #A service was installed on the system
 
-#Application Event Log IDs to Retrieve (Application)
-$ApplicationEvents = @(
+        )
 
-        1033,  #Installation completed (with success/failure status)
-        1034,  #Application removal completed (with success/failure status)
-        11707, #Installation completed successfully
-        11708, #Installation operation failed
-        11724  #Application removal completed successfully
+    #Application Event Log IDs to Retrieve (Application)
+    $ApplicationEvents = @(
 
-    )
+            1033,  #Installation completed (with success/failure status)
+            1034,  #Application removal completed (with success/failure status)
+            11707, #Installation completed successfully
+            11708, #Installation operation failed
+            11724  #Application removal completed successfully
 
-#Windows Firewall Event Log IDs to Retrieve (Microsoft-Windows-Windows Firewall With Advanced Security/Firewall.evtx)
-$WinFirewallEvents = @(
+        )
 
-        2003 #Windows firewall profile has been changed
+    #Windows Firewall Event Log IDs to Retrieve (Microsoft-Windows-Windows Firewall With Advanced Security/Firewall.evtx)
+    $WinFirewallEvents = @(
 
-    )
+            2003 #Windows firewall profile has been changed
 
-#PowerShell Event Log IDs to Retrieve (Microsoft-Windows-PowerShell/Operational.evtx)
-$PowerShellEvents = @(
+        )
 
-        4104, #Script contents
-        4105, #Script start
-        4106  #Script stop
+    #PowerShell Event Log IDs to Retrieve (Microsoft-Windows-PowerShell/Operational.evtx)
+    $PowerShellEvents = @(
 
-    )
+            4104, #Script contents
+            4105, #Script start
+            4106  #Script stop
 
-#WMI Event Log IDs to Retrieve (Microsoft-Windows-WMI-Activity/Operational.evtx)
-$WMI_Events = @(
+        )
 
-        5857, #Record filter/consumer activity
-        5858, #Record filter/consumer activity
-        5859, #Record filter/consumer activity
-        5860, #Record filter/consumer activity
-        5861  #New permanent event consumer creation
+    #WMI Event Log IDs to Retrieve (Microsoft-Windows-WMI-Activity/Operational.evtx)
+    $WMI_Events = @(
 
-    )
+            5857, #Record filter/consumer activity
+            5858, #Record filter/consumer activity
+            5859, #Record filter/consumer activity
+            5860, #Record filter/consumer activity
+            5861  #New permanent event consumer creation
 
-#RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-RDPClient/Operational.evtx)
-$RDP_TC_RDPClient_Events = @(
+        )
 
-        1024, #Destination Hostname (From Source/Initiating System - system RDP-ing from)
-        1102  #Destination IP Address (From Source/Initiating System - system RDP-ing from)
+    #RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-RDPClient/Operational.evtx)
+    $RDP_TC_RDPClient_Events = @(
 
-)
-
-#RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational.evtx)
-$RDP_TC_RCM_Events = @(
-
-        1149 #Source IP/Logon Username (On destination system-machine being RDP'd to)
+            1024, #Destination Hostname (From Source/Initiating System - system RDP-ing from)
+            1102  #Destination IP Address (From Source/Initiating System - system RDP-ing from)
 
     )
 
-#RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-LocalSessionManager/Operational.evtx)
-$RDP_TC_LSM_Events = @(
+    #RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational.evtx)
+    $RDP_TC_RCM_Events = @(
 
-        21, #Source IP/Logon Username
-        22, #Source IP/Logon Username
-        25, #Source IP/Logon Username
-        41  #Source IP/Logon Username
-    )
+            1149 #Source IP/Logon Username (On destination system-machine being RDP'd to)
 
-#RDP Event Log IDs to Retrieve (Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational.evtx)
-$RDP_RdpTS_Events = @(
+        )
 
-        98, #Successful Connections
-        131 #Connection Attempts (Source IP/Logon UserName)
+    #RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-LocalSessionManager/Operational.evtx)
+    $RDP_TC_LSM_Events = @(
 
-    )
+            21, #Source IP/Logon Username
+            22, #Source IP/Logon Username
+            25, #Source IP/Logon Username
+            41  #Source IP/Logon Username
+        )
 
-#Scheduled Tasks Event Log IDs to Retireve (Microsoft-Windows-Task Scheduler/Operational.evtx)
-$Sched_Tasks_Events = @(
+    #RDP Event Log IDs to Retrieve (Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational.evtx)
+    $RDP_RdpTS_Events = @(
 
-        106, #Scheluded task created
-        140, #Scheduled task updated
-        141 #Scheduled task deleted
-       
-    )
+            98, #Successful Connections
+            131 #Connection Attempts (Source IP/Logon UserName)
 
-#Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
+        )
 
-foreach ($Computer in $ComputerName) {
+    #Scheduled Tasks Event Log IDs to Retireve (Microsoft-Windows-Task Scheduler/Operational.evtx)
+    $Sched_Tasks_Events = @(
 
-        #Verify Computer is online prior to processing
+            106, #Scheluded task created
+            140, #Scheduled task updated
+            141 #Scheduled task deleted
+           
+        )
 
-        if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        Write-Error ("{0} appears to be offline, event logs were not collected" -f $Computer)
-        continue
-        
-        #If online, collect event logs for $Computer
-        } else {
+    #Get Windows Security Event Logs
+    Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents} -ErrorAction SilentlyContinue
+    Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents2} -ErrorAction SilentlyContinue
 
-        #Get Windows Security Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Security"; StartTime=$StartDate; ID=$SecurityEvents2} -ComputerName $Computer -ErrorAction SilentlyContinue
+    #Get Windows System Event Logs
+    Get-WinEvent -FilterHashtable @{LogName="System"; StartTime=$StartDate; ID=$SystemEvents} -ErrorAction SilentlyContinue
 
-        #Get Windows System Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="System"; StartTime=$StartDate; ID=$SystemEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+    #Get Windows Application Event Logs
+    Get-WinEvent -FilterHashtable @{LogName="Application"; StartTime=$StartDate; ID=$ApplicationEvents} -ErrorAction SilentlyContinue
 
-        #Get Windows Application Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Application"; StartTime=$StartDate; ID=$ApplicationEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+    #Get Windows Firewall Event Logs
+    Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-Windows Firewall With Advanced Security/Firewall"; StartTime=$StartDate; ID=$WinFirewallEvents} -ErrorAction SilentlyContinue
 
-        #Get Windows Firewall Event Logs
-        Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-Windows Firewall With Advanced Security/Firewall"; StartTime=$StartDate; ID=$WinFirewallEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+    #Get Windows PowerShell Event Logs
+    Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-PowerShell/Operational"; StartTime=$StartDate; ID=$PowerShellEvents} -ErrorAction SilentlyContinue
 
-        #Get Windows PowerShell Event Logs
-        Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-PowerShell/Operational"; StartTime=$StartDate; ID=$PowerShellEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
+    #Get WMI Event Logs 
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-WMI-Activity/Operational"; StartTime=$StartDate; ID=$WMI_Events} -ErrorAction SilentlyContinue
 
-        #Get WMI Event Logs 
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-WMI-Activity/Operational"; StartTime=$StartDate; ID=$WMI_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
+    #Get Remote Desktop Event Logs
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RDPClient/Operational"; StartTime=$StartDate; ID=$RDP_TC_RDPClient_Events} -ErrorAction SilentlyContinue
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_RCM_Events} -ErrorAction SilentlyContinue
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_LSM_Events} -ErrorAction SilentlyContinue
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational"; StartTime=$StartDate; ID=$RDP_RdpTS_Events} -ErrorAction SilentlyContinue
 
-        #Get Remote Desktop Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RDPClient/Operational"; StartTime=$StartDate; ID=$RDP_TC_RDPClient_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_RCM_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_LSM_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational"; StartTime=$StartDate; ID=$RDP_RdpTS_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-
-        #Get Scheduled Tasks Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TaskScheduler/Operational"; StartTime=$StartDate; ID=$Sched_Tasks_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-
-        }
-    }
+    #Get Scheduled Tasks Event Logs
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TaskScheduler/Operational"; StartTime=$StartDate; ID=$Sched_Tasks_Events} -ErrorAction SilentlyContinue
 
 }

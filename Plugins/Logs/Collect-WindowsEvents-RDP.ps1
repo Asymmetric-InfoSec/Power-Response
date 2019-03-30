@@ -22,7 +22,6 @@
     finding a pivot point, and then search for events around your pivot point.
 
 .EXAMPLE
-    .\Collect-WindowsEvents-RDP.ps1 -ComputerName Test-PC -StartDate 12/23/2018
 
     Power-Response Execution
 
@@ -43,69 +42,47 @@
 
 param (
 
-    [Parameter(Mandatory=$true, Position=0)]
-    [string[]]$ComputerName,
-
-    #If no date is supplied, the default is the current date minus 90 days (average dwell time of an adversary)
-    [Parameter(Mandatory=$false, Position=1)]
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
-
     )
 
 process {
 
-#RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-RDPClient/Operational.evtx)
-$RDP_TC_RDPClient_Events = @(
+    [DateTime]$StartDate=(Get-Date).AddDays(-90)
 
-        1024, #Destination Hostname (From Source/Initiating System - system RDP-ing from)
-        1102  #Destination IP Address (From Source/Initiating System - system RDP-ing from)
+    #RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-RDPClient/Operational.evtx)
+    $RDP_TC_RDPClient_Events = @(
 
-)
-
-#RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational.evtx)
-$RDP_TC_RCM_Events = @(
-
-        1149 #Source IP/Logon Username (On destination system-machine being RDP'd to)
+            1024, #Destination Hostname (From Source/Initiating System - system RDP-ing from)
+            1102  #Destination IP Address (From Source/Initiating System - system RDP-ing from)
 
     )
 
-#RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-LocalSessionManager/Operational.evtx)
-$RDP_TC_LSM_Events = @(
+    #RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational.evtx)
+    $RDP_TC_RCM_Events = @(
 
-        21, #Source IP/Logon Username
-        22, #Source IP/Logon Username
-        25, #Source IP/Logon Username
-        41  #Source IP/Logon Username
-    )
+            1149 #Source IP/Logon Username (On destination system-machine being RDP'd to)
 
-#RDP Event Log IDs to Retrieve (Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational.evtx)
-$RDP_RdpTS_Events = @(
+        )
 
-        98, #Successful Connections
-        131 #Connection Attempts (Source IP/Logon UserName)
+    #RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-LocalSessionManager/Operational.evtx)
+    $RDP_TC_LSM_Events = @(
 
-    )
+            21, #Source IP/Logon Username
+            22, #Source IP/Logon Username
+            25, #Source IP/Logon Username
+            41  #Source IP/Logon Username
+        )
 
-#Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
+    #RDP Event Log IDs to Retrieve (Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational.evtx)
+    $RDP_RdpTS_Events = @(
 
-foreach ($Computer in $ComputerName) {
+            98, #Successful Connections
+            131 #Connection Attempts (Source IP/Logon UserName)
 
-        #Verify Computer is online prior to processing
+        )
 
-        if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        Write-Error ("{0} appears to be offline, event logs were not collected" -f $Computer)
-        continue
-        
-        #If online, collect event logs for $Computer
-        } else {
-
-        #Get Remote Desktop Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RDPClient/Operational"; StartTime=$StartDate; ID=$RDP_TC_RDPClient_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_RCM_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_LSM_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational"; StartTime=$StartDate; ID=$RDP_RdpTS_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-
-        }
-    }
-
+    #Get Remote Desktop Event Logs
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RDPClient/Operational"; StartTime=$StartDate; ID=$RDP_TC_RDPClient_Events} -ErrorAction SilentlyContinue
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-RemoteConnectionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_RCM_Events} -ErrorAction SilentlyContinue
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TerminalServices-LocalSessionManager/Operational"; StartTime=$StartDate; ID=$RDP_TC_LSM_Events} -ErrorAction SilentlyContinue
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-RemoteDesktopServices-RdpCoreTS/Operational"; StartTime=$StartDate; ID=$RDP_RdpTS_Events} -ErrorAction SilentlyContinue
 }

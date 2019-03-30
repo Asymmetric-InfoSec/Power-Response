@@ -10,10 +10,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution
-
-    .\Collect-SystemInfo.ps1 -ComputerName Test-PC
-
     Power-Response Execution
 
     Set ComputerName Test-PC
@@ -32,20 +28,12 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
     )
 
 process{
 
-    foreach ($Computer in $ComputerName) {
-
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-ComputerInfo | Select CsName, CsDNSHostName, CsPartOfDomain, CsDomain, LogonServer, OsArchitecture, CsProcessors, CsNumberofProcessors, CsNumberofLogicalProcessors, CsPhysicallyInstalledMemory, CstotalPhysicalMemory, OsName, WindowsCurrentVersion, OsVersion, WindowsVersion, OsBuildNumber, OsServicePackMajorVersion, OsServicePackMinorVersion, WindowsInstallDateFromRegistry, OsCountryCode, OsLocalDateTime, OsLocale, TimeZone, OsBootDevice, OsSystemDrive, WindowsSystemRoot, OsUptime, HyperVisorPresent, DeviceGuardServicesRunning, CSManufacturer, CsModel")
-
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
-
-    }
-
+    #Gets system information for remote host 
+    
+    Get-ComputerInfo | Select CsName, CsDNSHostName, CsPartOfDomain, CsDomain, LogonServer, OsArchitecture, CsProcessors, CsNumberofProcessors, CsNumberofLogicalProcessors, CsPhysicallyInstalledMemory, CstotalPhysicalMemory, OsName, WindowsCurrentVersion, OsVersion, WindowsVersion, OsBuildNumber, OsServicePackMajorVersion, OsServicePackMinorVersion, WindowsInstallDateFromRegistry, OsCountryCode, OsLocalDateTime, OsLocale, TimeZone, OsBootDevice, OsSystemDrive, WindowsSystemRoot, OsUptime, HyperVisorPresent, DeviceGuardServicesRunning, CSManufacturer, CsModel
 
 }

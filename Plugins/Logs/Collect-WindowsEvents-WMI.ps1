@@ -22,7 +22,6 @@
     finding a pivot point, and then search for events around your pivot point.
 
 .EXAMPLE
-    .\Collect-WindowsEvents-WMI.ps1 -ComputerName Test-PC -StartDate 12/23/2018
 
     Power-Response Execution
 
@@ -43,45 +42,24 @@
 
 param (
 
-    [Parameter(Mandatory=$true, Position=0)]
-    [string[]]$ComputerName,
-
-    #If no date is supplied, the default is the current date minus 90 days (average dwell time of an adversary)
-    [Parameter(Mandatory=$false, Position=1)]
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
-
     )
 
 process {
 
-#WMI Event Log IDs to Retrieve (Microsoft-Windows-WMI-Activity/Operational.evtx)
-$WMI_Events = @(
+    [DateTime]$StartDate=(Get-Date).AddDays(-90)
 
-        5857, #Record filter/consumer activity
-        5858, #Record filter/consumer activity
-        5859, #Record filter/consumer activity
-        5860, #Record filter/consumer activity
-        5861  #New permanent event consumer creation
+    #WMI Event Log IDs to Retrieve (Microsoft-Windows-WMI-Activity/Operational.evtx)
+    $WMI_Events = @(
 
-    )
+            5857, #Record filter/consumer activity
+            5858, #Record filter/consumer activity
+            5859, #Record filter/consumer activity
+            5860, #Record filter/consumer activity
+            5861  #New permanent event consumer creation
 
-#Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
+        )
 
-foreach ($Computer in $ComputerName) {
-
-        #Verify Computer is online prior to processing
-
-        if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        Write-Error ("{0} appears to be offline, event logs were not collected" -f $Computer)
-        continue
-        
-        #If online, collect event logs for $Computer
-        } else {
-
-        #Get WMI Event Logs 
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-WMI-Activity/Operational"; StartTime=$StartDate; ID=$WMI_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-
-        }
-    }
+    #Get WMI Event Logs 
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-WMI-Activity/Operational"; StartTime=$StartDate; ID=$WMI_Events} -ErrorAction SilentlyContinue
 
 }

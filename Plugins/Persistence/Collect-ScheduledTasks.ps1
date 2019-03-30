@@ -11,10 +11,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution
-
-    .\Collect-ScheduledTasks.ps1 -ComputerName Test-PC
-
     Power-Response Execution
 
     Set ComputerName Test-PC
@@ -40,7 +36,8 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName,
+    [System.Management.Automation.Runspaces.PSSession[]]$Session,
+
     [Parameter(Mandatory=$false,Position=1)]
     [string]$TaskName
 
@@ -49,34 +46,23 @@ param (
 process{
 
     # Set $Output for where to store recovered scheduled task files
-    $Output= ("{0}\ScheduledTasks" -f $global:PowerResponse.OutputPath)
+    $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'ScheduledTasks')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing scheduled tasks
     If (-not (Test-Path $Output)) {
+        
         New-Item -Type Directory -Path $Output | Out-Null
     }   
 
-    foreach ($Computer in $ComputerName) {
+    if ($TaskName){
 
-        # Create session on remote host
-        $Session = New-PSSession -ComputerName "$Computer" -SessionOption (New-PSSessionOption -NoMachineProfile)
+         # Copy specified task into $Output
+        Copy-Item "C:\Windows\System32\Tasks\$TaskName" -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
 
-        if ($TaskName){
+    } else {
 
-             # Copy specified task into $Output
-            Copy-Item "C:\Windows\System32\Tasks\$TaskName" -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+        # Recursively copy directory contents into $Output
+        Copy-Item "C:\Windows\System32\Tasks\" -Recurse -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
 
-        } else {
-
-            # Recursively copy directory contents into $Output
-            Copy-Item "C:\Windows\System32\Tasks\" -Recurse -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
-
-
-        }
-
-        #Close PS Remoting Session
-        $Session | Remove-PSSession
-    
     }
-
 }

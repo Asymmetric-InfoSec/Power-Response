@@ -22,7 +22,6 @@
     finding a pivot point, and then search for events around your pivot point.
 
 .EXAMPLE
-    .\Collect-WindowsEvents-SchedTasks.ps1 -ComputerName Test-PC -StartDate 12/23/2018
 
     Power-Response Execution
 
@@ -43,45 +42,24 @@
 
 param (
 
-    [Parameter(Mandatory=$true, Position=0)]
-    [string[]]$ComputerName,
-
-    #If no date is supplied, the default is the current date minus 90 days (average dwell time of an adversary)
-    [Parameter(Mandatory=$false, Position=1)]
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
-
     )
 
 process {
 
-#Scheduled Tasks Event Log IDs to Retireve (Microsoft-Windows-Task Scheduler/Operational.evtx)
-$Sched_Tasks_Events = @(
+    [DateTime]$StartDate=(Get-Date).AddDays(-90)
 
-        106, #Scheluded task created
-        140, #Scheduled task updated
-        141, #Scheduled task deleted
-        200, #Scheduled task executed
-        201  #Scheduled task completed
+    #Scheduled Tasks Event Log IDs to Retireve (Microsoft-Windows-Task Scheduler/Operational.evtx)
+    $Sched_Tasks_Events = @(
 
-    )
+            106, #Scheluded task created
+            140, #Scheduled task updated
+            141, #Scheduled task deleted
+            200, #Scheduled task executed
+            201  #Scheduled task completed
 
-#Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
+        )
 
-foreach ($Computer in $ComputerName) {
-
-        #Verify Computer is online prior to processing
-
-        if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        Write-Error ("{0} appears to be offline, event logs were not collected" -f $Computer)
-        continue
-        
-        #If online, collect event logs for $Computer
-        } else {
-
-        #Get Scheduled Tasks Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TaskScheduler/Operational"; StartTime=$StartDate; ID=$Sched_Tasks_Events} -ComputerName $Computer -ErrorAction SilentlyContinue
-
-        }
-    }
+    #Get Scheduled Tasks Event Logs
+    Get-WinEvent -FilterHashtable @{LogName="Microsoft-Windows-TaskScheduler/Operational"; StartTime=$StartDate; ID=$Sched_Tasks_Events} -ErrorAction SilentlyContinue
 
 }

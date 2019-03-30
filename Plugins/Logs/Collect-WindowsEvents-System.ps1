@@ -22,7 +22,6 @@
     finding a pivot point, and then search for events around your pivot point.
 
 .EXAMPLE
-    .\Collect-WindowsEvents-System.ps1 -ComputerName Test-PC -StartDate 12/23/2018
 
     Power-Response Execution
 
@@ -43,58 +42,37 @@
 
 param (
 
-    [Parameter(Mandatory=$true, Position=0)]
-    [string[]]$ComputerName,
-
-    #If no date is supplied, the default is the current date minus 90 days (average dwell time of an adversary)
-    [Parameter(Mandatory=$false, Position=1)]
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
-
     )
 
 process {
 
-#System Event Log IDs to Retrieve (System)
-$SystemEvents = @(
+    [DateTime]$StartDate=(Get-Date).AddDays(-90)
 
-        10000,
-        10001,
-        1001,  #Windows Error Reporting (May be noisy)
-        10100,
-        104,   #Audit Log Cleared
-        1056,  #DHCP credentials not configured
-        20001, #Device installation
-        20002,
-        20003,
-        24576, #Successful driver installation
-        24577, #Encryption of volume started
-        24579, #Encryption of volume completed
-        7030,  #A service was marked as an interactive service
-        7034,  #Service crashed unexpectedly
-        7035,  #Service sent a start/stop control
-        7036,  #Service started or stopped
-        7040,  #Service start type changed (Boot | On Request | Disabled)
-        7045   #A service was installed on the system
+    #System Event Log IDs to Retrieve (System)
+    $SystemEvents = @(
 
-    )
+            10000,
+            10001,
+            1001,  #Windows Error Reporting (May be noisy)
+            10100,
+            104,   #Audit Log Cleared
+            1056,  #DHCP credentials not configured
+            20001, #Device installation
+            20002,
+            20003,
+            24576, #Successful driver installation
+            24577, #Encryption of volume started
+            24579, #Encryption of volume completed
+            7030,  #A service was marked as an interactive service
+            7034,  #Service crashed unexpectedly
+            7035,  #Service sent a start/stop control
+            7036,  #Service started or stopped
+            7040,  #Service start type changed (Boot | On Request | Disabled)
+            7045   #A service was installed on the system
 
-#Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
+        )
 
-foreach ($Computer in $ComputerName) {
-
-        #Verify Computer is online prior to processing
-
-        if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        Write-Error ("{0} appears to be offline, event logs were not collected" -f $Computer)
-        continue
-        
-        #If online, collect event logs for $Computer
-        } else {
-
-        #Get Windows System Event Logs
-        Get-WinEvent -FilterHashtable @{LogName="System"; StartTime=$StartDate; ID=$SystemEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
-
-       }
-    }
+    #Get Windows System Event Logs
+    Get-WinEvent -FilterHashtable @{LogName="System"; StartTime=$StartDate; ID=$SystemEvents} -ErrorAction SilentlyContinue
 
 }

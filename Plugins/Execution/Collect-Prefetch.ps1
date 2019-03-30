@@ -13,10 +13,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-Prefetch.ps1 -ComputerName Test-PC
-
     Power-Response Execution
 
     Set ComputerName Test-PC
@@ -42,7 +38,8 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName,
+    [System.Management.Automation.Runspaces.PSSession[]]$Session,
+
     [Parameter(Mandatory=$false,Position=1)]
     [string[]]$PrefetchName
 
@@ -51,44 +48,32 @@ param (
 process{
     
     # Set $Output for where to store recovered prefetch files
-    $Output= ("{0}\Prefetch\" -f $global:PowerResponse.OutputPath)
+    $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'Prefetch')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
     If (-not (Test-Path $Output)) {
         New-Item -Type Directory -Path $Output | Out-Null
     }   
 
-    foreach ($Computer in $ComputerName) {
+    #Scope $PrefetchName
+    If (!$PrefetchName){
 
-        # Create session on remote host
-        $Session = New-PSSession -ComputerName "$Computer" -SessionOption (New-PSSessionOption -NoMachineProfile)
+        #Get Prefetch File Names - get only files that have a .pf extension
+        $PrefetchName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Windows\Prefetch" -Filter "*.pf"} 
 
-        #Scope $PrefetchName
-        If (!$PrefetchName){
-
-            #Get Prefetch File Names - get only files that have a .pf extension
-            $PrefetchName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Windows\Prefetch" -Filter "*.pf"} 
-
-        }
-
-        #Collect Prefetch Files
-        foreach ($File in $PrefetchName){
-
-            #Get Prefetch File Attributes
-            $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item C:\Windows\Prefetch\$($args[0])).CreationTime} -ArgumentList $File 
-
-            #Copy specified prefetch file to $Output
-            Copy-Item "C:\Windows\Prefetch\$File" -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
-
-            #Set original creation time on copied prefetch file
-            (Get-Item "$Output\$File").CreationTime = $CreationTime
-
-        }
-
-        #Close PS remoting session
-        $Session | Remove-PSSession
-    
     }
 
-}
+    #Collect Prefetch Files
+    foreach ($File in $PrefetchName){
 
+        #Get Prefetch File Attributes
+        $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item C:\Windows\Prefetch\$($args[0])).CreationTime} -ArgumentList $File 
+
+        #Copy specified prefetch file to $Output
+        Copy-Item "C:\Windows\Prefetch\$File" -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+
+        #Set original creation time on copied prefetch file
+        (Get-Item "$Output\$File").CreationTime = $CreationTime
+
+    }   
+}
