@@ -38,6 +38,9 @@
 param (
 
     [Parameter(Mandatory=$false,Position=0)]
+    [System.Management.Automation.Runspaces.PSSession[]]$Session, 
+
+    [Parameter(Mandatory=$false,Position=1)]
     [DateTime]$AnalyzeDate= (Get-Date)
 
     )
