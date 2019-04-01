@@ -7,9 +7,6 @@
     Collects the User Assist data for all users for Executable and Shortcut executions
 
 .EXAMPLE
-    Stand Alone Execution
-
-    .\Collect-UserAssist.ps1 -ComputerName Test-PC
 
     Power-Response Execution
 
@@ -173,27 +170,39 @@ process {
 
     foreach ($SID in $UserSIDs) {
 
-        # Get User Assist Values for CEBFF5CD - executable file execution
-        $EFE = Get-Item "HKU:\$SID\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD*\Count" -ErrorAction SilentlyContinue | Select -ExpandProperty Property 
+        try {
 
-        foreach ($Value in $EFE) {
+            # Get User Assist Values for CEBFF5CD - executable file execution
+            $EFE = Get-Item "HKU:\$SID\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{CEBFF5CD*\Count" -ErrorAction Stop | Select -ExpandProperty Property 
 
-            $GUID = Rot-13 -RotText ($Value.Split("\")[0].Trim('{}'))
-            $ROTValue = ROT-13 -RotText $Value
-            $EFEHash =@{ Type = 'Executable File Execution'; SID = $SID; UserAssist = $ROTValue ; GUID = $FolderGuids.Item($GUID)}
-            [PSCustomObject]$EFEHash | Select Type, SID, UserAssist, GUID
+            foreach ($Value in $EFE) {
+
+                $GUID = Rot-13 -RotText ($Value.Split("\")[0].Trim('{}'))
+                $ROTValue = ROT-13 -RotText $Value
+                $EFEHash =@{ Type = 'Executable File Execution'; SID = $SID; UserAssist = $ROTValue ; GUID = $FolderGuids.Item($GUID)}
+                [PSCustomObject]$EFEHash | Select Type, SID, UserAssist, GUID
+
+            }
+
+        } catch {
 
         }
 
-        # Get User Assist Values for F4E57C4B - shortcut file execution
-        $SFE = Get-Item "HKU:\$SID\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{F4E57C4B*\Count" -ErrorAction SilentlyContinue | Select -ExpandProperty Property 
+        try {
 
-        foreach ($Value in $SFE) {
+            # Get User Assist Values for F4E57C4B - shortcut file execution
+            $SFE = Get-Item "HKU:\$SID\Software\Microsoft\Windows\CurrentVersion\Explorer\UserAssist\{F4E57C4B*\Count" -ErrorAction Stop | Select -ExpandProperty Property 
 
-            $GUID = Rot-13 -RotText ($Value.Split("\")[0].Trim('{}'))
-            $ROTValue = ROT-13 -RotText $Value
-            $EFEHash =@{ Type = 'Shortcut File Execution'; SID = $SID; UserAssist = $ROTValue ; GUID = $FolderGuids.Item($GUID)}
-            [PSCustomObject]$EFEHash | Select Type, SID, UserAssist, GUID
+            foreach ($Value in $SFE) {
+
+                $GUID = Rot-13 -RotText ($Value.Split("\")[0].Trim('{}'))
+                $ROTValue = ROT-13 -RotText $Value
+                $EFEHash =@{ Type = 'Shortcut File Execution'; SID = $SID; UserAssist = $ROTValue ; GUID = $FolderGuids.Item($GUID)}
+                [PSCustomObject]$EFEHash | Select Type, SID, UserAssist, GUID
+
+            }
+        
+        } catch {
 
         }                
     } 
