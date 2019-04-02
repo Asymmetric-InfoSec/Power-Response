@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Handles.ps1
+    Plugin-Name: Retrieve-Handles.ps1
     
 .Description
 

@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Jumplists.ps1
+    Plugin-Name: Retrieve-Jumplists.ps1
     
 .Description
 
@@ -20,7 +20,7 @@
 
     
 .NOTES
-    Author: Drew
+    Author: Drew Schmitt
     Date Created: 3/7/2019
     Twitter: @5ynax
     

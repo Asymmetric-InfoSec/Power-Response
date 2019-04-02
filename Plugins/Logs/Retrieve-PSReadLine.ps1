@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-PSReadLine.ps1
+    Plugin-Name: Retrieve-PSReadLine.ps1
     
 .Description
 

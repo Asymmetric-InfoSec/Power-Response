@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-AutoRuns.ps1
+    Plugin-Name: Retrieve-AutoRuns.ps1
     
 .Description
     This plugin gathers Auto Start Execution Points from one or several hosts

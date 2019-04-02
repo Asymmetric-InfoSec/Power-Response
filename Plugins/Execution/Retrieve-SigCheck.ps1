@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Sigcheck.ps1
+    Plugin-Name: Retrieve-Sigcheck.ps1
     
 .Description
     This plugin uses Sigcheck to verify the digital signature and version
@@ -30,7 +30,6 @@
     to complete.
 
 .EXAMPLE
-    Collect-Sigcheck.ps1 -ComputerName Test-PC -Location C:\Windows [-Recurse]
 
     PowerResponse Execution (Non-recursive)
     Set ComputerName Test-PC

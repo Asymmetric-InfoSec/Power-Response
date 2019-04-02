@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Prefetch.ps1
+    Plugin-Name: Retrieve-Prefetch.ps1
     
 .Description
 
@@ -25,7 +25,7 @@
     Run
 
 .NOTES
-    Author: Drew
+    Author: Drew Schmitt
     Date Created: 2/2/2019
     Twitter: @5ynax
     

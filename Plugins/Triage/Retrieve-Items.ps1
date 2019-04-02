@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Items.ps1
+    Plugin-Name: Retrieve-Items.ps1
     
 .Description
     Retrieves a list of items based on user specified item paths or a list stored on disk

@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-MemoryWinpmem.ps1
+    Plugin-Name: Retrieve-MemoryWinpmem.ps1
     
 .Description
     This plugin captures memory from a remote host by deploying winpmem to the 

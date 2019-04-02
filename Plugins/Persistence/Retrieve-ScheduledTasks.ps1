@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-ScheduledTasks.ps1
+    Plugin-Name: Retrieve-ScheduledTasks.ps1
     
 .Description
     This plugin is used to collect scheduled task configuration files from

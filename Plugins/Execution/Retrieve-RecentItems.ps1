@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-RecentItems.ps1
+    Plugin-Name: Retrieve-RecentItems.ps1
     
 .Description
     Collects shortcuts (lnk files) from Recent Items (%UserProfile\AppData\Roaming\Microsoft\Windows\Recent)
