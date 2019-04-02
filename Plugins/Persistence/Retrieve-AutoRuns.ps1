@@ -61,7 +61,7 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession[]]$Session
+    [System.Management.Automation.Runspaces.PSSession]$Session
 
     )
 
@@ -87,7 +87,7 @@ process{
     #Determine system architecture and select proper Autorunsc executable
     try {
 
-        $Architecture = Invoke-Command -Session $Session -ScriptBlock {Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
+        $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
         
         if ($Architecture -eq "64-bit") {
 
@@ -115,7 +115,7 @@ process{
         
         Copy-Item -Path $Installexe -Destination $RemotePath -ToSession $Session -ErrorAction Stop
         
-        $RemoteFile = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $RemotePath -ErrorAction Stop}
+        $RemoteFile = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $($args[0]) -ErrorAction Stop} -ArgumentList $RemotePath
 
         # verify that the file copy succeeded to the remote host
         if (!$RemoteFile) {

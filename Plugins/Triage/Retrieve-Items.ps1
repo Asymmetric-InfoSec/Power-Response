@@ -43,7 +43,7 @@ param (
 
     [Parameter(ParameterSetName = "Items", Position = 0, Mandatory = $true)]
     [Parameter(ParameterSetName = "List", Position = 0, Mandatory = $true)]
-    [System.Management.Automation.Runspaces.PSSession[]]$Session,
+    [System.Management.Automation.Runspaces.PSSession]$Session,
 
     [Parameter(ParameterSetName = "Items", Position = 1, Mandatory = $true)]
     [string[]]$ItemPath,

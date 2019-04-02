@@ -56,7 +56,7 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession[]]$Session,
+    [System.Management.Automation.Runspaces.PSSession]$Session,
 
     [Parameter(Mandatory=$true,Position=1)]
     [string]$Location,
@@ -88,7 +88,8 @@ process{
 
     # Determine system architecture and select proper Sigcheck executable
     try {
-        $Architecture = Invoke-Command -Session $Session -ScriptBlock {Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
+
+        $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
         
         if ($Architecture -eq "64-bit") {
 
@@ -116,7 +117,7 @@ process{
         
         Copy-Item -Path $Installexe -Destination $RemotePath -ToSession $Session -ErrorAction Stop
         
-        $RemoteFile = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $RemotePath -ErrorAction Stop}
+        $RemoteFile = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $($args[0]) -ErrorAction Stop} -Argumentlist $RemotePath
 
         # verify that the file copy succeeded to the remote host
         if (!$RemoteFile) {
@@ -142,7 +143,7 @@ process{
 
          $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0} /accepteula -nobanner -e -vt -h -c {1}") -f ($RemotePath, $Location))
     
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | ConverFrom-CSV
+        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | ConvertFrom-CSV
 
     }
     

@@ -32,7 +32,7 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession[]]$Session
+    [System.Management.Automation.Runspaces.PSSession]$Session
 
     )
 
