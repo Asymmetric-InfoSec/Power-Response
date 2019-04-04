@@ -77,12 +77,14 @@ process{
     $Velo_64 = ("{0}\Velociraptor-amd64.exe" -f $global:PowerResponse.Config.Path.Bin)
     $Velo_32 = ("{0}\Velociraptor-386.exe" -f $global:PowerResponse.Config.Path.Bin)
 
+    $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
+    $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
 
-    if (!$Velo_64) {
+    if (!$Velo_64TestPath) {
 
         Throw "64 bit version of Velociraptor not detected in Bin. Place 64bit executable in Bin directory and try again."
 
-    } elseif (!$Velo_32) {
+    } elseif (!$Velo_32TestPath) {
 
         Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
     }
