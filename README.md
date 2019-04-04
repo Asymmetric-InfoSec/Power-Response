@@ -61,8 +61,9 @@ PowerShell (.NET actually) has some native limitations for compression (must be 
 
 To get around locked files, we decided to use the default binary from the Velociraptor project:
 
-1. Download `velociraptor-v0.2.7-windows-4.0-amd64.exe` from https://github.com/Velocidex/velociraptor/releases
-2. Rename the file to `velociraptor-amd64.exe`
+1. Download `velociraptor-vx.x.x-windows-4.0-amd64.exe` and `velociraptor-vx.x.x-windows-4.0-386.exe`
+   from https://github.com/Velocidex/velociraptor/releases (Whatever the latest versions are)
+2. Rename the files to `velociraptor-amd64.exe` and `velociraptor-386.exe` respectively
 3. Move executable to `BIN`
 
 Another big shout out to Michael Cohen for his work on Velociraptor!
