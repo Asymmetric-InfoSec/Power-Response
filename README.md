@@ -70,7 +70,7 @@ Another big shout out to Michael Cohen for his work on Velociraptor!
 
 #### Eric Zimmerman's Tools
 
-We use the following executables from Eric's tools that can be found at https://ericzimmerman.github.io/#!index.md
+We use the following executables from Eric's tools that can be found at https://ericzimmerman.github.io/#!index.md. Download and place in `BIN`.
 
 1. `PECmd`
 2. `JLECmd`
