@@ -73,7 +73,7 @@ process{
     #Determine system architecture and select proper 7za.exe executable
     try {
      
-     $Architecture = Invoke-Commad -Session $Session -ScriptBlock {Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
+     $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
     
         if ($Architecture -eq "64-bit") {
 
@@ -102,7 +102,7 @@ process{
     
     Copy-Item -Path $Winpmem -Destination $RemotePathWinpmem -ToSession $Session -ErrorAction Stop
     
-    $RemoteFileWinpmem = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $RemotePathWinpmem -ErrorAction Stop}
+    $RemoteFileWinpmem = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $($args[0]) -ErrorAction Stop} -ArgumentList $RemotePathWinpmem
 
     # verify that the file copy succeeded to the remote host
         if (!$RemoteFileWinpmem) {
@@ -126,7 +126,7 @@ process{
     
     Copy-Item -Path $Installexe -Destination $RemotePath7za -ToSession $Session -ErrorAction Stop
     
-    $RemoteFile7za = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $RemotePath7za -ErrorAction Stop}
+    $RemoteFile7za = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $($args[0]) -ErrorAction Stop} -ArgumentList $RemotePath7za
 
     # verify that the file copy succeeded to the remote host
     if (!$RemoteFile7za) {

@@ -68,8 +68,8 @@ param (
 process{
 
     #Autorunsc executable locations
-    $Autorunsc64 = "{0}\Bin\autorunsc64.exe" -f $global:PowerResponse.Config.Path.Bin
-    $Autorunsc32 = "{0}\Bin\autorunsc.exe" -f $global:PowerResponse.Config.Path.Bin
+    $Autorunsc64 = ("{0}\autorunsc64.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $Autorunsc32 = ("{0}\autorunsc.exe" -f $global:PowerResponse.Config.Path.Bin)
 
     #Verify binaries exist in Bin
     $64bitTestPath = Get-Item -Path $Autorunsc64 -ErrorAction SilentlyContinue
@@ -132,7 +132,7 @@ process{
 
 
     #Run Autorunsc on the remote host and collect ASEP data
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0}\{1} /accepteula -a * -h -nobanner -vt -s -t -c *") -f ($RemotePath, Split-Path -Path $Installexe -Leaf))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0} /accepteula -a * -h -nobanner -vt -s -t -c *") -f ($RemotePath))
     
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | ConvertFrom-CSV
 
