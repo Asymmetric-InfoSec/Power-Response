@@ -117,6 +117,6 @@ Any output generated will be moved to the **Output** directory and named based o
 
 **Note:** As you navigate from plugin to plugin, Power-Response will attempt to maintain parameter values. For instance, if you set `ComputerName` in one plugin and navigate to another plugin to collect more data, the `ComputerName` parameter will already be assigned (as long as the parameter types are the same - see the Wiki for more details)
 
-At anytime you can execute the `show` command to see what is available to you in a meny or plugin.
+At anytime you can execute the `show` command to see what is available to you in a menu or plugin.
 
 #### For a quick video tutorial, take a look at this video
