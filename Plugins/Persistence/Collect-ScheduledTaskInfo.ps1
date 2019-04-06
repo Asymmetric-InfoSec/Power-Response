@@ -12,10 +12,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-ScheduledTaskInfo.ps1 -ComputerName Test-PC
-
     Power-Response Execution
 
     Set ComputerName Test-PC
@@ -34,27 +30,11 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
     )
 
 process{
 
-
-    foreach ($Computer in $ComputerName) {
-        #For machines that have the PowerShell Scheduled Tasks Module
-        try {
-
-            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-ScheduledTask | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns")
-            Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
-
-         #For machines that do not have the PowerShell Scheduled Tasks Module   
-        }catch{
-
-            $CimSession = New-CimSession -ComputerName $Computer
-            Get-ScheduledTask -CimSession $CimSession | Get-ScheduledTaskInfo -CimSession $CimSession | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns
-
-        }
-    }
+    #Get Scheduled Task Information (Will be successful on Windows 10 only)
+    Get-ScheduledTask | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns
+    
 }

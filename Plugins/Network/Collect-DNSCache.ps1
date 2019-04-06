@@ -9,10 +9,6 @@
 
 .EXAMPLE
 
-    Stand Alone Execution:
-
-    .\Collect-DNSCache.ps1 -ComputerName Test-PC
-
     Power-Response Execution:
 
     Set ComputerName Test-PC
@@ -31,20 +27,13 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
 
     )
 
 process {
 
-    foreach ($Computer in $ComputerName) {
+    # Get-DNSClientCache
 
-        # Get-DNSClientCache
+    Get-DNSClientCache
 
-        $ScriptBlock_DNSClientCache = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-DNSClientCache')
-    
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock_DNSClientCache -SessionOption (New-PSSessionOption -NoMachineProfile)
-
-    }
 }

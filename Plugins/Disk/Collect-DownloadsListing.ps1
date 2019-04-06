@@ -1,21 +1,24 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-RecentItems.ps1
+    Plugin-Name: Collect-DownloadsListing.ps1
     
 .Description
-    Collects listing of shortcuts from Recent Items (%UserProfile\AppData\Roaming\Microsoft\Windows\Recent)
+
+	Collects the Downloads directory contents (listing only) for each user
+	to use as part of an investigation to determine if a document was downloaded 
+	or saved from the internet or an email attachment.
 
 .EXAMPLE
 
-    Power-Response Execution
+	Power-Response Execution
 
-    set ComputerName Test-PC
-    run
+	Set ComputerName Test-PC
+	run
 
 .NOTES
     Author: Drew Schmitt
-    Date Created: 3/7/2019
+    Date Created: 4/3/2019
     Twitter: @5ynax
     
     Last Modified By:
@@ -24,23 +27,23 @@
   
 #>
 
-param (
+param(
 
-    )
+)
 
 process {
 
-    # Get list of users that exist on this process
+	# Get list of users that exist on this process
 
     $Users = Get-ChildItem "C:\Users\"
 
-    #For each user, get contents of recent files (lnk files)
+    #For each user, get contents of Downloads directory
 
     foreach ($User in $Users){
 
-        $RecentItems = Get-ChildItem "C:\Users\$User\AppData\Roaming\Microsoft\Windows\Recent" -ErrorAction SilentlyContinue
+        $DownloadItems = Get-ChildItem "C:\Users\$User\Downloads" -ErrorAction SilentlyContinue
 
-        foreach ($Item in $RecentItems) {
+        foreach ($Item in $DownloadItems) {
 
             $OutHash = @{
 
@@ -54,4 +57,4 @@ process {
             [PSCustomObject]$OutHash | Select User, Name, Mode, CreationTime, ModificationTime
         }
     }
-} 
+}

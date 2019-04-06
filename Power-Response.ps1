@@ -1,11 +1,13 @@
 [CmdletBinding()]
 param(
     [String]$ConfigPath = ('{0}\Config.psd1' -f $PSScriptRoot),
-    [String[]]$ComputerName
+    [String[]]$ComputerName = 'LOCALHOST',
+    [PSCredential]$Credential
 )
 
-# $ErrorActionPreference of 'Stop'
+# $ErrorActionPreference of 'Stop' and $ProgressPreference of 'SilentlyContinue'
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 
 # UserInput class is designed to separate user input strings to successfully casted string type parameters
 # Essentially acts like a string for our purposes
@@ -33,6 +35,18 @@ function Format-Parameter {
     process {
         # Gather to $global:PowerResponse.Location's $CommandParameters
         $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters'
+
+        # If $CommandParameters does not contain a 'ComputerName' entry
+        if ($CommandParameters.Keys -NotContains 'ComputerName') {
+            # Add a fake 'ComputerName' parameter to $CommandParameters
+            $CommandParameters.Add('ComputerName',(New-Object -TypeName 'System.Management.Automation.ParameterMetadata' -ArgumentList 'ComputerName',([String[]])))
+        }
+
+        # If $CommandParameters does not contain a 'ComputerName' entry
+        if ($CommandParameters.Keys -NotContains 'OutputType') {
+            # Add a fake 'ComputerName' parameter to $CommandParameters
+            $CommandParameters.Add('OutputType',(New-Object -TypeName 'System.Management.Automation.ParameterMetadata' -ArgumentList 'OutputType',([String[]])))
+        }
 
         # If we are passed no $Arguments, assume full $Parameter format check
         if ($Arguments.Count -eq 0) {
@@ -104,7 +118,7 @@ function Format-Parameter {
                 Write-Log -Message $Warning
 
                 # Remove the $CommandParam key from $global:PowerResponse.Parameters
-                $global:PowerResponse.Parameters.Remove($CommandParam) | Out-Null
+                $null = $global:PowerResponse.Parameters.Remove($CommandParam)
             }
         }
     }
@@ -152,20 +166,62 @@ function Get-Menu {
     }
 }
 
-function Import-Config {
+function Get-OnlineComputer {
     param (
-        [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
-        [String[]]$RootKeys = @('HashAlgorithm', 'OutputType', 'PromptText', 'Path', 'UserName')
+        [String[]]$ComputerName
     )
 
     process {
-        Write-Verbose 'Begin Get-ConfigData'
+        # Initialize $OnlineComputers array
+        $OnlineComputers = @()
+
+        # Loop through tracked $global:PowerResponse.Parameters.ComputerName
+        foreach ($Computer in $ComputerName) {
+            # If the $ComputerName is online
+            if (Test-Connection -ComputerName $Computer -Count 1 -Quiet) {
+                # Add $ComputerName to $ReleventParameters.ComputerName
+                $OnlineComputers += $Computer
+
+                # Format the online $Message
+                $Message = 'Machine: {0} is online and ready for processing' -f $Computer
+
+                # Write the $Message to verbose
+                Write-Verbose -Message $Message
+            } else {
+                # Format the offline $Message
+                $Message = 'Skipping offline machine: {0}' -f $Computer
+
+                # Write $Message to host
+                Write-Host -Object $Message
+            }
+
+            # Write the $Message to log
+            Write-Log -Message $Message
+        }
+
+        # Return $OnlineComputers array
+        return $OnlineComputers
+    }
+}
+
+function Import-Config {
+    param (
+        [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
+        [String[]]$RootKeys
+    )
+
+    process {
+        Write-Verbose 'Begin Import-Config'
 
         # Default 'Config' values
         $Default = @{
+            AdminUserName = $ENV:UserName
+            AutoAnalyze = $true
+            AutoClear = $true
             HashAlgorithm = 'SHA256'
             OutputType = @('XML','CSV')
             PromptText = 'power-response'
+            ThrottleLimit = 32
 
             # C:\Path\To\Power-Response\{FolderName}
             Path = @{
@@ -176,12 +232,12 @@ function Import-Config {
             }
 
             # Executing UserName
-            UserName = @{
-                Windows = $ENV:UserName
+            PSSession = @{
+                NoMachineProfile = $true
             }
         }
 
-        # Try to import the data, on failure set to default 
+        # Try to import the data, on failure set to default
         try {
             # If the Config file $Path does not exist, throw an error to skip to catch block
             if (!(Test-Path $Path)) {
@@ -192,7 +248,7 @@ function Import-Config {
             $File = Get-Item -Path $Path
 
             # Import the Config data file and bind it to the $Config variable
-            Import-LocalizedData -BindingVariable 'Config' -BaseDirectory $File.PSParentPath -FileName $File.Name -ErrorAction Stop
+            Import-LocalizedData -BindingVariable 'Config' -BaseDirectory $File.PSParentPath -FileName $File.Name
         } catch {
             # Either intentionally threw an error on file absense, or Import-LocalizedData failed
             Write-Verbose ('Unable to import config on ''Path'': ''{0}''' -f $Path)
@@ -201,7 +257,7 @@ function Import-Config {
 
         # Check for unexpected values in Config file
         if ($RootKeys) {
-            # Iterate through Config.Keys and keep any values not contained in expected $RootKeys 
+            # Iterate through Config.Keys and keep any values not contained in expected $RootKeys
             $UnexpectedRootKeys = $Config.Keys | Where-Object { $RootKeys -NotContains $PSItem }
 
             # If we found unexpected keys, print a warning message
@@ -211,11 +267,20 @@ function Import-Config {
                 Write-Warning  'Removing these values from the Config hashtable'
 
                 # Remove any detected unexpected keys from $Config
-                $UnexpectedRootKeys | % { $Config.Remove($PSItem) | Out-Null }
+                $null = $UnexpectedRootKeys | % { $Config.Remove($PSItem) }
             }
         }
 
         # If no value is provided in the config file, set the default values
+        if (!$Config.AdminUserName) {
+            $Config.AdminUserName = $Default.AdminUserName
+        }
+        if (!$Config.AutoAnalyze) {
+            $Config.AutoAnalyze = $Default.AutoAnalyze
+        }
+        if (!$Config.AutoClear) {
+            $Config.AutoClear = $Default.AutoClear
+        }
         if (!$Config.HashAlgorithm) {
             $Config.HashAlgorithm = $Default.HashAlgorithm
         }
@@ -228,13 +293,16 @@ function Import-Config {
         if (!$Config.Path) {
             $Config.Path = $Default.Path
         }
-        if (!$Config.UserName) {
-            $Config.UserName = $Default.UserName
+        if (!$Config.PSSession) {
+            $Config.PSSession = $Default.PSSession
+        }
+        if (!$Config.ThrottleLimit) {
+            $Config.ThrottleLimit = $Default.ThrottleLimit
         }
 
         if (!$Config.Path.Bin) {
             $Config.Path.Bin = $Default.Path.Bin
-        } 
+        }
         if (!$Config.Path.Logs) {
             $Config.Path.Logs = $Default.Path.Logs
         }
@@ -245,12 +313,12 @@ function Import-Config {
             $Config.Path.Plugins = $Default.Path.Plugins
         }
 
-        if (!$Config.UserName.Windows) {
-            $Config.UserName.Windows = $Default.UserName.Windows
+        if (!$Config.PSSession.NoMachineProfile) {
+            $Config.PSSession.NoMachineProfile = $Default.PSSession.NoMachineProfile
         }
 
         # Check for required $Config value existence (sanity check - should never fail with default values)
-        if (!$Config.HashAlgorithm -or !$Config.Path -or !$Config.UserName -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.UserName.Windows) {
+        if (!$Config.AdminUserName -or !$Config.HashAlgorithm -or !$Config.Path -or !$Config.PSSession -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.PSSession.NoMachineProfile) {
             throw 'Missing required configuration value'
         }
 
@@ -261,20 +329,25 @@ function Import-Config {
         foreach ($DirPath in $Config.Path.GetEnumerator()) {
             # If the $DirPath doesn't exist, create it and get rid of the output
             if (!(Test-Path $DirPath.Key)) {
-                New-Item -Path $DirPath.Key -ItemType Directory | Out-Null
+                $null = New-Item -Path $DirPath.Key -ItemType 'Directory'
             }
 
             # Store each path as a regular expressions for string replacing later
             $global:PowerResponse.Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}$' -f $DirPath.Key))
         }
+    }
+}
 
-        # Gather credentials for non-sessioned $UserName
-        $global:PowerResponse.Credential = @{}
-        foreach ($UserName in $Config.UserName.GetEnumerator()) {
-            if ($UserName.Value -ne $ENV:UserName) {
-                $global:PowerResponse.Credential.($UserName.Key) = Get-Credential -UserName $UserName.Value -Message ('Please enter {0} credentials' -f $UserName.Key)
-            }
-        }
+function Get-PROutputPath {
+    param (
+        [Parameter(Mandatory=$true)]
+        [String]$ComputerName,
+        [String]$Directory
+    )
+
+    process {
+        # Format the returned path as $global:PowerResponse.Config.Path.Output\$ComputerName\{yyyy-MM-dd}\$Directory
+        return '{0}\{1}\{2:yyyy-MM-dd}\{3}' -f $global:PowerResponse.Config.Path.Output,$ComputerName.ToUpper(),(Get-Date),$Directory -Replace '\\+','\' -Replace '\\$'
     }
 }
 
@@ -367,10 +440,10 @@ function Invoke-RemoveCommand {
         # If $Arguments are blank and we have selected a file $global:PowerResponse.Location
         if ($Arguments.Count -eq 0 -and !$global:PowerResponse.Location.PSIsContainer) {
             # Assume 'remove' all tracked command parameters
-            $Arguments = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters | Select-Object -ExpandProperty Keys
+            $Arguments = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters' | Select-Object -ExpandProperty 'Keys'
         } elseif ($Arguments.Count -eq 0) {
             # Assume 'remove' all tracked $global:PowerResponse.Parameters
-            $Arguments = $global:PowerResponse.Parameters | Select-Object -ExpandProperty Keys
+            $Arguments = $global:PowerResponse.Parameters | Select-Object -ExpandProperty 'Keys'
         }
 
         # Filter $Arguments to remove invalid $global:PowerResponse.Parameters.Keys
@@ -379,10 +452,22 @@ function Invoke-RemoveCommand {
         # If we have $Arguments to remove
         if ($Arguments.Count -ne 0) {
             # Remove $Arguments from $global:PowerResponse.Parameters
-            $Arguments | Foreach-Object { $global:PowerResponse.Parameters.Remove($PSItem) | Out-Null }
+            $null = $Arguments | Foreach-Object { $global:PowerResponse.Parameters.Remove($PSItem) }
 
             # Write parameter removal log
             Write-Log ('Removed Parameter(s): ''{0}''' -f ($Arguments -Join ''', '''))
+        }
+
+        # If ComputerName parameter got removed
+        if (!$global:PowerResponse.Parameters.ComputerName) {
+            # Set it back to LOCALHOST
+            $global:PowerResponse.Parameters.ComputerName = 'LOCALHOST'
+        }
+
+        # If OutputType parameter got removed
+        if (!$global:PowerResponse.Parameters.OutputType) {
+            # Set it back to the $global:PowerResponse.Config.OutputType
+            $global:PowerResponse.Parameters.OutputType = $global:PowerResponse.Config.OutputType
         }
 
         # Show the new parameter list
@@ -396,106 +481,209 @@ function Invoke-RunCommand {
     )
 
     process {
+        # Gather $OnlineComputers
+        $OnlineComputers = Get-OnlineComputer -ComputerName $global:PowerResponse.Parameters.ComputerName
+
         # If we have selected a file $global:PowerResponse.Location
-        if ($global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
-            Write-Host -Object ('Plugin Execution Started at {0}' -f (Get-Date))
-
+        if ($OnlineComputers -and $global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
             # Gather to $global:PowerResponse.Location's $CommandParameters
-            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
+            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters'
 
-            # Initialize $ReleventParameters Hashtable
-            $ReleventParameters = @{}
+            # Gather the $SessionOption from $global:PowerResponse.Config.PSSession
+            $SessionOption = $global:PowerResponse.Config.PSSession
 
-            # Parse the $ReleventParameters from $global:PowerResponse.Parameters
-            $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
+            # Gather $SessionParameters
+            $SessionParameters = @{
+                ComputerName = $OnlineComputers.ToUpper()
+                ErrorAction = 'SilentlyContinue'
+                Name = $OnlineComputers.ToUpper()
+                SessionOption = New-PSSessionOption @SessionOption
+            }
+
+            # Add Credential parameter if we are tracking one
+            if ($global:PowerResponse.Parameters.Credential) {
+                $SessionParameters.Credential = $global:PowerResponse.Parameters.Credential
+            }
+
+            # Create the $Sessions array
+            $Sessions = New-PSSession @SessionParameters
+
+            # Write execution to host
+            Write-Host -Object ('Plugin Execution Started at {0}' -f (Get-Date))
 
             # Write execution log
             Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
 
-            # Store $HasComputerParams boolean for future conditional checks
-            $HasComputerParams = $ReleventParameters.ComputerName -ne $null
+            # If $CommandParameters doesn't contain 'Session'
+            if ($CommandParameters.Keys -NotContains 'Session') {
+                # Clear $Error log
+                $Error.Clear()
 
-            # Set up $ComputerName array to run at least once
-            $ComputerName = @('RUNONCE')
-
-            # if a we $HasComputerParams, cycle through the contained array
-            if ($HasComputerParams) {
-                $ComputerName = $ReleventParameters.ComputerName
-            }
-
-            foreach ($Computer in $ComputerName) {
-                # Check to ensure that the host is online and is ready for processing prior to attempting to collect data
-                $Online = Test-Connection -ComputerName $Computer -Count 1 -Quiet
-
-                # If we $HasComputerParams and the target is $Online, set parameters up for execution
-                if ($HasComputerParams -and $Online) {
-                    # Force the current $Computer as the $ReleventParameters.ComputerName
-                    $ReleventParameters.ComputerName = $Computer
-
-                    # Format $Computer into $ComputerText for future $Message composition
-                    $ComputerText = ' for {0}' -f $Computer
-                } elseif ($HasComputerParams) {
-                    # Format $Computer offline $Message
-                    $Message = "{0} appears to be offline, skipping plugin execution." -f $Computer
-
-                    # Write offline warning $Message to screen
-                    Write-Warning -Message $Message
-
-                    # Write offline $Message to log
-                    Write-Log -Message $Message
-
-                    continue
-                } else {
-                    # Format $Computer into $ComputerText as null for future $Message
-                    $ComputerText = ''
-
-                    # Set $Computer to null for the $global:PowerResponse.OutputPath formatting
-                    $Computer = ''
+                # Compile $InvokeCommandParameters HashTable
+                $InvokeCommandParameters = @{
+                    ArgumentList = $CommandParameters.Keys | Foreach-Object { $global:PowerResponse.Parameters.$PSItem }
+                    AsJob = $true
+                    FilePath = $global:PowerResponse.Location.FullName
+                    JobName = $global:PowerResponse.Location.BaseName
+                    Session = $Sessions
+                    ThrottleLimit = $global:PowerResponse.Config.ThrottleLimit
                 }
-
-                # Set $global:PowerResponse.OutputPath for use in the plugin and Out-PRFile
-                $global:PowerResponse.OutputPath = ('{0}\{1}\{2:yyyy-MM-dd}' -f $global:PowerResponse.Config.Path.Output,$Computer,(Get-Date)) -Replace '\\\\','\\'
 
                 try {
-                    # Execute the $global:PowerResponse.Location with the $ReleventParameters
-                    & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile
-
-                    # Format host success $Message
-                    $Message = "Plugin Execution Succeeded{0} at {1}" -f $ComputerText, (Get-Date)
-
-                    # Write execution success message
-                    Write-Host -Object $Message
-                    
+                    # Invoke the script file as a $Job with the $ArgumentList
+                    $Job = Invoke-Command @InvokeCommandParameters
                 } catch {
-                    # Format warning $Message
-                    $Message = 'Plugin execution error{0}: {1}' -f $ComputerText,$PSItem
+                    # Format remoting warning $Message
+                    $Message = 'Plugin Job Creation Error: {0}' -f $PSItem
 
-                    # Write warning $Message to screen along with some admin advice
-                    Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
+                    # Write warning $Message
+                    Write-Warning -Message $Message
+
+                    # Write log $Message
+                    Write-Log -Message $Message
                 }
 
-                # Protect any files that were copied to this particular $global:PowerResponse.OutputPath
-                Protect-PRFile
+                # If we successfully created the $Job
+                if ($Job) {
+                    # Wait for the $Job to complete
+                    $null = Wait-Job -Job $Job
+
+                    # Receive the $Results of the $Job and group them by PSComputerName
+                    $Results = Receive-Job -Job $Job -ErrorAction 'SilentlyContinue' | Group-Object -Property 'PSComputerName'
+
+                    # Loop through $Result groups
+                    foreach ($Result in $Results) {
+                        # Send each $Result to it's specific PR output file based on ComputerName
+                        $Result.Group | Out-PRFile -ComputerName $Result.Name
+
+                        # Format the remote execution success $Message
+                        $Message = 'Plugin Execution Succeeded for {0}' -f $Result.Name
+
+                        # Write host $Message
+                        Write-Host -Object $Message
+
+                        # Write log $Message
+                        Write-Log -Message $Message
+                    }
+
+                    # Gather the $RemoteError
+                    $RemoteErrors = $Error | Where-Object { $PSItem -is [System.Management.Automation.Runspaces.RemotingErrorRecord] }
+
+                    foreach ($RemoteError in $RemoteErrors) {
+                        # Format the remote error $Message
+                        $Message = 'Plugin Execution Error for {0}: {1}' -f $RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
+
+                        # Write warning $Message
+                        Write-Warning -Message $Message
+
+                        # Write log $Message
+                        Write-Log -Message $Message
+                    }
+
+                    # Remove the $Job
+                    Remove-Job -Job $Job
+                }
+            } else {
+                # Initialize $ReleventParameters Hashtable
+                $ReleventParameters = @{}
+
+                # Parse the $ReleventParameters from $global:PowerResponse.Parameters
+                $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
+
+                # Loop through tracked $Sessions
+                foreach ($Session in $Sessions) {
+                    # Set $ReleventParameters.Session to the current $Session
+                    $ReleventParameters.Session = $Session
+
+                    try {
+                        # Execute the $global:PowerResponse.Location with the $ReleventParameters
+                        & $global:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile -ComputerName $Session.ComputerName
+
+                        # Format host success $Message
+                        $Message = 'Plugin Execution Succeeded for {0} at {1}' -f $Session.ComputerName, (Get-Date)
+
+                        # Write execution success message
+                        Write-Host -Object $Message
+                    } catch {
+                        # Format warning $Message
+                        $Message = 'Plugin Execution Error for {0}: {1}' -f $Session.ComputerName,$PSItem
+
+                        # Write warning $Message to screen along with some admin advice
+                        Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
+                    }
+
+                    # Write execution $Message to log
+                    Write-Log -Message $Message
+                }
+            }
+
+            # Compute $AnalysisPath
+            $AnalysisPath = '{0}\Analysis\{1}' -f $global:PowerResponse.Config.Path.Plugins,($global:PowerResponse.Location.Name -Replace 'Collect-','Analyze-')
+
+            # If auto execution of analysis plugins is set
+            if ($global:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $global:PowerResponse.Location.FullName -and (Test-Path -Path $AnalysisPath)) {
+                Write-Host -Object ('Analysis Plugin Execution Started at {0}' -f (Get-Date))
+
+                # Gather to $AnalysisPath's $AnalysisParameters
+                $AnalysisParameters = Get-Command -Name $AnalysisPath | Select-Object -ExpandProperty 'Parameters'
+
+                # Initialize $AnalysisParametersParameters Hashtable
+                $ReleventParameters = @{}
+
+                # Parse the $AnalysisParameters from $global:PowerResponse.Parameters
+                $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $AnalysisParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
+
+                try {
+                    # Execute the plugin at $AnalysisPath
+                    & $AnalysisPath @ReleventParameters | Out-PRFile -ComputerName $Session.ComputerName
+
+                    # Format $Message
+                    $Message = 'Automatically executed analysis plugin {0} for collection plugin {1}' -f $AnalysisPath,$global:PowerResponse.Location.FullName
+
+                    # Write execution $Message to verbose stream
+                    Write-Verbose -Message $Message
+
+                } catch {
+                    # Format warning $Message
+                    $Message = 'Analysis plugin execution error for {0}: {1}' -f $Session.ComputerName,$PSItem
+
+                    # Write warning $Message to screen
+                    Write-Warning -Message $Message
+                }
 
                 # Write execution $Message to log
                 Write-Log -Message $Message
             }
 
-            # Clear $global:PowerResponse.OutputPath so legacy data doesn't stick around
-            $global:PowerResponse.OutputPath = $null
+            # Protect any files that were copied to this particular $global:PowerResponse.OutputPath
+            Protect-PRFile
+
+            # Clean up the created $Sessions
+            Remove-PSSession -Session $Sessions
 
             # Write plugin execution completion message and verify with input prior to clearing
-             Write-Host -Object ("Plugin execution complete at {0}. Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -f (Get-Date)) -ForegroundColor Cyan -Backgroundcolor Black
+             Write-Host -Object ('Plugin execution complete at {0}' -f (Get-Date))
+        } elseif (!$OnlineComputers) {
+            # Format all computers offline $Message
+            $Message = 'All tracked computers are offline, skipping plugin execution'
+
+            # Write warning $Message
+            Write-Warning -Message $Message
         } else {
             # Write the warning for no plugin selected
-            Write-Warning -Message ('No plugin selected for execution. Press Enter to Continue.')
+            Write-Warning -Message 'No plugin selected for execution. Press Enter to Continue.'
         }
 
-        # Somewhat janky way of being able to have a message acknowledged and still have it show in color
-        Read-Host | Out-Null
+        if ($global:PowerResponse.Config.AutoClear) {
+            # Prompt for message acknowledgment
+            Write-Host -Object "Review status messages above or consult the Power-Response log.`r`nPress Enter to Continue Forensicating" -ForegroundColor 'Cyan' -Backgroundcolor 'Black'
 
-        # Clear screen once completion acknowledged
-        Invoke-ClearCommand
+            # Somewhat janky way of being able to have a message acknowledged and still have it show in color
+            $null = Read-Host
+
+            # Clear screen once completion acknowledged
+            Invoke-ClearCommand
+        }
     }
 }
 
@@ -538,44 +726,62 @@ function Invoke-ShowCommand {
     )
 
     process {
+        # Initialize $CommandParameters HashTable
+        $CommandParameters = @{}
+
         # If we have selected a file $global:PowerResponse.Location
         if (!$global:PowerResponse.Location.PSIsContainer) {
             # Gather to $global:PowerResponse.Location's $CommandParameters
-            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty Parameters
+            $CommandParameters = Get-Command -Name $global:PowerResponse.Location | Select-Object -ExpandProperty 'Parameters'
+
+            # If $CommandParameters does not contain a 'ComputerName' entry
+            if ($CommandParameters.Keys -NotContains 'ComputerName') {
+                # Add a fake 'ComputerName' parameter to $CommandParameters
+                $CommandParameters.Add('ComputerName',(New-Object -TypeName 'System.Management.Automation.ParameterMetadata' -ArgumentList 'ComputerName',([String[]])))
+            }
+
+            # If $CommandParameters does not contain a 'ComputerName' entry
+            if ($CommandParameters.Keys -NotContains 'OutputType') {
+                # Add a fake 'ComputerName' parameter to $CommandParameters
+                $CommandParameters.Add('OutputType',(New-Object -TypeName 'System.Management.Automation.ParameterMetadata' -ArgumentList 'OutputType',([String[]])))
+            }
 
             # Filter $Arguments to remove invalid $CommandParameters.Keys
             $Arguments = $Arguments | Where-Object { $CommandParameters.Keys -Contains $PSItem }
 
             # If $Arguments array is empty
             if ($Arguments.Count -eq 0) {
+                # Create stub cmdlet function to parse $System parameters
+                function stub { [CmdletBinding()] param() process{} }
+
                 # List of $System scoped parameters
-                $System = @('WarningAction','Debug','InformationAction','ErrorVariable','InformationVariable','WarningVariable','Verbose','ErrorAction','OutVariable','OutBuffer','PipelineVariable')
+                $System = Get-Command -Name 'stub' | Select-Object -ExpandProperty 'Parameters' | Select-Object -ExpandProperty 'Keys'
 
-                # Get all $UserCommandParameters (non-system generated parameters)
-                $UserCommandParameters = $CommandParameters.GetEnumerator() | Where-Object { $System -NotContains $PSItem.Key -or $global:PowerResponse.Parameters.($PSItem.Key) }
-
-                # Set $Arguments to $UserCommandParameters.Key to return full list
-                $Arguments = $UserCommandParameters.Key
+                # Set $Arguments to all non-$System keys of $global:PowerResponse.Parmeters
+                $Arguments = $CommandParameters.GetEnumerator() | Where-Object { $System -NotContains $PSItem.Key -or $global:PowerResponse.Parameters.($PSItem.Key) } | Select-Object -ExpandProperty 'Key'
             }
-        } else {
-            # Ensure $CommandParameters is blank
-            $CommandParameters = @{}
+        } elseif ($Arguments.Count -eq 0) {
+            # Set $Arguments to all Keys of $global:PowerResponse.Parameters
+            $Arguments = $global:PowerResponse.Parameters.Keys
+        }
 
-            # If $Arguments array is empty
-            if ($Arguments.Count -eq 0) {
-                # Set $Arguments to all Keys of $global:PowerResponse.Parameters
-                $Arguments = $global:PowerResponse.Parameters.Keys
-            }
+        # If we weren't provided specific $Arguments and $Arguments doesn't contain ComputerName
+        if (!$PSBoundParameters.Arguments -and $Arguments -NotContains 'ComputerName') {
+            # Add 'ComputerName' to the front of the list
+            $Arguments = @('ComputerName') + $Arguments
+        }
+
+        # If we weren't provided specific $Arguments and $Arguments doesn't contain OutputType
+        if (!$PSBoundParameters.Arguments -and $Arguments -NotContains 'OutputType') {
+            # Add 'OutputType' to the end of the list
+            $Arguments = $Arguments + @('OutputType')
         }
 
         # Initialize empty $Param(eter) return HashTable
         $Param = @{}
-        
-        #For plugins with no parameters, write-host to run plugin
-        if ($CommandParameters.Count -eq 0 -and !$global:PowerResponse.Location.PSIsContainer) {
-            Write-Host "`r`nNo parameters detected. Type run to execute plugin."
-        }
-        elseif ($CommandParameters.Count -gt 0) {
+
+        # For plugins with no parameters, write-host to run plugin
+        if ($CommandParameters.Count -gt 0) {
             # Set $Param.[Type]$Key to the $global:PowerResponse.Parameters.$Key value
             $Arguments | Sort-Object | Foreach-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$global:PowerResponse.Parameters.$PSItem }
         } else {
@@ -618,8 +824,11 @@ function Invoke-PRCommand {
 
 function Out-PRFile {
     param (
-        [Parameter(ValueFromPipeline=$true)]
+        [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
         [PSObject]$InputObject,
+
+        [Parameter(Mandatory=$true)]
+        [String]$ComputerName,
 
         [ValidateSet('CSV','XML')]
         [String[]]$OutputType = $global:PowerResponse.Parameters.OutputType,
@@ -637,7 +846,7 @@ function Out-PRFile {
         $Name = ('{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}_{2}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower(),$Append) -Replace '_$'
 
         # Set up $FullName based on $Directory and $Name
-        $DirectoryPath = '{0}\{1}' -f $global:PowerResponse.OutputPath,$Directory
+        $OutputPath = Get-PROutputPath -ComputerName $ComputerName -Directory $Directory
 
         # Initialize $Objects array for pipeline handling
         $Objects = @()
@@ -654,8 +863,8 @@ function Out-PRFile {
         }
 
         # If the $Directory doesn't exist, create it
-        if (!(Test-Path -Path $DirectoryPath)) {
-            New-Item -Path $DirectoryPath -Type 'Directory' | Out-Null
+        if (!(Test-Path -Path $OutputPath)) {
+            $null = New-Item -Path $OutputPath -Type 'Directory'
         }
 
         try {
@@ -664,8 +873,8 @@ function Out-PRFile {
 
             # Export the $Objects into specified format
             switch($OutputType) {
-                'CSV' { $Objects | Export-Csv -Path ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()) }
-                'XML' { $Objects | Export-CliXml -Path ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $DirectoryPath,$Name,$PSItem.ToLower()) }
+                'CSV' { $Objects | Export-Csv -Path ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()) }
+                'XML' { $Objects | Export-CliXml -Path ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()) }
                 default { Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType); exit }
             }
         } catch {
@@ -690,7 +899,7 @@ function Out-PRFile {
 function Protect-PRFile {
     param (
         [Parameter(Position=0)]
-        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Path $global:PowerResponse.OutputPath | Select-Object -ExpandProperty 'FullName'),
+        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Path $global:PowerResponse.Config.Path.Output -ErrorAction 'SilentlyContinue' | Select-Object -ExpandProperty 'FullName'),
 
         [ValidateSet('SHA1','SHA256','SHA384','SHA512','MACTripleDES','MD5','RIPEMD160')]
         [String]$HashAlgorithm = $global:PowerResponse.Config.HashAlgorithm
@@ -770,12 +979,12 @@ function Write-Log {
 
 # $Banner for Power-Response
 $Banner = @'
-    ____                                ____                                      
-   / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________ 
+    ____                                ____
+   / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________
   / /_/ / __ \ | /| / / _ \/ ___/_____/ /_/ / _ \/ ___/ __ \/ __ \/ __ \/ ___/ _ \
  / ____/ /_/ / |/ |/ /  __/ /  /_____/ _, _/  __(__  ) /_/ / /_/ / / / (__  )  __/
-/_/    \____/|__/|__/\___/_/        /_/ |_|\___/____/ .___/\____/_/ /_/____/\___/ 
-                                                   /_/                            
+/_/    \____/|__/|__/\___/_/        /_/ |_|\___/____/ .___/\____/_/ /_/____/\___/
+                                                   /_/
 
 Authors: Drew Schmitt | Matt Weikert | Gavin Prentice
 
@@ -783,7 +992,7 @@ Authors: Drew Schmitt | Matt Weikert | Gavin Prentice
 
 Write-Host $Banner
 
-# Initialize $globalPowerResponse hashtable
+# Initialize $global:PowerResponse hashtable
 $global:PowerResponse = @{}
 
 # Import $global:PowerResponse.Config from data file
@@ -812,11 +1021,15 @@ if (!(Get-ChildItem $global:PowerResponse.Location)) {
 }
 
 # Initialize tracked $global:PowerResponse.Parameters to $global:PowerResponse.Config data
-$global:PowerResponse.Parameters = @{ OutputType = $global:PowerResponse.Config.OutputType; ComputerName = $ComputerName }
+$global:PowerResponse.Parameters = @{
+    ComputerName = $ComputerName
+    Credential = $Credential
+    OutputType = $global:PowerResponse.Config.OutputType
+}
 
-# If we have gathered a credential object from the Config, add it to the $global:PowerResponse.Parameters hashtable
-if ($global:PowerResponse.Credential.Windows) {
-    $global:PowerResponse.Parameters.Credential = $global:PowerResponse.Credential.Windows
+# If we have have a executing-admin user name mismatch, gather the credential object and store it in the $global:PowerResponse.Parameters hashtable
+if ($ENV:UserName -ne $global:PowerResponse.Config.AdminUserName -and $Credential.UserName -ne $global:PowerResponse.Config.AdminUserName) {
+    $global:PowerResponse.Parameters.Credential = Get-Credential -UserName $global:PowerResponse.Config.AdminUserName -Message 'Enter administrative credentials'
 }
 
 # Trap 'exit's and Ctrl-C interrupts
@@ -829,7 +1042,7 @@ try {
             $Title = $global:PowerResponse.Location.FullName -Replace $global:PowerResponse.Regex.Plugins
 
             # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
-            $Choice = Get-ChildItem -Path $global:PowerResponse.Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property PSIsContainer,Name
+            $Choice = Get-ChildItem -Path $global:PowerResponse.Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property 'PSIsContainer','Name'
 
             #Compute $Back - ensure we are not at the $global:PowerResponse.Config.Path.Plugins
             $Back = $Plugins.FullName -NotMatch [Regex]::Escape($global:PowerResponse.Location.FullName)
@@ -839,7 +1052,7 @@ try {
 
             # Get the selected $global:PowerResponse.Location item
             try {
-                $global:PowerResponse.Location = Get-Item (('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -Replace '\\$') -ErrorAction Stop
+                $global:PowerResponse.Location = Get-Item (('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -Replace '\\$')
             } catch {
                 Write-Warning 'Something went wrong, please try again'
             }

@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Sigcheck.ps1
+    Plugin-Name: Retrieve-Sigcheck.ps1
     
 .Description
     This plugin uses Sigcheck to verify the digital signature and version
@@ -30,7 +30,6 @@
     to complete.
 
 .EXAMPLE
-    Collect-Sigcheck.ps1 -ComputerName Test-PC -Location C:\Windows [-Recurse]
 
     PowerResponse Execution (Non-recursive)
     Set ComputerName Test-PC
@@ -57,20 +56,17 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName,
+    [System.Management.Automation.Runspaces.PSSession]$Session,
 
     [Parameter(Mandatory=$true,Position=1)]
     [string]$Location,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false,Position=2)]
     [Switch]$Recurse
 
     )
 
 process{
-
-    # Get the root Power-Response directory - Assumes that the plugin is located in the plugins/ASEP directory
-    $PRRoot = (Get-Item $PSScriptRoot).parent.parent.FullName
 
     # Sigcheck executable locations
     $Sigcheck64 = ("{0}\sigcheck64.exe" -f $global:PowerResponse.Config.Path.Bin)
@@ -80,35 +76,20 @@ process{
     $64bitTestPath = Get-Item -Path $Sigcheck64 -ErrorAction SilentlyContinue
     $32bitTestPath = Get-Item -Path $Sigcheck32 -ErrorAction SilentlyContinue
 
-    if (-not $64bitTestPath) {
+    if (!$64bitTestPath) {
 
         Throw "Sigcheck64.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
 
-    } elseif (-not $32bitTestPath) {
+    } elseif (!$32bitTestPath) {
 
         Throw "Sigcheck.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
 
     }
 
-    # Loop through machines in $ComputerName to obtain data for each machine (if multiple machines are specified)
-    foreach ($Computer in $ComputerName) {
-
-    # Handle $ComputerName defined as localhost and not break the Plugin
-    if ($Computer -eq "Localhost") {
-
-        $Computer = $ENV:ComputerName
-    }
-    
-    # Verify machine is online and ready for data collection
-    if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        
-        Write-Error ("{0} appears to be offline. Cannot gather Sigcheck data." -f $Computer)
-        Continue
-    }
-
     # Determine system architecture and select proper Sigcheck executable
     try {
-        $Architecture = (Get-WmiObject -ComputerName $Computer -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
+
+        $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
         
         if ($Architecture -eq "64-bit") {
 
@@ -120,60 +101,61 @@ process{
 
         } else {
             
-            Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Computer)
+            Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Session.ComputerName)
             Continue
         }
     } catch {
         
-        Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Computer)
+        Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Session.ComputerName)
         Continue
     }
 
     # Copy Sigcheck to remote host
-    $SmbPath = ("\\{0}\c`$\ProgramData\{1}" -f $Computer, (Split-Path -Path $Installexe -Leaf))
+    $RemotePath = ("C:\ProgramData\{0}") -f (Split-Path $Installexe -Leaf)
+
     try {
         
-        Copy-Item -Path $Installexe -Destination $SmbPath -ErrorAction Stop
-        $RemoteFile = Get-Item -Path $SmbPath -ErrorAction Stop
+        Copy-Item -Path $Installexe -Destination $RemotePath -ToSession $Session -ErrorAction Stop
+        
+        $RemoteFile = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $($args[0]) -ErrorAction Stop} -Argumentlist $RemotePath
 
         # verify that the file copy succeeded to the remote host
-        if (-not $RemoteFile) {
+        if (!$RemoteFile) {
             
-            Write-Error ("Remote file not found on {0}. There may have been a problem during the copy process. Data was not gathered." -f $Computer)
+            Write-Error ("Remote file not found on {0}. There may have been a problem during the copy process. Data was not gathered." -f $Session.ComputerName)
             Continue
         }
+
     } catch {
         
-        Write-Error ("An unexpected error occurred while copying Sigcheck to {0}. Data was not gathered" -f $Computer)
+        Write-Error ("An unexpected error occurred while copying Sigcheck to {0}. Data was not gathered" -f $Session.ComputerName)
         Continue
     }
-
 
     # Run Sigcheck on the remote host and collect Sigcheck data (use -s option if $Recurse -eq $true)
     if ($Recurse) {
     
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} /accepteula -nobanner -e -vt -h -c -s {1}") -f ((Split-Path -Path $Installexe -Leaf), $Location))
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0} /accepteula -nobanner -e -vt -h -c -s {1}") -f ($RemotePath, $Location))
     
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
+        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
 
     } else {
 
-         $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} /accepteula -nobanner -e -vt -h -c {1}") -f ((Split-Path -Path $Installexe -Leaf), $Location))
+         $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0} /accepteula -nobanner -e -vt -h -c {1}") -f ($RemotePath, $Location))
     
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock | ConverFrom-CSV
+        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | ConvertFrom-CSV
 
     }
     
     # Remove Sigcheck from remote host
     try {
-            Remove-Item -Path $SmbPath -Force -ErrorAction Stop
+            
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item {0} -Force -ErrorAction Stop") -f ($RemotePath))
+            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
             
         } catch {
             
-            Write-Error ("Unable to remove the Sigcheck executable from {0}. The file will need to be removed manually." -f $Computer)
+            Write-Error ("Unable to remove the Sigcheck executable from {0}. The file will need to be removed manually." -f $Session.ComputerName)
             Continue
-        }
-
     }
-
 }

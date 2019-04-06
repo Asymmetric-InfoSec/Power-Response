@@ -1,17 +1,13 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Services
+    Plugin-Name: Collect-Services.ps1
     
 .Description
 
     Collects service information for the remote host
 
 .EXAMPLE
-
-    Stand Alone Execution:
-
-    .\Collect-Services.ps1 -ComputerName Test-CS
 
     Power-Response Execution
 
@@ -31,20 +27,11 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
     )
 
 process{
 
-    foreach ($Computer in $ComputerName) {
-
-        # Get Service Paths via WMI Object
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-CimInstance win32_service | Select ProcessID, Name, DisplayName, Pathname, ServiceType, StartMode, Status')
-    
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
-
-    }
+    # Get Service Paths via WMI Object
+    Get-CimInstance win32_service | Select ProcessID, Name, DisplayName, Pathname, ServiceType, StartMode, Status
 
 }

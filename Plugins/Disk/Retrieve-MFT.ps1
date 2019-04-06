@@ -1,22 +1,21 @@
 ﻿<#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Amcache.ps1
+    Plugin-Name: Retrieve-MFT.ps1
     
 .Description
-
-    This plugin collects the amcache.hve. The file is copied by pushing the 
-    Velociraptor binary to the the remote system, where it copies the files 
-    to C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied to the system, 
-    to then zip the directory containing the amcache.hve before moving them 
-    back to your local system for further analysis and processing. This plugin 
-    will remove the Velociraptor, 7zip PE, and all locally created files after 
-    successfully pulling the artifacts back to the output destination in Power-Response.
+    This plugin collects the $MFT from a remote system. The file is copied by pushing 
+    the Velociraptor binary to the the remote system, where it copies the files to 
+    C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied to the system, to then zip 
+    the directory containing the MFT before moving them back to your local system for 
+    further analysis and processing. This plugin will remove the Velociraptor, 7zip PE, 
+    and all locally created files after successfully pulling the artifacts back to the 
+    output destination in Power-Response.
 
 .EXAMPLE
     Stand Alone 
 
-    .\Collect-Amcache.ps1 -ComputerName Test-PC
+    .\Retrieve-MFT.ps1 -ComputerName Test-PC
 
     Power-Response Execution
 
@@ -25,7 +24,7 @@
 
 .NOTES
     Author: Matt Weikert
-    Date Created: 2/22/2019
+    Date Created: 2/18/2019
     Twitter: @5k33tz
     
     Last Modified By:
@@ -136,23 +135,23 @@ process{
             Continue
         }
 
-        # Collect %SystemRoot%\AppCompat\Programs\Amcache.hve
-        Write-Host ("Collecting {0}\AppCompat\Programs\Amcache.hve" -f $env:SystemRoot)
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& {0}\{1} fs --accessor ntfs cp \\.\{2}\AppCompat\Programs\Amcache.hve {0}\{3}') -f ($env:ProgramData, (Split-Path -Path $Velociraptor -Leaf), $env:SystemRoot, $Computer))
+        # Collect %SystemDrive%\$MFT
+        Write-Host ("Collecting {0}\`$MFT" -f $env:SystemDrive)
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& {0}\{1} fs --accessor ntfs cp \\.\{2}\`$MFT {0}\{3}') -f ($env:ProgramData, (Split-Path -Path $Velociraptor -Leaf), $env:SystemDrive, $Computer))
         Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
         
         # Compress artifacts directory
-        Write-Host ("Compressing Artifacts into {0}\{1}_amcache.zip" -f $env:ProgramData, $Computer)        
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0}\{1} a {0}\{2}_amcache.zip {0}\{2}") -f ($env:ProgramData, (Split-Path -Path $7za64 -Leaf), $Computer))
+        Write-Host ("Compressing Artifacts into {0}\{1}_MFT.zip" -f $env:ProgramData, $Computer)        
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0}\{1} a {0}\{2}_MFT.zip {0}\{2}") -f ($env:ProgramData, (Split-Path -Path $7za64 -Leaf), $Computer))
         Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
         # Copy artifacts back to $Output (Uses $Session)
-        Write-Host ("Copying {0}\{1}_amcache.zip to {2}" -f $env:ProgramData, $Computer, $Output)
-        Copy-Item -Path (("{0}\{1}_amcache.zip") -f ($env:ProgramData, $Computer)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+        Write-Host ("Copying {0}\{1}_MFT.zip to {2}" -f $env:ProgramData, $Computer, $Output)
+        Copy-Item -Path (("{0}\{1}_MFT.zip") -f ($env:ProgramData, $Computer)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
 
         # Delete initial artifacts, 7za, and velociraptor binaries from remote machine
         Write-Host ("Performing cleanup")
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path {0}\{1}, {0}\{2}, {0}\{3}_amcache.zip, {0}\{3}") -f ($env:ProgramData, (Split-Path -Path $Velociraptor -Leaf), (Split-Path -Path $7za64 -Leaf), $Computer))
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path {0}\{1}, {0}\{2}, {0}\{3}_MFT.zip, {0}\{3}") -f ($env:ProgramData, (Split-Path -Path $Velociraptor -Leaf), (Split-Path -Path $7za64 -Leaf), $Computer))
         Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock | Out-Null
 
         #Remove PS Session

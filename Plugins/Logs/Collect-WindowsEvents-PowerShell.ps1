@@ -43,43 +43,22 @@
 
 param (
 
-    [Parameter(Mandatory=$true, Position=0)]
-    [string[]]$ComputerName,
-
-    #If no date is supplied, the default is the current date minus 90 days (average dwell time of an adversary)
-    [Parameter(Mandatory=$false, Position=1)]
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
-
     )
 
 process {
 
-#PowerShell Event Log IDs to Retrieve (Microsoft-Windows-PowerShell/Operational.evtx)
-$PowerShellEvents = @(
+    $StartDate=(Get-Date).AddDays(-90)
 
-        4104, #Script contents
-        4105, #Script start
-        4106  #Script stop
+    #PowerShell Event Log IDs to Retrieve (Microsoft-Windows-PowerShell/Operational.evtx)
+    $PowerShellEvents = @(
 
-    )
+            4104, #Script contents
+            4105, #Script start
+            4106  #Script stop
 
-#Get-WinEvent does not support string arrays for the ComputerName parameter, looping through computers in ComputerName parameter to allow compatibility with Import-Computers.ps1 plugin
+        )
 
-foreach ($Computer in $ComputerName) {
-
-        #Verify Computer is online prior to processing
-
-        if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        Write-Error ("{0} appears to be offline, event logs were not collected" -f $Computer)
-        continue
-        
-        #If online, collect event logs for $Computer
-        } else {
-
-        #Get Windows PowerShell Event Logs
-        Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-PowerShell/Operational"; StartTime=$StartDate; ID=$PowerShellEvents} -ComputerName $Computer -ErrorAction SilentlyContinue
-
-       }
-    }
+    #Get Windows PowerShell Event Logs
+    Get-WinEvent -FilterHashTable @{LogName="Microsoft-Windows-PowerShell/Operational"; StartTime=$StartDate; ID=$PowerShellEvents} -ErrorAction SilentlyContinue
 
 }

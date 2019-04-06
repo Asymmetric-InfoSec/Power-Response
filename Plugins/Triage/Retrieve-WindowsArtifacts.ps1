@@ -1,7 +1,7 @@
 ﻿<#
 
 .SYNOPSIS
-    Plugin-Name: Collect-WindowsArtifacts.ps1
+    Plugin-Name: Retrieve-WindowsArtifacts.ps1
     
 .Description
     This plugin collects windows artifacts (including locked files) from the 

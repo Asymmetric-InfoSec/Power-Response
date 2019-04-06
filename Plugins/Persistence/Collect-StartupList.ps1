@@ -1,15 +1,12 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-StartupList
+    Plugin-Name: Collect-StartupList.ps1
     
 .Description
     This plugin collects all startup items from the remote host for analysis.
 
 .EXAMPLE
-    Stand Alone Execution
-
-    .\Collect-StartupList.ps1 -ComputerName Test-PC
 
     Power-Response Execution
 
@@ -29,19 +26,12 @@
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
-
     )
 
 process{
 
+    # Get Startup List on remote host
 
-    foreach ($Computer in $ComputerName) {
-
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-CimInstance Win32_StartupCommand")
+    Get-CimInstance Win32_StartupCommand
     
-        Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
-
-    }
 }

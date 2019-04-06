@@ -23,28 +23,21 @@
     Date Created: 2/2/2019
     Twitter: 
     
-    Last Modified By:
-    Last Modified Date:
-    Twitter:
+    Last Modified By: Gavin Prentice
+    Last Modified Date: 3/28/2019
+    Twitter: @valrkey
   
 #>
 
 param (
 
-    [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
 
     )
 
 process {
 
-    foreach ($Computer in $ComputerName) {
-
-    #Run command on the remote host and collect process data
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock('Get-WmiObject win32_process | Select ParentProcessID, ProcessID, SessionID, Name, ExecutablePath, Commandline, ThreadCount, Handle, Handlecount')
+    # Collect process data
+    Get-WmiObject win32_process | Select ParentProcessID, ProcessID, SessionID, Name, ExecutablePath, Commandline, ThreadCount, Handle, Handlecount
     
-    Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
-
-    }
 
 }
