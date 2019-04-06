@@ -342,12 +342,27 @@ function Get-PROutputPath {
     param (
         [Parameter(Mandatory=$true)]
         [String]$ComputerName,
+        [String]$Plugin = (Get-PSCallStack | Where-Object { $PSItem.ScriptName -Match $global:PowerResponse.Regex.Plugins } | Select-Object -First 1 -ExpandProperty 'ScriptName'),
         [String]$Directory
     )
 
     process {
+        # Get the $Item at $Plugin path
+        $Item = Get-Item -Path $Plugin
+
+        # Ensure we have a Directory $Item
+        if (!$Item.ISPSContainer) {
+            $Item = $Item.Directory
+        }
+
+        # Ensure 'Plugins' is removed with the rest of the $global:PowerResponse.Regex.Plugins
+        $PluginRegex = '{0}Plugins\\?' -f $global:PowerResponse.Regex.Plugins
+
+        # Determine the path to the $Plugin to mirror the directory structure
+        $Mirror = $Item.FullName -Replace $PluginRegex
+
         # Format the returned path as $global:PowerResponse.Config.Path.Output\$ComputerName\{yyyy-MM-dd}\$Directory
-        return '{0}\{1}\{2:yyyy-MM-dd}\{3}' -f $global:PowerResponse.Config.Path.Output,$ComputerName.ToUpper(),(Get-Date),$Directory -Replace '\\+','\' -Replace '\\$'
+        return '{0}\{1}\{2}\{3}' -f $global:PowerResponse.Config.Path.Output,$ComputerName.ToUpper(),$Mirror,$Directory -Replace '\\+','\' -Replace '\\$'
     }
 }
 
@@ -559,7 +574,7 @@ function Invoke-PRPlugin {
                 # Loop through $Result groups
                 foreach ($Result in $Results) {
                     # Send each $Result to it's specific PR output file based on ComputerName
-                    $Result.Group | Out-PRFile -ComputerName $Result.Name
+                    $Result.Group | Out-PRFile -ComputerName $Result.Name -Plugin $Path
 
                     # Format the remote execution success $Message
                     $Message = 'Plugin Execution Succeeded for {0}' -f $Result.Name
@@ -602,7 +617,7 @@ function Invoke-PRPlugin {
 
                 try {
                     # Execute the $Path with the $ReleventParameters
-                    & $Path @ReleventParameters | Out-PRFile -ComputerName $SessionInstance.ComputerName
+                    & $Path @ReleventParameters | Out-PRFile -ComputerName $SessionInstance.ComputerName -Plugin $Path
 
                     # Format host success $Message
                     $Message = 'Plugin Execution Succeeded for {0} at {1}' -f $SessionInstance.ComputerName, (Get-Date)
@@ -629,6 +644,8 @@ function Invoke-PRPlugin {
 
         # If auto execution of analysis plugins is set and we have a valid $AnalysisPath
         if ($global:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $Path -and (Test-Path -Path $AnalysisPath)) {
+            Write-Host -Object 'Detected Analysis Plugin'
+
             Invoke-PRPlugin -Path $AnalysisPath -Session $Session
         }
     }
@@ -654,7 +671,6 @@ function Invoke-RunCommand {
             # Gather $SessionParameters
             $SessionParameters = @{
                 ComputerName = $OnlineComputers.ToUpper()
-                ErrorAction = 'SilentlyContinue'
                 Name = $OnlineComputers.ToUpper()
                 SessionOption = New-PSSessionOption @SessionOption
             }
@@ -866,6 +882,8 @@ function Out-PRFile {
         [Parameter(Mandatory=$true)]
         [String]$ComputerName,
 
+        [String]$Plugin,
+
         [ValidateSet('CSV','XML')]
         [String[]]$OutputType = $global:PowerResponse.Parameters.OutputType,
 
@@ -881,8 +899,13 @@ function Out-PRFile {
         # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}_{APPEND}
         $Name = ('{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}_{2}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower(),$Append) -Replace '_$'
 
-        # Set up $FullName based on $Directory and $Name
-        $OutputPath = Get-PROutputPath -ComputerName $ComputerName -Directory $Directory
+        # Remove irrelevent keys from $PSBoundParameters
+        $null = $PSBoundParameters.Remove('InputObject')
+        $null = $PSBoundParameters.Remove('OutputType')
+        $null = $PSBoundParameters.Remove('Append')
+
+        # Get $OutputPath with remaining $PSBoundParameters
+        $OutputPath = Get-PROutputPath @PSBoundParameters
 
         # Initialize $Objects array for pipeline handling
         $Objects = @()
