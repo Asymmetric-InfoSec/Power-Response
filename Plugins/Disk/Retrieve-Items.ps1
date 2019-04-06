@@ -92,7 +92,7 @@ process{
     # Set $Output for where to store recovered prefetch files
     $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'CollectedItems')
 
-    # Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
+    # Create Subdirectory in $global:PowerResponse.OutputPath for storing items
     If (!(Test-Path $Output)) {
 
         New-Item -Type Directory -Path $Output | Out-Null
@@ -307,7 +307,7 @@ process{
             #Collect $Item
             $FinalPath = "C:\ProgramData\{1}_{0}" -f $Session.ComputerName, (Split-Path $Item -Leaf)
 
-            Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path $($args[0])} -Argumentlist $FinalPath
+            Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path $($args[0])} -Argumentlist $FinalPath | Out-Null
 
             $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& {0}\{1} fs --accessor ntfs cp \\.\{2} {3}') -f ($env:ProgramData, (Split-Path -Path $Velo_exe -Leaf), $Item, $FinalPath))
             Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null

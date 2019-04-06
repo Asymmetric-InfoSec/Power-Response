@@ -25,6 +25,10 @@ There is no formal installation required. Simply clone the reposity using git (g
 
 ### Dependencies
 
+PowerShell Remoting
+
+Power-Response depends on PowerShell remoting. All remote hosts will need to have PowerShell remoting enabled for data collection to be successful.
+
 Download and/or place the follwing dependencies into `BIN`
 
 #### Sysinternals Tools
