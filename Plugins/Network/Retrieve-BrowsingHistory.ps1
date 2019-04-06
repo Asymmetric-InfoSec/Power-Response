@@ -1,51 +1,12 @@
-﻿<#
+<#
 
 .SYNOPSIS
-    Plugin-Name: Retrieve-WindowsArtifacts.ps1
+    Plugin-Name: Retrieve-BrowsingHistory.ps1
     
 .Description
-    This plugin collects windows artifacts (including locked files) from the 
-    preset list below. The file are copied by pushing the Velociraptor binary to 
-    the the remote system, where it copies the files to C:\ProgramData\%COMPUTERNAME%.
-    7za.exe is also copied to the system, to then zip the directory of artifacts 
-    before moving them back to your local system for further analysis. This plugin 
-    will remove the Velociraptor, 7zip PE, and all locally created files after 
-    successfully pulling the artifacts back to the output destination in Power-Response.
-
-    System Artifacts:
-    %SystemDrive%\$MFT
-    %SYSTEMROOT%\Tasks
-    %SYSTEMROOT%\System32\Tasks
-    %SYSTEMROOT%\Prefetch
-    %SYSTEMROOT%\System32\config\SAM
-    %SYSTEMROOT%\System32\config\SAM.LOG1
-    %SYSTEMROOT%\System32\config\SAM.LOG2
-    %SYSTEMROOT%\System32\config\SYSTEM
-    %SYSTEMROOT%\System32\config\SYSTEM.LOG1
-    %SYSTEMROOT%\System32\config\SYSTEM.LOG2
-    %SYSTEMROOT%\System32\config\SOFTWARE
-    %SYSTEMROOT%\System32\config\SOFTWARE.LOG1
-    %SYSTEMROOT%\System32\config\SOFTWARE.LOG2
-    %SYSTEMROOT%\System32\config\SECURITY
-    %SYSTEMROOT%\System32\config\SECURITY.LOG1
-    %SYSTEMROOT%\System32\config\SECURITY.LOG2
-    %SYSTEMROOT%\Appcompat\Programs
-    %SYSTEMROOT%\System32\drivers\etc\hosts
-    %SYSTEMROOT%\System32\winevt\logs
-    %PROGRAMDATA%\Microsoft\Search\Data\Applications\Windows
-    %PROGRAMDATA%\Microsoft\Windows\Start Menu\Programs\Startup
-
-    User Artifacts:
-    %UserProfile%\NTUSER.DAT
-    %UserProfile%\NTUSER.DAT.LOG1
-    %UserProfile%\NTUSER.DAT.LOG2
-    %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat
-    %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1
-    %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2
-    %UserProfile%\AppData\Roaming\Microsoft\Windows\Recent
-    %UserProfile%\AppData\Local\Google\Chrome\User Data\Default\History
-    %UserProfile%\AppData\Local\Microsoft\Windows\WebCache
-    %UserProfile%\AppData\Roaming\Mozilla\Firefox\Profiles\*.default\places.sqlite
+    This plugin retrieves browsing history files for all users for Chrome,
+    Firefox, and IE from remote machines and copies them back to the analysis
+    machine for further analysis
 
 .EXAMPLE
 
@@ -55,13 +16,13 @@
     Run
 
 .NOTES
-    Author: Matt Weikert
-    Date Created: 2/12/2019
-    Twitter: @5k33tz
-    
-    Last Modified By: Drew Schmitt
-    Last Modified Date: 4/5/2019
+    Author: Drew Schmitt
+    Date Created: 4/5/2019
     Twitter: @5ynax
+    
+    Last Modified By: 
+    Last Modified Date: 
+    Twitter: 
   
 #>
 
@@ -109,7 +70,7 @@ process{
     }
 
     # Set $Output for where to store recovered artifacts
-    $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'Artifacts')
+    $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'BrowsingHistory')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
     If (!(Test-Path $Output)){
@@ -190,51 +151,10 @@ process{
     
     }
 
-    #Collect System Artifacts    
-    $SystemArtifacts = @(
-
-        "$env:SystemDrive\```$MFT",
-        "$env:SystemRoot\Tasks\*",
-        "$env:SystemRoot\System32\Tasks\*",
-        "$env:SystemRoot\Prefetch\*",
-        "$env:SystemRoot\System32\config\SAM",
-        "$env:SystemRoot\System32\config\SAM.LOG1",
-        "$env:SystemRoot\System32\config\SAM.LOG2",
-        "$env:SystemRoot\System32\config\SYSTEM",
-        "$env:SystemRoot\System32\config\SYSTEM.LOG1",
-        "$env:SystemRoot\System32\config\SYSTEM.LOG2",
-        "$env:SystemRoot\System32\config\SOFTWARE",
-        "$env:SystemRoot\System32\config\SOFTWARE.LOG1",
-        "$env:SystemRoot\System32\config\SOFTWARE.LOG2",
-        "$env:SystemRoot\System32\config\SECURITY",
-        "$env:SystemRoot\System32\config\SECURITY.LOG1",
-        "$env:SystemRoot\System32\config\SECURITY.LOG2",
-        "$env:SystemRoot\Appcompat\Programs\*",
-        "$env:SystemRoot\System32\drivers\etc\hosts",
-        "$env:SystemRoot\System32\winevt\logs\*",
-        "$env:SystemRoot\system32\sru\SRUDB.dat",
-        "$env:ProgramData\Microsoft\Search\Data\Applications\Windows\*",
-        "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\*"
-
-    )
-           
-    foreach ($Artifact in $SystemArtifacts){
-
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& C:\ProgramData\{0} fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}') -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
-    }
-    
     #Collect User Artifacts
 
     $UserArtifacts = @(
 
-        "NTUSER.DAT",
-        "NTUSER.DAT.LOG1",
-        "NTUSER.DAT.LOG2",
-        "AppData\Local\Microsoft\Windows\UsrClass.dat",
-        "AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1",
-        "AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2",
-        "AppData\Roaming\Microsoft\Windows\Recent*\*",
         "AppData\Local\Google\Chrome\User*\Default\History*",
         "AppData\Local\Microsoft\Windows\WebCache\*",
         "AppData\Roaming\Mozilla\Firefox\Profiles\*.default\places.sqlite"
@@ -242,7 +162,7 @@ process{
         )
 
     # Grab list of user profiles
-    $Users = Invoke-Command -Session $Session -Scriptblock {Get-CimInstance -ClassName Win32_UserProfile | Select-Object -ExpandProperty LocalPath | Select-String Users} | Out-Null
+    $Users = Invoke-Command -Session $Session -Scriptblock {Get-CimInstance -ClassName Win32_UserProfile | Select-Object -ExpandProperty LocalPath | Select-String Users}
 
     # Iterate through each user profile grabbing the artifacts
     foreach ($User in $Users){
@@ -256,13 +176,13 @@ process{
     }
         
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} a C:\ProgramData\{1}_Artifacts.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} a C:\ProgramData\{1}_BrowsingHistory.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)
     try {
 
-        Copy-Item -Path (("C:\ProgramData\{0}_Artifacts.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
+        Copy-Item -Path (("C:\ProgramData\{0}_BrowsingHistory.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
 
     } catch {
 
@@ -270,7 +190,7 @@ process{
     }
     
     # Delete initial artifacts, 7za, and velociraptor binaries from remote machine
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}, C:\ProgramData\{1}, C:\ProgramData\{2}_Artifacts.zip, C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), (Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}, C:\ProgramData\{1}, C:\ProgramData\{2}_BrowsingHistory.zip, C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), (Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
 }
