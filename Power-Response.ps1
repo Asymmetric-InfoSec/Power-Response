@@ -646,6 +646,7 @@ function Invoke-PRPlugin {
         if ($global:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $Path -and (Test-Path -Path $AnalysisPath)) {
             Write-Host -Object 'Detected Analysis Plugin'
 
+            # Invoke the $AnalysisPath plugin
             Invoke-PRPlugin -Path $AnalysisPath -Session $Session
         }
     }
@@ -690,6 +691,7 @@ function Invoke-RunCommand {
                 # Write warning $Message
                 Write-Warning -Message ("{0}`n`tSkipping plugin execution" -f $Message)
 
+                # Write log $Message
                 Write-Log -Message $Message
 
                 return
