@@ -25,6 +25,10 @@ There is no formal installation required. Simply clone the reposity using git (g
 
 ### Dependencies
 
+PowerShell Remoting
+
+Power-Response depends on PowerShell remoting. All remote hosts will need to have PowerShell remoting enabled for data collection to be successful.
+
 Download and/or place the follwing dependencies into `BIN`
 
 #### Sysinternals Tools
@@ -61,15 +65,16 @@ PowerShell (.NET actually) has some native limitations for compression (must be 
 
 To get around locked files, we decided to use the default binary from the Velociraptor project:
 
-1. Download `velociraptor-v0.2.7-windows-4.0-amd64.exe` from https://github.com/Velocidex/velociraptor/releases
-2. Rename the file to `velociraptor-amd64.exe`
+1. Download `velociraptor-vx.x.x-windows-4.0-amd64.exe` and `velociraptor-vx.x.x-windows-4.0-386.exe`
+   from https://github.com/Velocidex/velociraptor/releases (Whatever the latest versions are)
+2. Rename the files to `velociraptor-amd64.exe` and `velociraptor-386.exe` respectively
 3. Move executable to `BIN`
 
 Another big shout out to Michael Cohen for his work on Velociraptor!
 
 #### Eric Zimmerman's Tools
 
-We use the following executables from Eric's tools that can be found at https://ericzimmerman.github.io/#!index.md
+We use the following executables from Eric's tools that can be found at https://ericzimmerman.github.io/#!index.md. Download and place in `BIN`.
 
 1. `PECmd`
 2. `JLECmd`
@@ -116,6 +121,6 @@ Any output generated will be moved to the **Output** directory and named based o
 
 **Note:** As you navigate from plugin to plugin, Power-Response will attempt to maintain parameter values. For instance, if you set `ComputerName` in one plugin and navigate to another plugin to collect more data, the `ComputerName` parameter will already be assigned (as long as the parameter types are the same - see the Wiki for more details)
 
-At anytime you can execute the `show` command to see what is available to you in a meny or plugin.
+At anytime you can execute the `show` command to see what is available to you in a menu or plugin.
 
 #### For a quick video tutorial, take a look at this video

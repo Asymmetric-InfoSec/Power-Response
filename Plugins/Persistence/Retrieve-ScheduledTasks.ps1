@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-ScheduledTasks.ps1
+    Plugin-Name: Retrieve-ScheduledTasks.ps1
     
 .Description
     This plugin is used to collect scheduled task configuration files from
@@ -36,7 +36,7 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession[]]$Session,
+    [System.Management.Automation.Runspaces.PSSession]$Session,
 
     [Parameter(Mandatory=$false,Position=1)]
     [string]$TaskName

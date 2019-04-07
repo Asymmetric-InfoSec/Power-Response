@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-AutoRuns.ps1
+    Plugin-Name: Retrieve-AutoRuns.ps1
     
 .Description
     This plugin gathers Auto Start Execution Points from one or several hosts
@@ -42,7 +42,6 @@
     Autorunsc
 
 .EXAMPLE
-    Collect-AutoRuns.ps1 -ComputerName Test-PC
 
     PowerResponse Execution
     Set ComputerName Test-PC
@@ -62,52 +61,33 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [string[]]$ComputerName
+    [System.Management.Automation.Runspaces.PSSession]$Session
 
     )
 
 process{
 
-    #Get the root Power-Response directory - Assumes that the plugin is located in the plugins/ASEP directory
-    $PRRoot = (Get-Item $PSScriptRoot).parent.parent.FullName
-
     #Autorunsc executable locations
-    $Autorunsc64 = "$PRRoot\Bin\autorunsc64.exe"
-    $Autorunsc32 = "$PRRoot\Bin\autorunsc.exe"
+    $Autorunsc64 = ("{0}\autorunsc64.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $Autorunsc32 = ("{0}\autorunsc.exe" -f $global:PowerResponse.Config.Path.Bin)
 
     #Verify binaries exist in Bin
     $64bitTestPath = Get-Item -Path $Autorunsc64 -ErrorAction SilentlyContinue
     $32bitTestPath = Get-Item -Path $Autorunsc32 -ErrorAction SilentlyContinue
 
-    if (-not $64bitTestPath) {
+    if (!$64bitTestPath) {
 
         Throw "Autorunsc64.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
 
-    } elseif (-not $32bitTestPath) {
+    } elseif (!$32bitTestPath) {
 
         Throw "Autorunsc.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-
-    }
-
-    #Loop through machines in $ComputerName to obtain data for each machine (if multiple machines are specified)
-    foreach ($Computer in $ComputerName) {
-
-    #Handle $ComputerName defined as localhost and not break the Plugin
-    if ($Computer -eq "Localhost") {
-
-        $Computer = $ENV:ComputerName
-    }
-    
-    #Verify machine is online and ready for data collection
-    if (-not (Test-Connection -ComputerName $Computer -Count 1 -Quiet)) {
-        
-        Write-Error ("{0} appears to be offline. Cannot gather ASEP data." -f $Computer)
-        Continue
     }
 
     #Determine system architecture and select proper Autorunsc executable
     try {
-        $Architecture = (Get-WmiObject -ComputerName $Computer -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
+
+        $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
         
         if ($Architecture -eq "64-bit") {
 
@@ -119,51 +99,53 @@ process{
 
         } else {
             
-            Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Computer)
+            Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Session.ComputerName)
             Continue
         }
     } catch {
         
-        Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Computer)
+        Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Session.ComputerName)
         Continue
     }
 
     #Copy Autorunsc to remote host
-    $SmbPath = ("\\{0}\c`$\ProgramData\{1}" -f $Computer, (Split-Path -Path $Installexe -Leaf))
+    $RemotePath = ("C:\ProgramData\{0}") -f (Split-Path $Installexe -Leaf)
+
     try {
         
-        Copy-Item -Path $Installexe -Destination $SmbPath -ErrorAction Stop
-        $RemoteFile = Get-Item -Path $SmbPath -ErrorAction Stop
+        Copy-Item -Path $Installexe -Destination $RemotePath -ToSession $Session -ErrorAction Stop
+        
+        $RemoteFile = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $($args[0]) -ErrorAction Stop} -ArgumentList $RemotePath
 
         # verify that the file copy succeeded to the remote host
-        if (-not $RemoteFile) {
+        if (!$RemoteFile) {
             
-            Write-Error ("Remote file not found on {0}. There may have been a problem during the copy process. Data was not gathered." -f $Computer)
+            Write-Error ("Remote file not found on {0}. There may have been a problem during the copy process. Data was not gathered." -f $Session.ComputerName)
             Continue
         }
+
     } catch {
         
-        Write-Error ("An unexpected error occurred while copying Autorunsc to {0}. Data was not gathered" -f $Computer)
+        Write-Error ("An unexpected error occurred while copying Autorunsc to {0}. Data was not gathered" -f $Session.ComputerName)
         Continue
     }
 
 
     #Run Autorunsc on the remote host and collect ASEP data
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} /accepteula -a * -h -nobanner -vt -s -t -c *") -f (Split-Path -Path $Installexe -Leaf))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0} /accepteula -a * -h -nobanner -vt -s -t -c *") -f ($RemotePath))
     
-    Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock | ConvertFrom-CSV
+    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | ConvertFrom-CSV
 
     
     #Remove Autorunsc from remote host
     try {
-            Remove-Item -Path $SmbPath -Force -ErrorAction Stop
+            
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item {0} -Force -ErrorAction Stop") -f ($RemotePath))
+            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
             
         } catch {
             
-            Write-Error ("Unable to remove the Autoruns executable from {0}. The file will need to be removed manually." -f $Computer)
+            Write-Error ("Unable to remove the Autoruns executable from {0}. The file will need to be removed manually." -f $Session.ComputerName)
             Continue
-        }
-
     }
-
 }

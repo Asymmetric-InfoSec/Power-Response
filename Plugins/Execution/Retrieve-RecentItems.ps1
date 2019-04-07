@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-RecentItems.ps1
+    Plugin-Name: Retrieve-RecentItems.ps1
     
 .Description
     Collects shortcuts (lnk files) from Recent Items (%UserProfile\AppData\Roaming\Microsoft\Windows\Recent)
@@ -27,7 +27,7 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession[]]$Session,
+    [System.Management.Automation.Runspaces.PSSession]$Session,
 
     [Parameter(Mandatory=$false,Position=1)]
     [string[]]$RecentItemName

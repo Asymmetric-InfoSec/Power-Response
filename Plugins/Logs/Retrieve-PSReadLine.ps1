@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-PSReadLine.ps1
+    Plugin-Name: Retrieve-PSReadLine.ps1
     
 .Description
 
@@ -30,7 +30,7 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession[]]$Session
+    [System.Management.Automation.Runspaces.PSSession]$Session
 
     )
 
@@ -46,7 +46,7 @@ process{
 
     # Get all user profiles on the PC if default, continue if not 
     $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Get-ChildItem C:\Users")
-    $UserProfiles = Invoke-Command -ComputerName $Computer -ScriptBlock $ScriptBlock
+    $UserProfiles = Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
 
     # Retrieve the consolehost_history file for all users on the machine
     Foreach ($UserProfile in $UserProfiles){

@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-Handles.ps1
+    Plugin-Name: Retrieve-Handles.ps1
     
 .Description
 
@@ -28,7 +28,7 @@
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession[]]$Session
+    [System.Management.Automation.Runspaces.PSSession]$Session
 
     )
 
