@@ -51,20 +51,20 @@ process{
     $AnalysisDate = ($AnalyzeDate.ToString('yyyy-MM-dd'))
 
     #Verify that bin dependencies are met
-    $TestBin = Test-Path ("{0}\PEcmd.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $TestBin = Test-Path ("{0}\PEcmd.exe" -f (Get-PRPath -Bin))
 
     if (!$TestBin){
 
-        Throw "PECmd not found in {0}. Place executable in binary directory and try again." -f $global:PowerResponse.Config.Path.Bin
+        Throw "PECmd not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
     }
 
     #Build list of hosts that have been analyzed with Power-Response
-    $Machines = Get-ChildItem $global:PowerResponse.Config.Path.Output
+    $Machines = Get-ChildItem (Get-PRPath -Output)
 
     #Loop through and analyze prefetch files, while skipping if the analysis directory exists
-    foreach ($Machine in $Machines){
+    foreach ($ComputerName in $Session.ComputerName){
         #Path to verify for existence before processing prefetch
-        $PrefetchPath = ("{0}\{1}\{2}\Prefetch\") -f $global:PowerResponse.Config.Path.Output,$Machine,$AnalysisDate
+        $PrefetchPath = ("{0}\{1}\Execution\Prefetch\") -f (Get-PRPath -ComputerName $ComputerName)
         
         #Determine if prefetch output directory exists
         if (Test-Path $PrefetchPath){
@@ -78,7 +78,7 @@ process{
                 New-Item -Type Directory -Path $PrefetchProcessed | Out-Null
 
                 #Process Prefetch and store in analysis directory
-                $Command = ("{0}\PECmd.exe -d {1} --csv {2}") -f $global:PowerResponse.Config.Path.Bin,$PrefetchPath,$PrefetchProcessed
+                $Command = ("{0}\PECmd.exe -d {1} --csv {2}") -f (Get-PRPath -Bin),$PrefetchPath,$PrefetchProcessed
 
                 Invoke-Expression -Command $Command | Out-Null
 

@@ -47,11 +47,11 @@ process{
         New-Item -Type Directory -Path $Output | Out-Null
     }
 
-    # Verify that 7za and winpmem executables are located in $global:PowerResponse.Config.Path.Bin
+    # Verify that 7za and winpmem executables are located in (Get-PRPath -Bin)
 
-    $7za32 = ("{0}\7za_x86.exe" -f $global:PowerResponse.Config.Path.Bin)
-    $7za64 = ("{0}\7za_x64.exe" -f $global:PowerResponse.Config.Path.Bin)
-    $Winpmem = ("{0}\winpmem.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
+    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
+    $Winpmem = ("{0}\winpmem.exe" -f (Get-PRPath -Bin))
 
     $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
     $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue

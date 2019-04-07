@@ -35,17 +35,17 @@ param (
 process {
 
 	#Verify that bin dependencies are met
-    $Bin_32 = ("{0}\handle.exe" -f $global:PowerResponse.Config.Path.Bin)
-    $Bin_64 = ("{0}\handle64.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $Bin_32 = ("{0}\handle.exe" -f (Get-PRPath -Bin))
+    $Bin_64 = ("{0}\handle64.exe" -f (Get-PRPath -Bin))
 
     if (!(Test-Path $Bin_32)){
 
-        Throw "handle.exe not found in {0}. Place executable in binary directory and try again." -f $global:PowerResponse.Config.Path.Bin
+        Throw "handle.exe not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
     }
 
     if (!(Test-Path $Bin_64)){
 
-        Throw "handle64.exe not found in {0}. Place executable in binary directory and try again." -f $global:PowerResponse.Config.Path.Bin
+        Throw "handle64.exe not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
     }
 
     #Determine remote system architecture

@@ -68,8 +68,8 @@ param (
 process{
 
     #Autorunsc executable locations
-    $Autorunsc64 = ("{0}\autorunsc64.exe" -f $global:PowerResponse.Config.Path.Bin)
-    $Autorunsc32 = ("{0}\autorunsc.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $Autorunsc64 = ("{0}\autorunsc64.exe" -f (Get-PRPath -Bin))
+    $Autorunsc32 = ("{0}\autorunsc.exe" -f (Get-PRPath -Bin))
 
     #Verify binaries exist in Bin
     $64bitTestPath = Get-Item -Path $Autorunsc64 -ErrorAction SilentlyContinue
