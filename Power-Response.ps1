@@ -541,161 +541,39 @@ function Invoke-RunCommand {
                 $SessionParameters.Credential = $script:PowerResponse.Parameters.Credential
             }
 
-            # Create the $Sessions array
-            $Sessions = New-PSSession @SessionParameters
+            try {
+                # Create the $Sessions array
+                $Session = New-PSSession @SessionParameters
+            } catch {
+                # Format warning $Message
+                $Message = 'Error creating Session: {0}' -f $PSItem
+
+                # Write warning $Message
+                Write-Warning -Message ("{0}`n`tSkipping plugin execution" -f $Message)
+
+                # Write log $Message
+                Write-Log -Message $Message
+
+                return
+            }
+
+            # Format execution $Message
+            $Message = 'Plugin Execution Started at {0}' -f (Get-Date)
 
             # Write execution to host
-            Write-Host -Object ('Plugin Execution Started at {0}' -f (Get-Date))
+            Write-Host -Object $Message
 
             # Write execution log
-            Write-Log -Message ('Began execution with Parameters: ''{0}''' -f ($ReleventParameters.Keys -Join ''', '''))
+            Write-Log -Message $Message
 
-            # If $CommandParameters doesn't contain 'Session'
-            if ($CommandParameters.Keys -NotContains 'Session') {
-                # Clear $Error log
-                $Error.Clear()
-
-                # Compile $InvokeCommandParameters HashTable
-                $InvokeCommandParameters = @{
-                    ArgumentList = $CommandParameters.Keys | Foreach-Object { $script:PowerResponse.Parameters.$PSItem }
-                    AsJob = $true
-                    FilePath = $script:PowerResponse.Location.FullName
-                    JobName = $script:PowerResponse.Location.BaseName
-                    Session = $Sessions
-                    ThrottleLimit = $script:PowerResponse.Config.ThrottleLimit
-                }
-
-                try {
-                    # Invoke the script file as a $Job with the $ArgumentList
-                    $Job = Invoke-Command @InvokeCommandParameters
-                } catch {
-                    # Format remoting warning $Message
-                    $Message = 'Plugin Job Creation Error: {0}' -f $PSItem
-
-                    # Write warning $Message
-                    Write-Warning -Message $Message
-
-                    # Write log $Message
-                    Write-Log -Message $Message
-                }
-
-                # If we successfully created the $Job
-                if ($Job) {
-                    # Wait for the $Job to complete
-                    $null = Wait-Job -Job $Job
-
-                    # Receive the $Results of the $Job and group them by PSComputerName
-                    $Results = Receive-Job -Job $Job -ErrorAction 'SilentlyContinue' | Group-Object -Property 'PSComputerName'
-
-                    # Loop through $Result groups
-                    foreach ($Result in $Results) {
-                        # Send each $Result to it's specific PR output file based on ComputerName
-                        $Result.Group | Out-PRFile -ComputerName $Result.Name -Plugin $script:PowerResponse.Location
-
-                        # Format the remote execution success $Message
-                        $Message = 'Plugin Execution Succeeded for {0}' -f $Result.Name
-
-                        # Write host $Message
-                        Write-Host -Object $Message
-
-                        # Write log $Message
-                        Write-Log -Message $Message
-                    }
-
-                    # Gather the $RemoteError
-                    $RemoteErrors = $Error | Where-Object { $PSItem -is [System.Management.Automation.Runspaces.RemotingErrorRecord] }
-
-                    foreach ($RemoteError in $RemoteErrors) {
-                        # Format the remote error $Message
-                        $Message = 'Plugin Execution Error for {0}: {1}' -f $RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
-
-                        # Write warning $Message
-                        Write-Warning -Message $Message
-
-                        # Write log $Message
-                        Write-Log -Message $Message
-                    }
-
-                    # Remove the $Job
-                    Remove-Job -Job $Job
-                }
-            } else {
-                # Initialize $ReleventParameters Hashtable
-                $ReleventParameters = @{}
-
-                # Parse the $ReleventParameters from $script:PowerResponse.Parameters
-                $script:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
-
-                # Loop through tracked $Sessions
-                foreach ($Session in $Sessions) {
-                    # Set $ReleventParameters.Session to the current $Session
-                    $ReleventParameters.Session = $Session
-
-                    try {
-                        # Execute the $script:PowerResponse.Location with the $ReleventParameters
-                        & $script:PowerResponse.Location.FullName @ReleventParameters | Out-PRFile -ComputerName $Session.ComputerName -Plugin $script:PowerResponse.Location
-
-                        # Format host success $Message
-                        $Message = 'Plugin Execution Succeeded for {0} at {1}' -f $Session.ComputerName, (Get-Date)
-
-                        # Write execution success message
-                        Write-Host -Object $Message
-                    } catch {
-                        # Format warning $Message
-                        $Message = 'Plugin Execution Error for {0}: {1}' -f $Session.ComputerName,$PSItem
-
-                        # Write warning $Message to screen along with some admin advice
-                        Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
-                    }
-
-                    # Write execution $Message to log
-                    Write-Log -Message $Message
-                }
-            }
-
-            # Compute $AnalysisPath
-            $AnalysisPath = '{0}\Analysis\{1}' -f (Get-PRPath -Plugins),($script:PowerResponse.Location.Name -Replace 'Collect-','Analyze-')
-
-            # If auto execution of analysis plugins is set
-            if ($script:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $script:PowerResponse.Location.FullName -and (Test-Path -Path $AnalysisPath)) {
-                Write-Host -Object ('Analysis Plugin Execution Started at {0}' -f (Get-Date))
-
-                # Gather to $AnalysisPath's $AnalysisParameters
-                $AnalysisParameters = Get-Command -Name $AnalysisPath | Select-Object -ExpandProperty 'Parameters'
-
-                # Initialize $AnalysisParametersParameters Hashtable
-                $ReleventParameters = @{}
-
-                # Parse the $AnalysisParameters from $script:PowerResponse.Parameters
-                $script:PowerResponse.Parameters.GetEnumerator() | Where-Object { $AnalysisParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
-
-                try {
-                    # Execute the plugin at $AnalysisPath
-                    & $AnalysisPath @ReleventParameters | Out-PRFile -ComputerName $Session.ComputerName -Plugin $AnalysisPath
-
-                    # Format $Message
-                    $Message = 'Automatically executed analysis plugin {0} for collection plugin {1}' -f $AnalysisPath,$script:PowerResponse.Location.FullName
-
-                    # Write execution $Message to verbose stream
-                    Write-Verbose -Message $Message
-
-                } catch {
-                    # Format warning $Message
-                    $Message = 'Analysis plugin execution error for {0}: {1}' -f $Session.ComputerName,$PSItem
-
-                    # Write warning $Message to screen
-                    Write-Warning -Message $Message
-                }
-
-                # Write execution $Message to log
-                Write-Log -Message $Message
-            }
+            # Invoke the PR Plugin
+            Invoke-PRPlugin -Path $script:PowerResponse.Location -Session $Session
 
             # Protect any files that were copied to this particular $script:PowerResponse.OutputPath
             Protect-PRFile
 
             # Clean up the created $Sessions
-            Remove-PSSession -Session $Sessions
+            Remove-PSSession -Session $Session
 
             # Write plugin execution completion message and verify with input prior to clearing
              Write-Host -Object ('Plugin execution complete at {0}' -f (Get-Date))
@@ -858,6 +736,168 @@ function Invoke-PRCommand {
     }
 }
 
+function Invoke-PRPlugin {
+    [CmdletBinding(DefaultParameterSetName='Path')]
+    param (
+        [Parameter(Mandatory=$true,ParameterSetName='Path')]
+        [String]$Path,
+
+        [Parameter(Mandatory=$true,ParameterSetName='Name')]
+        [String]$Name,
+
+        [Parameter(Mandatory=$true)]
+        [System.Management.Automation.Runspaces.PSSession[]]$Session
+    )
+
+    begin {
+        # Collapse $Name parameter into $Path
+        if ($PSCmdlet.ParameterSetName -eq 'Name') {
+            # Search through the Plugins directory for a matching file $Name
+            $Path = Get-ChildItem -Recurse -File -Path (Get-PRPath -Plugins) | Where-Object { $PSItem.Name -eq $Name -or $PSItem.BaseName -eq $Name } | Select-Object -First 1 -ExpandProperty 'FullName'
+        }
+
+        # Ensure we have a valid $Path
+        if (!$Path -or !(Test-Path -Path $Path)) {
+            # Format error $Message
+            $Message = 'Empty or invalid plugin identifier passed: {0}' -f (@($PSBoundParameters.Name,$PSBoundParameters.Path) -Join '')
+
+            # Write error $Message
+            Write-Error -Message $Message
+
+            # Write log $Message
+            Write-Log -Message $Message
+
+            return
+        }
+
+        # Get the FileInfo $Item
+        $Item = Get-Item -Path $Path
+
+        # Gather to $Path's $CommandParameters
+        $CommandParameters = Get-Command -Name $Path | Select-Object -ExpandProperty 'Parameters'
+
+
+    }
+
+    process {
+        # If $CommandParameters doesn't contain 'Session'
+        if ($CommandParameters.Keys -NotContains 'Session') {
+            # Clear $Error log
+            $Error.Clear()
+
+            # Compile $InvokeCommandParameters HashTable
+            $InvokeCommandParameters = @{
+                ArgumentList = $CommandParameters.Keys | Foreach-Object { $script:PowerResponse.Parameters.$PSItem }
+                AsJob = $true
+                FilePath = $Path
+                JobName = Get-Item -Path $Path | Select-Object -ExpandProperty 'BaseName'
+                Session = $Session
+                ThrottleLimit = $script:PowerResponse.Config.ThrottleLimit
+            }
+
+            try {
+                # Invoke the script file as a $Job with the $ArgumentList
+                $Job = Invoke-Command @InvokeCommandParameters
+            } catch {
+                # Format remoting warning $Message
+                $Message = 'Plugin Job Creation Error: {0}' -f $PSItem
+
+                # Write warning $Message
+                Write-Warning -Message $Message
+
+                # Write log $Message
+                Write-Log -Message $Message
+            }
+
+            # If we successfully created the $Job
+            if ($Job) {
+                # Wait for the $Job to complete
+                $null = Wait-Job -Job $Job
+
+                # Receive the $Results of the $Job and group them by PSComputerName
+                $Results = Receive-Job -Job $Job -ErrorAction 'SilentlyContinue' | Group-Object -Property 'PSComputerName'
+
+                # Loop through $Result groups
+                foreach ($Result in $Results) {
+                    # Send each $Result to it's specific PR output file based on ComputerName
+                    $Result.Group | Out-PRFile -ComputerName $Result.Name -Plugin $Path
+
+                    # Format the remote execution success $Message
+                    $Message = 'Plugin Execution Succeeded for {0}' -f $Result.Name
+
+                    # Write host $Message
+                    Write-Host -Object $Message
+
+                    # Write log $Message
+                    Write-Log -Message $Message
+                }
+
+                # Gather the $RemoteError
+                $RemoteErrors = $Error | Where-Object { $PSItem -is [System.Management.Automation.Runspaces.RemotingErrorRecord] }
+
+                foreach ($RemoteError in $RemoteErrors) {
+                    # Format the remote error $Message
+                    $Message = 'Plugin Execution Error for {0}: {1}' -f $RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
+
+                    # Write warning $Message
+                    Write-Warning -Message $Message
+
+                    # Write log $Message
+                    Write-Log -Message $Message
+                }
+
+                # Remove the $Job
+                Remove-Job -Job $Job
+            }
+        } else {
+            # Initialize $ReleventParameters Hashtable
+            $ReleventParameters = @{}
+
+            # Parse the $ReleventParameters from $script:PowerResponse.Parameters
+            $script:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
+
+            # Loop through $Session
+            foreach ($SessionInstance in $Session) {
+                # Set $ReleventParameters.Session to the current $SessionInstance
+                $ReleventParameters.Session = $SessionInstance
+
+                try {
+                    # Execute the $Path with the $ReleventParameters
+                    & $Path @ReleventParameters | Out-PRFile -ComputerName $SessionInstance.ComputerName -Plugin $Path
+
+                    # Format host success $Message
+                    $Message = 'Plugin Execution Succeeded for {0} at {1}' -f $SessionInstance.ComputerName, (Get-Date)
+
+                    # Write execution success message
+                    Write-Host -Object $Message
+                } catch {
+                    # Format warning $Message
+                    $Message = 'Plugin Execution Error for {0}: {1}' -f $SessionInstance.ComputerName,$PSItem
+
+                    # Write warning $Message to screen along with some admin advice
+                    Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
+                }
+
+                # Write execution $Message to log
+                Write-Log -Message $Message
+            }
+        }
+    }
+
+    end {
+        # Compute $AnalysisPath
+        $AnalysisPath = '{0}\Analysis\{1}' -f (Get-PRPath -Plugins),($Path -Replace '.+-','Analyze-')
+
+        # If auto execution of analysis plugins is set and we have a valid $AnalysisPath
+        if ($script:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $Path -and (Test-Path -Path $AnalysisPath)) {
+            Write-Host -Object 'Detected Analysis Plugin'
+
+            # Invoke the $AnalysisPath plugin
+            Invoke-PRPlugin -Path $AnalysisPath -Session $Session
+        }
+    }
+}
+
 function Out-PRFile {
     param (
         [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
@@ -889,7 +929,7 @@ function Out-PRFile {
         $null = $PSBoundParameters.Remove('Append')
 
         # Get $OutputPath with remaining $PSBoundParameters
-        $OutputPath = Get-PROutputPath @PSBoundParameters
+        $OutputPath = Get-PRPath @PSBoundParameters
 
         # Initialize $Objects array for pipeline handling
         $Objects = @()
