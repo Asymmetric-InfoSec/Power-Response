@@ -70,7 +70,7 @@ process{
     }
 
     # Set $Output for where to store recovered artifacts
-    $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'ShimCache')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'ShimCache')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
     If (!(Test-Path $Output)){

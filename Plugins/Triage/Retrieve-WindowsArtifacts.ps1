@@ -109,7 +109,7 @@ process{
     }
 
     # Set $Output for where to store recovered artifacts
-    $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'Artifacts')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'Artifacts')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
     If (!(Test-Path $Output)){
