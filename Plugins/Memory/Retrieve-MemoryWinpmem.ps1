@@ -39,7 +39,7 @@ param (
 process{
 
     # Set $Output for where to store recovered memory
-    $Output= Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'Memory'
+    $Output= Get-PRPath -ComputerName $Session.ComputerName -Directory 'Memory'
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing memory
     If (!(Test-Path $Output)) {

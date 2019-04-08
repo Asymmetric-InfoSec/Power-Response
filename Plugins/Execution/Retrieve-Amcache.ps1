@@ -75,7 +75,7 @@ process{
     }
 
     # Set $Output for where to store recovered artifacts
-    $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'Amcache')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'Amcache')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
     If (!(Test-Path $Output)){
