@@ -69,8 +69,8 @@ param (
 process{
 
     # Sigcheck executable locations
-    $Sigcheck64 = ("{0}\sigcheck64.exe" -f $global:PowerResponse.Config.Path.Bin)
-    $Sigcheck32 = ("{0}\sigcheck.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $Sigcheck64 = ("{0}\sigcheck64.exe" -f (Get-PRPath -Bin))
+    $Sigcheck32 = ("{0}\sigcheck.exe" -f (Get-PRPath -Bin))
 
     # Verify binaries exist in Bin
     $64bitTestPath = Get-Item -Path $Sigcheck64 -ErrorAction SilentlyContinue

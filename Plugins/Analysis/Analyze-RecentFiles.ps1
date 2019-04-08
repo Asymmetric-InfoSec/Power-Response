@@ -50,11 +50,11 @@ process{
     $AnalysisDate = ($AnalyzeDate.ToString('yyyy-MM-dd'))
 
     #Verify that bin dependencies are met
-    $TestBin = Test-Path ("{0}\LECmd.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $TestBin = Test-Path ("{0}\LECmd.exe" -f (Get-PRPath -Bin))
 
     if (!$TestBin){
 
-        Throw "LECmd not found in {0}. Place executable in binary directory and try again." -f $global:PowerResponse.Config.Path.Bin
+        Throw "LECmd not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
     }
 
     #Build list of hosts that have been analyzed with Power-Response
@@ -85,7 +85,7 @@ process{
                     New-Item -Type Directory -Path $RecentItemsProcessed | Out-Null
 
                     #Process Prefetch and store in analysis directory
-                    $Command = ("{0}\LECmd.exe -d {1} --csv {2}") -f $global:PowerResponse.Config.Path.Bin,$RecentItemsData,$RecentItemsProcessed
+                    $Command = ("{0}\LECmd.exe -d {1} --csv {2}") -f (Get-PRPath -Bin),$RecentItemsData,$RecentItemsProcessed
 
                     Invoke-Expression -Command $Command | Out-Null
 

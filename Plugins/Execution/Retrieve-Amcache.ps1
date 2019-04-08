@@ -40,10 +40,10 @@ param (
 
 process{
 
-    # Verify that 7za executables are located in $global:PowerResponse.Config.Path.Bin
+    # Verify that 7za executables are located in (Get-PRPath -Bin)
 
-    $7za32 = ("{0}\7za_x86.exe" -f $global:PowerResponse.Config.Path.Bin)
-    $7za64 = ("{0}\7za_x64.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
+    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
 
     $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
     $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
@@ -57,10 +57,10 @@ process{
         Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
     }
 
-    #Verify that Velociraptor executables are located in $global:PowerREsponse.Config.Path.Bin (For locked files)
+    #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
 
-    $Velo_64 = ("{0}\Velociraptor-amd64.exe" -f $global:PowerResponse.Config.Path.Bin)
-    $Velo_32 = ("{0}\Velociraptor-386.exe" -f $global:PowerResponse.Config.Path.Bin)
+    $Velo_64 = ("{0}\Velociraptor-amd64.exe" -f (Get-PRPath -Bin))
+    $Velo_32 = ("{0}\Velociraptor-386.exe" -f (Get-PRPath -Bin))
 
     $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
     $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue

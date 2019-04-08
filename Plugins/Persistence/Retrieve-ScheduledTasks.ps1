@@ -46,7 +46,7 @@ param (
 process{
 
     # Set $Output for where to store recovered scheduled task files
-    $Output= (Get-PROutputPath -ComputerName $Session.ComputerName -Directory 'ScheduledTasks')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'ScheduledTasks')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing scheduled tasks
     If (-not (Test-Path $Output)) {
