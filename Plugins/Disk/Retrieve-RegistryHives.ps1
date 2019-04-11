@@ -21,6 +21,7 @@
     %SYSTEMROOT%\System32\config\SECURITY
     %SYSTEMROOT%\System32\config\SECURITY.LOG1
     %SYSTEMROOT%\System32\config\SECURITY.LOG2
+    %SYSTEMROOT%\System32\config\RegBack\*
 
     %UserProfile%\NTUSER.DAT
     %UserProfile%\NTUSER.DAT.LOG1
@@ -186,7 +187,8 @@ process{
         "$env:SystemRoot\System32\config\SOFTWARE.LOG2",
         "$env:SystemRoot\System32\config\SECURITY",
         "$env:SystemRoot\System32\config\SECURITY.LOG1",
-        "$env:SystemRoot\System32\config\SECURITY.LOG2"
+        "$env:SystemRoot\System32\config\SECURITY.LOG2",
+        "$env:SystemRoot\System32\config\*"
 
     )
            

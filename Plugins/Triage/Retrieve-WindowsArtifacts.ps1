@@ -34,6 +34,7 @@
     %SYSTEMROOT%\System32\winevt\logs
     %PROGRAMDATA%\Microsoft\Search\Data\Applications\Windows
     %PROGRAMDATA%\Microsoft\Windows\Start Menu\Programs\Startup
+    %SYSTEMROOT%\System32\config\RegBack\
 
     User Artifacts:
     %UserProfile%\NTUSER.DAT
@@ -214,7 +215,8 @@ process{
         "$env:SystemRoot\System32\winevt\logs\*",
         "$env:SystemRoot\system32\sru\SRUDB.dat",
         "$env:ProgramData\Microsoft\Search\Data\Applications\Windows\*",
-        "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\*"
+        "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\*",
+        "$env:SystemRoot\System32\config\RegBack\*"
 
     )
            
