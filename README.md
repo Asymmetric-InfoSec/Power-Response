@@ -79,6 +79,7 @@ We use the following executables from Eric's tools that can be found at https://
 1. `PECmd`
 2. `JLECmd`
 3. `LECmd`
+4. `MFTECmd`
 
 Huge shout out to Eric and his tools! They make easy analysis work of the data that Power-Response collects.
 
