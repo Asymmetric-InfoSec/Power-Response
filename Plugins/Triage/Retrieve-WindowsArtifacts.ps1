@@ -14,6 +14,10 @@
 
     System Artifacts:
     %SystemDrive%\$MFT
+    %SystemDrive%\$Boot
+    %SystemDrive%\$Secure:SDS
+    %SystemDrive%\$LogFile
+    %SystemDrive%\$Extend\$UsnJrnl:$J
     %SYSTEMROOT%\Tasks
     %SYSTEMROOT%\System32\Tasks
     %SYSTEMROOT%\Prefetch
@@ -35,6 +39,7 @@
     %PROGRAMDATA%\Microsoft\Search\Data\Applications\Windows
     %PROGRAMDATA%\Microsoft\Windows\Start Menu\Programs\Startup
     %SYSTEMROOT%\System32\config\RegBack\
+    %SYSTEMROOT%\$Recycle.Bin\*
 
     User Artifacts:
     %UserProfile%\NTUSER.DAT
@@ -195,6 +200,10 @@ process{
     $SystemArtifacts = @(
 
         "$env:SystemDrive\```$MFT",
+        "$env:SystemDrive\```$Boot",
+        "$env:SystemDrive\```$Secure:```$SDS",
+        "$env:SystemDrive\```$LogFile",
+        "$env:SystemDrive\```$Extend\```$UsnJrnl:```$J",
         "$env:SystemRoot\Tasks\*",
         "$env:SystemRoot\System32\Tasks\*",
         "$env:SystemRoot\Prefetch\*",
@@ -214,9 +223,9 @@ process{
         "$env:SystemRoot\System32\drivers\etc\hosts",
         "$env:SystemRoot\System32\winevt\logs\*",
         "$env:SystemRoot\system32\sru\SRUDB.dat",
+        "$env:SystemRoot\System32\config\RegBack\*",
         "$env:ProgramData\Microsoft\Search\Data\Applications\Windows\*",
-        "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\*",
-        "$env:SystemRoot\System32\config\RegBack\*"
+        "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\*"
 
     )
            
@@ -255,6 +264,15 @@ process{
             Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
         }
      
+    }
+
+    #Collect Contents of Recycle binaries
+    $SIDS = Get-ChildItem -Path 'C:\$Recycle.Bin' -Force | Select -ExpandProperty Name
+
+    foreach ($SID in $SIDS){
+
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& C:\ProgramData\{0} fs --accessor ntfs cp \\.\C:\`$Recycle.Bin\{1}\* C:\ProgramData\{2}') -f ((Split-Path $Velo_exe -Leaf), $SID, $Session.ComputerName))
+        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
     }
         
     # Compress artifacts directory      
