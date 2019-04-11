@@ -1,16 +1,16 @@
-﻿<#
+<#
 
 .SYNOPSIS
-    Plugin-Name: Retrieve-MFT.ps1
+    Plugin-Name: Retrieve-RecycleBins.ps1
     
 .Description
-    This plugin collects the $MFT from a remote system. The file is copied by pushing 
-    the Velociraptor binary to the the remote system, where it copies the files to 
-    C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied to the system, to then zip 
-    the directory containing the MFT before moving them back to your local system for 
-    further analysis and processing. This plugin will remove the Velociraptor, 7zip PE, 
-    and all locally created files after successfully pulling the artifacts back to the 
-    output destination in Power-Response.
+    This plugin collects the $Recycle.Bin contents (recursively) from a remote system. 
+    The file is copied by pushing the Velociraptor binary to the the remote system, 
+    where it copies the files to C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied
+    to the system, to then zip the directory containing the MFT before moving them back 
+    to your local system for further analysis and processing. This plugin will remove
+    the Velociraptor, 7zip PE, and all locally created files after successfully pulling
+    the artifacts back to the output destination in Power-Response.
 
 .EXAMPLE
 
@@ -20,13 +20,13 @@
     Run
 
 .NOTES
-    Author: Matt Weikert
-    Date Created: 2/18/2019
-    Twitter: @5k33tz
-    
-    Last Modified By: Drew Schmitt
-    Last Modified Date: 4/5/2019
+    Author: Drew Schmitt
+    Date Created: 4/10/2019
     Twitter: @5ynax
+    
+    Last Modified By: 
+    Last Modified Date: 
+    Twitter: 
   
 #>
 
@@ -74,7 +74,7 @@ process{
     }
 
     # Set $Output for where to store recovered artifacts
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'MFT')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'RecycleBin')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
     If (!(Test-Path $Output)){
@@ -156,26 +156,22 @@ process{
     }
 
     #Collect System Artifacts    
-    $SystemArtifacts = @(
-
-        "$env:SystemDrive\```$MFT"
-    
-     )
+    $SIDS = Get-ChildItem -Path 'C:\$Recycle.Bin' -Force | Select -ExpandProperty Name
            
-    foreach ($Artifact in $SystemArtifacts){
+    foreach ($SID in $SIDS){
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& C:\ProgramData\{0} fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}') -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& C:\ProgramData\{0} fs --accessor ntfs cp \\.\C:\`$Recycle.Bin\{1}\* C:\ProgramData\{2}') -f ((Split-Path $Velo_exe -Leaf), $SID, $Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
     }
         
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} a C:\ProgramData\{1}_MFT.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} a C:\ProgramData\{1}_RecycleBin.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)
     try {
 
-        Copy-Item -Path (("C:\ProgramData\{0}_MFT.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
+        Copy-Item -Path (("C:\ProgramData\{0}_RecycleBin.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
 
     } catch {
 
@@ -183,7 +179,7 @@ process{
     }
     
     # Delete initial artifacts, 7za, and velociraptor binaries from remote machine
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}, C:\ProgramData\{1}, C:\ProgramData\{2}_MFT.zip, C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), (Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}, C:\ProgramData\{1}, C:\ProgramData\{2}_RecycleBin.zip, C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), (Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
 }
