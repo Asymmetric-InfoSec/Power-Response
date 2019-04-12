@@ -84,6 +84,7 @@ We use the following executables from Eric's tools that can be found at https://
 6. `AmcacheParser`
 7. `SBECmd`
 8. `RBCmd`
+9. `RECmd`
 
 Huge shout out to Eric and his tools! They make easy analysis work of the data that Power-Response collects.
 
