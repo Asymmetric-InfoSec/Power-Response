@@ -40,7 +40,7 @@ param (
 process{
 
     # Set $Output for where to store recovered prefetch files
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'Jumplists')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('Jumplists_{0:yyyyMMdd}' -f (Get-Date)))
 
     # Create jumplists subdirectory in $global:PowerResponse.OutputPath for storing jumplists
     If (-not (Test-Path $Output)) {
