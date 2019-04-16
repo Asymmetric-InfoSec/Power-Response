@@ -130,3 +130,9 @@ Any output generated will be moved to the **Output** directory and named based o
 At anytime you can execute the `show` command to see what is available to you in a menu or plugin.
 
 #### For a quick video tutorial, take a look at this video
+
+### Contact Information ###
+
+Drew Schmitt - @5ynax (Twitter)
+Matt Weikert - @5k33tz (Twitter)
+Gavin Prentice - @Valrkey (Twitter)
