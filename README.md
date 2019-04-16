@@ -134,5 +134,7 @@ At anytime you can execute the `show` command to see what is available to you in
 ### Contact Information ###
 
 Drew Schmitt - @5ynax (Twitter)
+
 Matt Weikert - @5k33tz (Twitter)
+
 Gavin Prentice - @Valrkey (Twitter)
