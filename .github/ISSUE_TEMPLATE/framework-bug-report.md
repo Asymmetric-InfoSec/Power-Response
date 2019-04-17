@@ -3,7 +3,7 @@ name: Framework Bug report
 about: Create a report to help us improve the Power-Response framework
 title: ''
 labels: bug, framework
-assignees: valrkey
+assignees: ''
 
 ---
 

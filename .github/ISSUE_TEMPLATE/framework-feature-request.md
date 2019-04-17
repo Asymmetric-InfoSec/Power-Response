@@ -3,7 +3,7 @@ name: Framework Feature Request
 about: Suggest an idea for the Power-Response framework
 title: ''
 labels: enhancement, framework
-assignees: valrkey
+assignees: ''
 
 ---
 
