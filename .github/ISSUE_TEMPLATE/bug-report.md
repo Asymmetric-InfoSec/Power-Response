@@ -1,8 +1,8 @@
 ---
-name: Plugin Bug Report
-about: Create a report to help us improve a Power-Response plugin
+name: Bug Report
+about: Create a report to help us improve Power-Response
 title: ''
-labels: bug, plugin
+labels: bug
 assignees: ''
 
 ---
@@ -21,10 +21,13 @@ Steps to reproduce the behavior:
 **Expected behavior**
 A clear and concise description of what you expected to happen.
 
+**Framework vs Plugin**
+Is this a bug in the framework (`Power-Response.ps1`) or a specific plugin?
+
 **Screenshots**
 If applicable, add screenshots to help explain your problem.
 
-**Desktop (please complete the following information):**
+**System (please complete the following information):**
  - OS: [e.g. Windows 10]
  - PowerShell Version [e.g. 5.1]
 
