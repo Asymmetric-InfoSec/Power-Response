@@ -68,6 +68,14 @@ process{
         Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
     }
 
+    #Verify that analysis bin dependencies are met
+    $TestBin = Test-Path ("{0}\MFTECmd.exe" -f (Get-PRPath -Bin))
+
+    if (!$TestBin){
+
+        Throw "MFTECmd not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
+    }
+
      #Determine system architecture and select proper 7za.exe and Velociraptor executables
     try {
      
@@ -83,26 +91,18 @@ process{
 
         } else {
         
-            Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Session.ComputerName)
+            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered.)" -f $Architecture)
             Continue
         }
 
     } catch {
     
-     Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Session.ComputerName)
+     Write-Error ("Unable to determine system architecture. Data was not gathered.")
         Exit
     }
 
     #Format String Properly for use
     $AnalysisDate = ('{0:yyyyMMdd}' -f $AnalyzeDate)
-
-    #Verify that analysis bin dependencies are met
-    $TestBin = Test-Path ("{0}\MFTECmd.exe" -f (Get-PRPath -Bin))
-
-    if (!$TestBin){
-
-        Throw "MFTECmd not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
-    }
 
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem (Get-PRPath -Output)
