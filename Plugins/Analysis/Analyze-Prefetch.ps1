@@ -48,7 +48,7 @@ param (
 process{
 
     #Format String Properly for use
-    $AnalysisDate = ($AnalyzeDate.ToString('yyyy-MM-dd'))
+    $AnalysisDate = ('{0:yyyyMMdd}' -f $AnalyzeDate)
 
     #Verify that bin dependencies are met
     $TestBin = Test-Path ("{0}\PEcmd.exe" -f (Get-PRPath -Bin))
@@ -62,9 +62,10 @@ process{
     $Machines = Get-ChildItem (Get-PRPath -Output)
 
     #Loop through and analyze prefetch files, while skipping if the analysis directory exists
-    foreach ($ComputerName in $Session.ComputerName){
+    foreach ($Machine in $Machines){
+        
         #Path to verify for existence before processing prefetch
-        $PrefetchPath = ("{0}\{1}\Execution\Prefetch\") -f (Get-PRPath -ComputerName $ComputerName)
+        $PrefetchPath = ("{0}\{1}\Execution\Prefetch_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate 
         
         #Determine if prefetch output directory exists
         if (Test-Path $PrefetchPath){

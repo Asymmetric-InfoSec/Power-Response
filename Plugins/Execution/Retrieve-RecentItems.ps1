@@ -37,16 +37,17 @@ param (
 process {
 
     #Set $Output for where to store recovered prefetch files
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'RecentItems')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RecentItems_{0:yyyyMMdd}' -f (Get-Date)))
 
     #Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
     If (-not (Test-Path $Output)) {
+        
         New-Item -Type Directory -Path $Output | Out-Null
     }   
 
     #Get list of users that exist on this process
 
-    $Users = Invoke-Command -Session $Session -Scriptblock{Get-ChildItem "C:\Users\" | ? {@("Public","Default") -NotContains $_.name}}
+    $Users = Invoke-Command -Session $Session -Scriptblock{Get-ChildItem "C:\Users\" | Where-Object {@("Public","Default") -NotContains $_.name}}
 
     #For each user, create directory for storing recent files
 
@@ -64,7 +65,7 @@ process {
         #Get all recent files for user
         if (!$RecentItemName){
 
-            $RecentItemName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent" | ? {!$_.PSISContainer}} -ArgumentList $User -ErrorAction SilentlyContinue
+            $RecentItemName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent" | Where-Object {!$_.PSISContainer}} -ArgumentList $User -ErrorAction SilentlyContinue
 
         }
 
