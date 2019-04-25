@@ -29,64 +29,11 @@ PowerShell Remoting
 
 Power-Response depends on PowerShell remoting. All remote hosts will need to have PowerShell remoting enabled for data collection to be successful.
 
-Download and/or place the follwing dependencies into `BIN`
+### Run the Config Script
 
-#### Sysinternals Tools
+Execute `Config-PR.ps1` located in the Power-Response root directory to satisfy all dependencies
 
-The following Sysinternals tools are required for Sysinternals based plugins:
-
-1. `Autorunsc.exe`
-2. `Autorunsc64.exe`
-3. `Sigcheck.exe`
-4. `Sigcheck64.exe`
-5. `Handle.exe`
-6. `Handle64.exe`
-
-#### Winpmem Memory Acquisition Tool
-
-Winpmem is used for memory acquisition on Windows based machines:
-
-1. Download the most recent release of Winpmem from https://github.com/Velocidex/c-aff4/releases/
-2. Rename the executable to `winpmem.exe`
-3. Move winpmem.exe to `BIN`
-
-Big shout out to Michael Cohen for his work on winpmem!
-
-#### 7-zip Stand Alone Compression Tool
-
-PowerShell (.NET actually) has some native limitations for compression (must be less than 2GB), so we needed to bring in a stand alone tool to do compression on our behalf:
-
-1. Download `7-Zip Extra: standalone console version, 7z DLL, Plugin for Far Manager` from https://www.7-zip.org/download.html
-2. Locate the 64bit executable and rename to `7za_x64.exe`
-3. Locate the 32bit executable and rename to `7za_x86.exe`
-4. Move both executables to `BIN`
-
-#### Velociraptor Stand Alone Tool
-
-To get around locked files, we decided to use the default binary from the Velociraptor project:
-
-1. Download `velociraptor-vx.x.x-windows-4.0-amd64.exe` and `velociraptor-vx.x.x-windows-4.0-386.exe`
-   from https://github.com/Velocidex/velociraptor/releases (Whatever the latest versions are)
-2. Rename the files to `velociraptor-amd64.exe` and `velociraptor-386.exe` respectively
-3. Move executable to `BIN`
-
-Another big shout out to Michael Cohen for his work on Velociraptor!
-
-#### Eric Zimmerman's Tools
-
-We use the following executables from Eric's tools that can be found at https://ericzimmerman.github.io/#!index.md. Download and place in `BIN`.
-
-1. `PECmd`
-2. `JLECmd`
-3. `LECmd`
-4. `MFTECmd`
-5. `AppCompatCacheParser`
-6. `AmcacheParser`
-7. `SBECmd`
-8. `RBCmd`
-9. `RECmd`
-
-Huge shout out to Eric and his tools! They make easy analysis work of the data that Power-Response collects.
+Big shout outs to Eric Zimmerman, Michael Cohen, and the Sysinternals crew for making amazing tools we can incorporate into our framework!
 
 ### Start Power-Response
 
