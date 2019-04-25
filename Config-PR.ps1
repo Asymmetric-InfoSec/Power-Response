@@ -51,6 +51,10 @@ process{
     #Say Hello!
     Write-Host "Starting Configuration"
 
+    #Ensure that all files with alternate data streams are unblocked (for users that download a zip from the repo) to avoid PowerShell from not running Power-Response
+
+    Get-ChildItem -Path $PSScriptRoot -Recurse *.ps1 | Unblock-File
+
     #Verify that Bin exists and is ready for configuration process
 
     $Bin_Test = Test-Path "$PSScriptRoot\Bin"
