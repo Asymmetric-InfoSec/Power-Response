@@ -63,9 +63,9 @@ process {
         }
 
         #Get all recent files for user
-        if (!$RecentItemName){
+        if (!$PSBoundParameters.RecentItemName){
 
-            $RecentItemName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent" | Where-Object {!$_.PSISContainer}} -ArgumentList $User -ErrorAction SilentlyContinue
+            $RecentItemName = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\Users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent" -ErrorAction SilentlyContinue | Where-Object {!$_.PSISContainer}} -ArgumentList $User 
 
         }
 
@@ -77,8 +77,21 @@ process {
             #Copy specified file to $Output
             Copy-Item "C:\Users\$User\AppData\Roaming\Microsoft\Windows\Recent\$File" -Destination "$UserOutput\" -FromSession $Session -Force -ErrorAction SilentlyContinue
 
-            #Set original creation time on copied recent items lnk file
-            (Get-Item "$UserOutput\$File").CreationTime = $CreationTime
+            #Set original creation time on copied recent items lnk file, set to current date if CreationTime is Null
+            if (!($CreationTime)){
+
+                $CreationTime = (Get-Date)
+            }
+
+            try {
+
+                (Get-Item "$UserOutput\$File").CreationTime = $CreationTime
+
+            } catch {
+
+                Write-Warning ("Creation Time could not be set for {0}\{1} on {2}." -f $UserOutput, $File, $Session.ComputerName)
+            }
+            
         }
     }
 }

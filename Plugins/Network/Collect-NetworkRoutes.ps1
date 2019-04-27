@@ -33,6 +33,13 @@ process {
 
     # Get Routing Information
 
-    Get-NetRoute
+    try {
 
+        Get-NetRoute
+
+    } catch { 
+
+        Write-Warning "Could not collect network route information."
+
+    }
 }

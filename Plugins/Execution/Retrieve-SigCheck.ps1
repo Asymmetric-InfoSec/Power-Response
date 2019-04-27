@@ -58,8 +58,8 @@ param (
     [Parameter(Mandatory=$true,Position=0)]
     [System.Management.Automation.Runspaces.PSSession]$Session,
 
-    [Parameter(Mandatory=$true,Position=1)]
-    [string]$Location,
+    [Parameter(Mandatory=$false,Position=1)]
+    [string]$Location = 'C:\Windows',
 
     [Parameter(Mandatory=$false,Position=2)]
     [Switch]$Recurse

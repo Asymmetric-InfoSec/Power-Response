@@ -32,8 +32,17 @@ param (
 
 process {
 
-    # Get Interface Information
+    # Get Interface Information - Win 10 Cmdlet
 
-    Get-NetIPConfiguration
+    try {
+
+        Get-NetIPConfiguration
+
+    } catch {
+
+        Write-Warning "Interface Details could not be collected."
+    }
+
+    
 
 }
