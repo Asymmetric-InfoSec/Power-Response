@@ -125,16 +125,16 @@ process{
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem (Get-PRPath -Output)
 
-    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
+    #Loop through and analyze registry hive files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
 
-        #Path to verify for existence before processing prefetch
+        #Path to verify for existence before processing registry hives
         $RegPath = ("{0}\{1}\Disk\RegistryHives_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
-        #Determine if prefetch output directory exists
+        #Determine if registry explorer output directory exists
         if (Test-Path $RegPath){
 
-            #Verify that prefetch has not already been analyzed
+            #Verify that registry hives have not already been analyzed
             $RegProcessed = "$RegPath\Analysis\"
 
             if (!(Test-Path $RegProcessed)) {
@@ -154,7 +154,7 @@ process{
 
             } else {
 
-                #Prevent additional processing of prefetch already analyzed
+                #Prevent additional processing of registry hives already analyzed
                 continue
             }
         }

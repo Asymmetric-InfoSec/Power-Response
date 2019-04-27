@@ -36,10 +36,10 @@ param (
 
 process {
 
-    #Set $Output for where to store recovered prefetch files
+    #Set $Output for where to store recent items files
     $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RecentItems_{0:yyyyMMdd}' -f (Get-Date)))
 
-    #Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
+    #Create Subdirectory in $global:PowerResponse.OutputPath for storing recent items
     If (-not (Test-Path $Output)) {
         
         New-Item -Type Directory -Path $Output | Out-Null

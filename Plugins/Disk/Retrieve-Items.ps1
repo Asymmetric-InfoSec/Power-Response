@@ -89,7 +89,7 @@ process{
         Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
     }
 
-    # Set $Output for where to store recovered prefetch files
+    # Set $Output for where to store recovered files
     $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'CollectedItems')
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing items

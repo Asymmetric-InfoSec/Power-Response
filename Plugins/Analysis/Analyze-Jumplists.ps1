@@ -79,7 +79,7 @@ process{
                 #Determine if output directory exists
                 if (Test-Path $JumpItemsData){
 
-                    #Verify that prefetch has not already been analyzed
+                    #Verify that jumplist has not already been analyzed
                     $JumpItemsProcessed = "$JumpItemsData\Analysis\"
 
                     if (!(Test-Path $JumpItemsProcessed)) {

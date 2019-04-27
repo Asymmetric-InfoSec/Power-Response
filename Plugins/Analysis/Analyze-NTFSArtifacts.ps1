@@ -107,16 +107,16 @@ process{
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem (Get-PRPath -Output)
 
-    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
+    #Loop through and analyze NTFS files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
 
-        #Path to verify for existence before processing prefetch
+        #Path to verify for existence before processing NTFS
         $NTFSPath = ("{0}\{1}\Disk\NTFS_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
-        #Determine if prefetch output directory exists
+        #Determine if NTFS output directory exists
         if (Test-Path $NTFSPath){
 
-            #Verify that prefetch has not already been analyzed
+            #Verify that NTFS has not already been analyzed
             $NTFSProcessed = "$NTFSPath\Analysis\"
 
             if (!(Test-Path $NTFSProcessed)) {
@@ -156,7 +156,7 @@ process{
 
             } else {
 
-                #Prevent additional processing of prefetch already analyzed
+                #Prevent additional processing of NTFS already analyzed
                 continue
             }
         }

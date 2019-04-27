@@ -103,16 +103,16 @@ process{
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem (Get-PRPath -Output)
 
-    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
+    #Loop through and analyze amcache files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
 
-        #Path to verify for existence before processing prefetch
+        #Path to verify for existence before processing amcache
         $AmcachePath = ("{0}\{1}\Execution\Amcache_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
-        #Determine if prefetch output directory exists
+        #Determine if amcache output directory exists
         if (Test-Path $AmcachePath){
 
-            #Verify that prefetch has not already been analyzed
+            #Verify that amcache has not already been analyzed
             $AmcacheProcessed = "$AmcachePath\Analysis\"
 
             if (!(Test-Path $AmcacheProcessed)) {
@@ -132,7 +132,7 @@ process{
 
             } else {
 
-                #Prevent additional processing of prefetch already analyzed
+                #Prevent additional processing of amcache already analyzed
                 continue
             }
         }
