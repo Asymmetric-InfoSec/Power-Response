@@ -121,12 +121,12 @@ process{
                 New-Item -Type Directory -Path $RecycleProcessed | Out-Null
 
                 #Decompress zipped archive
-                $Command = ("{0}\{1} x {2}\{3}_RecycleBin.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RecyclePath,$Machine
+                $Command = ("& '{0}\{1} x {2}\{3}_RecycleBin.zip -o{2}'") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RecyclePath,$Machine
 
                 Invoke-Expression -Command $Command | Out-Null
 
                 #Process and store in analysis directory
-                $Command = ('{0}\RBCmd.exe -d {1}\{2}\c\`$Recycle.Bin --csv {3}') -f (Get-PRPath -Bin),$RecyclePath,$Machine,$RecycleProcessed
+                $Command = ("& '{0}\RBCmd.exe -d {1}\{2}\c\`$Recycle.Bin --csv {3}'") -f (Get-PRPath -Bin),$RecyclePath,$Machine,$RecycleProcessed
 
                 Invoke-Expression -Command $Command | Out-Null
 

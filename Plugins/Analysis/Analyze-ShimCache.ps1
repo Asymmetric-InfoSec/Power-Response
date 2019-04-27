@@ -121,12 +121,12 @@ process{
                 New-Item -Type Directory -Path $ShimCacheProcessed | Out-Null
 
                 #Decompress zipped archive
-                $Command = ("{0}\{1} x {2}\{3}_ShimCache.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShimCachePath,$Machine
+                $Command = ("& '{0}\{1} x {2}\{3}_ShimCache.zip -o{2}'") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShimCachePath,$Machine
 
                 Invoke-Expression -Command $Command | Out-Null 
 
                 #Process and store in analysis directory
-                $Command = ('{0}\AppCompatCacheParser.exe -f {1}\{2}\c\windows\System32\config\SYSTEM --csv {3}') -f (Get-PRPath -Bin),$ShimCachePath,$Machine,$ShimCacheProcessed
+                $Command = ("& '{0}\AppCompatCacheParser.exe -f {1}\{2}\c\windows\System32\config\SYSTEM --csv {3}'") -f (Get-PRPath -Bin),$ShimCachePath,$Machine,$ShimCacheProcessed
 
                 Invoke-Expression -Command $Command  | Out-Null
 
