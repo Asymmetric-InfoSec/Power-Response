@@ -721,6 +721,9 @@ function Invoke-ShowCommand {
             # Gather to $global:PowerResponse.Location's $CommandParameters
             $CommandParameters = Get-CommandParameter -Path $global:PowerResponse.Location
 
+            # Remove the 'Session' parameter
+            $null = $CommandParameters.Remove('Session')
+
             # If $CommandParameters does not contain a 'ComputerName' entry
             if ($CommandParameters.Keys -NotContains 'ComputerName') {
                 # Add a fake 'ComputerName' parameter to $CommandParameters
