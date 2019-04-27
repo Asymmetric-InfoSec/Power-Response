@@ -61,12 +61,12 @@ process{
         }
 
         #Collect Jumplist for specific user
-        $JumpFiles = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\ -ErrorAction SilentlyContinue} -ArgumentList $User
+        $JumpFiles = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\" -ErrorAction SilentlyContinue} -ArgumentList $User
 
         foreach ($File in $JumpFiles){
 
             #Get Jumplist File Attributes
-            $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$($args[1])).CreationTime} -ArgumentList $User,$File
+            $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item "C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$($args[1])").CreationTime} -ArgumentList $User,$File
             
             #Copy specified jumplist file to $Output
             Copy-Item "C:\users\$User\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$File" -Destination "$Output\$User" -FromSession $Session -Force -ErrorAction SilentlyContinue

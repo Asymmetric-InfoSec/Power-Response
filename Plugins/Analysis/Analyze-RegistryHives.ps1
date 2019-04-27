@@ -143,12 +143,12 @@ process{
                 New-Item -Type Directory -Path $RegProcessed | Out-Null
 
                 #Decompress zipped archive
-                $Command = ("{0}\{1} x {2}\{3}_RegistryHives.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RegPath,$Machine
+                $Command = ("& '{0}\{1} x {2}\{3}_RegistryHives.zip -o{2}'") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RegPath,$Machine
 
                 Invoke-Expression -Command $Command | Out-Null
 
                 #Process and store in analysis directory
-                $Command = ("{0}\RegistryExplorer\RECmd.exe --bn {1} -d {2}\{3} --csv {4}") -f (Get-PRPath -Bin),$BatchFile,$RegPath,$Machine,$RegProcessed
+                $Command = ("& '{0}\RegistryExplorer\RECmd.exe --bn {1} -d {2}\{3} --csv {4}'") -f (Get-PRPath -Bin),$BatchFile,$RegPath,$Machine,$RegProcessed
 
                 Invoke-Expression -Command $Command | Out-Null
 

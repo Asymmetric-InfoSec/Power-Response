@@ -88,7 +88,7 @@ process{
                         New-Item -Type Directory -Path $RecentItemsProcessed | Out-Null
 
                         #Process data and store in analysis directory
-                        $Command = ("{0}\LECmd.exe -d {1} --csv {2}") -f (Get-PRPath -Bin),$RecentItemsData,$RecentItemsProcessed
+                        $Command = ("& '{0}\LECmd.exe -d {1} --csv {2}'") -f (Get-PRPath -Bin),$RecentItemsData,$RecentItemsProcessed
 
                         Invoke-Expression -Command $Command | Out-Null
 

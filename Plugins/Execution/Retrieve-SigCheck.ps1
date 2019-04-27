@@ -135,13 +135,13 @@ process{
     # Run Sigcheck on the remote host and collect Sigcheck data (use -s option if $Recurse -eq $true)
     if ($Recurse) {
     
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0} /accepteula -nobanner -e -vt -h -c -s {1}") -f ($RemotePath, $Location))
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0} /accepteula -nobanner -e -vt -h -c -s {1}'") -f ($RemotePath, $Location))
     
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
 
     } else {
 
-         $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0} /accepteula -nobanner -e -vt -h -c {1}") -f ($RemotePath, $Location))
+         $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0} /accepteula -nobanner -e -vt -h -c {1}'") -f ($RemotePath, $Location))
     
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | ConvertFrom-CSV
 

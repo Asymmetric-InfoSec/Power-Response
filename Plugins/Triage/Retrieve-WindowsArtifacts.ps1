@@ -231,7 +231,7 @@ process{
            
     foreach ($Artifact in $SystemArtifacts){
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& C:\ProgramData\{0} fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}') -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0} fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}'") -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
     }
     
@@ -260,7 +260,7 @@ process{
 
         foreach ($Artifact in $UserArtifacts) {
 
-            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} fs --accessor ntfs cp \\.\{1}\{2} C:\ProgramData\{3}") -f ((Split-Path $Velo_exe -Leaf), $User, $Artifact,$Session.ComputerName))
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0} fs --accessor ntfs cp \\.\{1}\{2} C:\ProgramData\{3}'") -f ((Split-Path $Velo_exe -Leaf), $User, $Artifact,$Session.ComputerName))
             Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
         }
      
@@ -271,12 +271,12 @@ process{
 
     foreach ($SID in $SIDS){
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& C:\ProgramData\{0} fs --accessor ntfs cp \\.\C:\`$Recycle.Bin\{1}\* C:\ProgramData\{2}') -f ((Split-Path $Velo_exe -Leaf), $SID, $Session.ComputerName))
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0} fs --accessor ntfs cp \\.\C:\`$Recycle.Bin\{1}\* C:\ProgramData\{2}'") -f ((Split-Path $Velo_exe -Leaf), $SID, $Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
     }
         
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} a C:\ProgramData\{1}_Artifacts.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0} a C:\ProgramData\{1}_Artifacts.zip C:\ProgramData\{1}'") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)

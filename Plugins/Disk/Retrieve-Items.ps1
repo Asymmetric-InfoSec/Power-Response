@@ -309,7 +309,7 @@ process{
 
             Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path $($args[0])} -Argumentlist $FinalPath | Out-Null
 
-            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& {0}\{1} fs --accessor ntfs cp \\.\{2} {3}') -f ($env:ProgramData, (Split-Path -Path $Velo_exe -Leaf), $Item, $FinalPath))
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}\{1} fs --accessor ntfs cp \\.\{2} {3}'") -f ($env:ProgramData, (Split-Path -Path $Velo_exe -Leaf), $Item, $FinalPath))
             Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
            
             #Compress    
@@ -318,7 +318,7 @@ process{
                 #Create archive of Item and MetaData (separately)
                 $ArchivePath = ("C:\ProgramData\{0}.zip" -f (Split-Path $($args[1]) -Leaf))
                 
-                $Command_Compress = ("C:\ProgramData\{0} a -pinfected -tzip {1} {2} {3}" -f ($($args[0]), $ArchivePath, $ExportPath, ($($args[1]))))
+                $Command_Compress = ("& 'C:\ProgramData\{0} a -pinfected -tzip {1} {2} {3}'" -f ($($args[0]), $ArchivePath, $ExportPath, ($($args[1]))))
                 
                 Invoke-Expression -Command $Command_Compress | Out-Null
 
