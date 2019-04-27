@@ -87,7 +87,7 @@ process{
 
         } else {
         
-            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered.)" -f $Architecture
+            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered.)" -f $Architecture)
             Continue
         }
 
@@ -107,26 +107,32 @@ process{
     foreach ($Machine in $Machines){
 
         #Path to verify for existence before processing shimcache
-        $ShimCachePath = ("{0}\{1}\Execution\ShimCache_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
+        $ShimCachePath = ("{0}\{1}\Execution\ShimCache_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
+        $ShimDataPath = ("{0}\{1}\Disk\RegistryHives_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
         #Determine if shimcache output directory exists
         if (Test-Path $ShimCachePath){
 
             #Verify that shimcache has not already been analyzed
-            $ShimCacheProcessed = "$ShimCachePath\Analysis\"
+            $ShimCacheProcessed = "$ShimCachePath\Analysis"
 
             if (!(Test-Path $ShimCacheProcessed)) {
 
                 #Create Analysis Directory
                 New-Item -Type Directory -Path $ShimCacheProcessed | Out-Null
 
-                #Decompress zipped archive
-                $Command = ("& '{0}\{1} x {2}\{3}_ShimCache.zip -o{2}'") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShimCachePath,$Machine
+                #Decompress zipped archive if necessary
+                $ShimDataExtracted = ("{0}\{1}" -f $ShimDataPath, $Machine)
 
-                Invoke-Expression -Command $Command | Out-Null 
+                if (!(Test-Path $ShimDataExtracted)){
 
+                    $Command = ("& '{0}\{1}' x {2}\{4}_RegistryHives.zip -o{2}\") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShimDataPath,$AnalysisDate,$Machine
+
+                    Invoke-Expression -Command $Command | Out-Null 
+                }
+                
                 #Process and store in analysis directory
-                $Command = ("& '{0}\AppCompatCacheParser.exe -f {1}\{2}\c\windows\System32\config\SYSTEM --csv {3}'") -f (Get-PRPath -Bin),$ShimCachePath,$Machine,$ShimCacheProcessed
+                $Command = ("& '{0}\AppCompatCacheParser.exe' -f {1}\{2}\c\windows\System32\config\SYSTEM --csv {3}") -f (Get-PRPath -Bin),$ShimDataPath,$Machine,$ShimCacheProcessed
 
                 Invoke-Expression -Command $Command  | Out-Null
 

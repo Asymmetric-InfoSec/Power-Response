@@ -121,12 +121,12 @@ process{
                 New-Item -Type Directory -Path $AmcacheProcessed | Out-Null
 
                 #Decompress zipped archive
-                $Command = ("& '{0}\{1} x {2}\{3}_Amcache.zip -o{2}'") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$AmcachePath,$Machine
+                $Command = ("& '{0}\{1}' x {2}\{3}_Amcache.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$AmcachePath,$Machine
 
                 Invoke-Expression -Command $Command | Out-Null 
 
                 #Process and store in analysis directory
-                $Command = ("& '{0}\AmcacheParser.exe -f {1}\{2}\c\windows\appcompat\Programs\Amcache.hve --csv {3}'") -f (Get-PRPath -Bin),$AmcachePath,$Machine,$AmcacheProcessed
+                $Command = ("& '{0}\AmcacheParser.exe' -f {1}\{2}\c\windows\appcompat\Programs\Amcache.hve --csv {3}") -f (Get-PRPath -Bin),$AmcachePath,$Machine,$AmcacheProcessed
 
                 Invoke-Expression -Command $Command | Out-Null
 
