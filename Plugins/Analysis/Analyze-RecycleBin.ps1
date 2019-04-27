@@ -121,7 +121,7 @@ process{
                 New-Item -Type Directory -Path $RecycleProcessed | Out-Null
 
                 #Decompress zipped archive
-                $Command = ("& '{0}\{1}'' x {2}\{3}_RecycleBin.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RecyclePath,$Machine
+                $Command = ("& '{0}\{1}' x {2}\{3}_RecycleBin.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RecyclePath,$Machine
 
                 Invoke-Expression -Command $Command | Out-Null
 

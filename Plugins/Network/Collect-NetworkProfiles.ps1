@@ -33,6 +33,12 @@ process {
 
     # Get Network Connection Profile(s)
 
-    Get-NetConnectionProfile
+    try {
 
+        Get-NetConnectionProfile
+
+    } catch {
+
+        Write-Warning "Could not collection Net Connection information."
+    }
 }

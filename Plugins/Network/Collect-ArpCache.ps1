@@ -32,8 +32,15 @@ param (
 
 process {
 
-    # Get ARP Information
+    # Get ARP Information - Win 10 Cmdlet
+    try {
 
-    Get-NetNeighbor
+        Get-NetNeighbor
+
+    } catch {
+
+        Write-Warning "Arp Cache information could not be colleted."
+    }
+    
 
 }

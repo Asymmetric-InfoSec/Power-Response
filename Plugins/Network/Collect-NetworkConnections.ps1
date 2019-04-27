@@ -33,53 +33,67 @@ process {
 
     # Get TCP Connection Information
 
-    $TCPConnections = Get-NetTCPConnection | Select LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcess, CreationTime, State
+    try {
 
-    foreach ($Connection in $TCPConnections){
+        $TCPConnections = Get-NetTCPConnection | Select LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcess, CreationTime, State
 
-        $OwningProcessName = Get-Process -ID ($Connection.OwningProcess)
-        
-        $TCPConArray = @{
+        foreach ($Connection in $TCPConnections){
 
-            Protocol = "TCP"
-            LocalAddress = $Connection.LocalAddress
-            LocalPort = $Connection.LocalPort
-            RemoteAddress = $Connection.RemoteAddress
-            RemotePort = $Connection.RemotePort
-            OwningProcessID = $Connection.OwningProcess
-            OwningProcessName = $OwningProcessName.Name
-            CreationTime = $Connection.CreationTime
-            State = $Connrction.State
+            $OwningProcessName = Get-Process -ID ($Connection.OwningProcess)
+            
+            $TCPConArray = @{
+
+                Protocol = "TCP"
+                LocalAddress = $Connection.LocalAddress
+                LocalPort = $Connection.LocalPort
+                RemoteAddress = $Connection.RemoteAddress
+                RemotePort = $Connection.RemotePort
+                OwningProcessID = $Connection.OwningProcess
+                OwningProcessName = $OwningProcessName.Name
+                CreationTime = $Connection.CreationTime
+                State = $Connrction.State
+
+            }
+
+            [PSCustomObject]$TCPConArray | Select Protocol, LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcessID, OwningProcessName, CreationTime, State
 
         }
 
-        [PSCustomObject]$TCPConArray | Select Protocol, LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcessID, OwningProcessName, CreationTime, State
+    } catch {
 
-    }
+        Write-Warning "Could not collect TCP connection information."
+    } 
 
     # Get UDP Connection Information
 
-    $UDPConnections = Get-NetUDPEndPoint | Select LocalAddress, LocalPort, OwningProcess, CreationTime
+    try {
 
-    foreach ($Connection in $UDPConnections){
+        $UDPConnections = Get-NetUDPEndPoint | Select LocalAddress, LocalPort, OwningProcess, CreationTime
 
-        $OwningProcessName = Get-Process -ID ($Connection.OwningProcess)
+        foreach ($Connection in $UDPConnections){
+
+            $OwningProcessName = Get-Process -ID ($Connection.OwningProcess)
+            
+            $UDPConArray = @{
+
+                Protocol = "UDP"
+                LocalAddress = $Connection.LocalAddress
+                LocalPort = $Connection.LocalPort
+                RemoteAddress = $Null
+                RemotePort = $Null
+                OwningProcessID = $Connection.OwningProcess
+                OwningProcessName = $OwningProcessName.Name
+                CreationTime = $Connection.CreationTime
+                State = $Null
+
+            }
+
+            [PSCustomObject]$UDPConArray | Select Protocol, LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcessID, OwningProcessName,CreationTime, State
         
-        $UDPConArray = @{
-
-            Protocol = "UDP"
-            LocalAddress = $Connection.LocalAddress
-            LocalPort = $Connection.LocalPort
-            RemoteAddress = $Null
-            RemotePort = $Null
-            OwningProcessID = $Connection.OwningProcess
-            OwningProcessName = $OwningProcessName.Name
-            CreationTime = $Connection.CreationTime
-            State = $Null
-
         }
+        
+    } catch {
 
-        [PSCustomObject]$UDPConArray | Select Protocol, LocalAddress, LocalPort, RemoteAddress, RemotePort, OwningProcessID, OwningProcessName,CreationTime, State
-    
-    }
+        Write-Warning "Could not collect UDP connection information."
+    }  
 }

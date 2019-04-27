@@ -38,6 +38,7 @@
     Twitter:
   
 #>
+[CmdletBinding(DefaultParameterSetName="Items")]
 
 param (
 
@@ -45,7 +46,7 @@ param (
     [Parameter(ParameterSetName = "List", Position = 0, Mandatory = $true)]
     [System.Management.Automation.Runspaces.PSSession]$Session,
 
-    [Parameter(ParameterSetName = "Items", Position = 1, Mandatory = $true)]
+    [Parameter(ParameterSetName = "Items", Position = 1, Mandatory = $false)]
     [string[]]$ItemPath,
 
     [Parameter(ParameterSetName = "List", Position = 1, Mandatory = $true)]
@@ -90,7 +91,7 @@ process{
     }
 
     # Set $Output for where to store recovered files
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'CollectedItems')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('CollectedItems_{0:yyyyMMdd}' -f $(Get-Date))
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing items
     If (!(Test-Path $Output)) {
@@ -102,6 +103,11 @@ process{
 
         "Items" {[string[]]$Items = $ItemPath}
         "List" {[string[]]$Items = (Import-CSV $ListPath | Select -ExpandProperty "Path")}
+    }
+
+    if (!$Items) {
+
+        Throw ("Value for ItemPath not detected for {0}. Add item path and try again" -f $Session.ComputerName)
     }
 
     #Determine system architecture and select proper 7za.exe and Velociraptor executables
