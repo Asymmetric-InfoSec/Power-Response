@@ -224,50 +224,9 @@ function Get-Config {
         }
 
         # If no value is provided in the config file, set the default values
-        if (!$Config.AdminUserName) {
-            $Config.AdminUserName = $Default.AdminUserName
-        }
-        if (!$Config.AutoAnalyze) {
-            $Config.AutoAnalyze = $Default.AutoAnalyze
-        }
-        if (!$Config.AutoClear) {
-            $Config.AutoClear = $Default.AutoClear
-        }
-        if (!$Config.HashAlgorithm) {
-            $Config.HashAlgorithm = $Default.HashAlgorithm
-        }
-        if (!$Config.OutputType) {
-            $Config.OutputType = $Default.OutputType
-        }
-        if (!$Config.PromptText) {
-            $Config.PromptText = $Default.PromptText
-        }
-        if (!$Config.Path) {
-            $Config.Path = $Default.Path
-        }
-        if (!$Config.PSSession) {
-            $Config.PSSession = $Default.PSSession
-        }
-        if (!$Config.ThrottleLimit) {
-            $Config.ThrottleLimit = $Default.ThrottleLimit
-        }
-
-        if (!$Config.Path.Bin) {
-            $Config.Path.Bin = $Default.Path.Bin
-        }
-        if (!$Config.Path.Logs) {
-            $Config.Path.Logs = $Default.Path.Logs
-        }
-        if (!$Config.Path.Output) {
-            $Config.Path.Output = $Default.Path.Output
-        }
-        if (!$Config.Path.Plugins) {
-            $Config.Path.Plugins = $Default.Path.Plugins
-        }
-
-        if (!$Config.PSSession.NoMachineProfile) {
-            $Config.PSSession.NoMachineProfile = $Default.PSSession.NoMachineProfile
-        }
+        $Default.Keys | Where-Object { $Config.Keys -NotContains $PSItem } | Foreach-Object { $Config.$PSItem = $Default.$PSItem }
+        $Default.Path.Keys | Where-Object { $Config.Path.Keys -NotContains $PSItem } | Foreach-Object { $Config.Path.$PSItem = $Default.Path.$PSItem }
+        $Default.PSSession.Keys | Where-Object { $Config.PSSession.Keys -NotContains $PSItem } | Foreach-Object { $Config.PSSession.$PSItem = $Default.PSSession.$PSItem }
 
         return $Config
     }
@@ -312,44 +271,6 @@ function Get-Menu {
         } while (!$UserInput -or (0..($Choice.Length-1)) -NotContains $UserInput)
 
         return $Choice[$UserInput]
-    }
-}
-
-function Get-OnlineComputer {
-    param (
-        [String[]]$ComputerName
-    )
-
-    process {
-        # Initialize $OnlineComputers array
-        $OnlineComputers = @()
-
-        # Loop through tracked $global:PowerResponse.Parameters.ComputerName
-        foreach ($Computer in $ComputerName) {
-            # If the $ComputerName is online
-            if (Test-Connection -ComputerName $Computer -Count 1 -Quiet) {
-                # Add $ComputerName to $ReleventParameters.ComputerName
-                $OnlineComputers += $Computer
-
-                # Format the online $Message
-                $Message = 'Machine: {0} is online and ready for processing' -f $Computer
-
-                # Write the $Message to verbose
-                Write-Verbose -Message $Message
-            } else {
-                # Format the offline $Message
-                $Message = 'Skipping offline machine: {0}' -f $Computer
-
-                # Write $Message to host
-                Write-Host -Object $Message
-            }
-
-            # Write the $Message to log
-            Write-Log -Message $Message
-        }
-
-        # Return $OnlineComputers array
-        return $OnlineComputers
     }
 }
 
@@ -594,18 +515,13 @@ function Invoke-RunCommand {
     )
 
     process {
-        # Gather $OnlineComputers
-        $OnlineComputers = Get-OnlineComputer -ComputerName $global:PowerResponse.Parameters.ComputerName
-
         # If we have selected a file $global:PowerResponse.Location
-        if ($OnlineComputers -and $global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
+        if ($global:PowerResponse.Parameters.ComputerName -and $global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
             # Gather the $SessionOption from $global:PowerResponse.Config.PSSession
             $SessionOption = $global:PowerResponse.Config.PSSession
 
             # Gather $SessionParameters
             $SessionParameters = @{
-                ComputerName = $OnlineComputers.ToUpper()
-                Name = $OnlineComputers.ToUpper()
                 SessionOption = New-PSSessionOption @SessionOption
             }
 
@@ -614,21 +530,43 @@ function Invoke-RunCommand {
                 $SessionParameters.Credential = $global:PowerResponse.Parameters.Credential
             }
 
-            try {
-                # Create the $Sessions array
-                $Session = New-PSSession @SessionParameters
-            } catch {
-                # Format warning $Message
-                $Message = 'Error creating Session: {0}' -f $PSItem
+            # Initialize $Session
+            $Session = @()
 
-                # Write warning $Message
-                Write-Warning -Message ("{0}`n`tSkipping plugin execution" -f $Message)
+            foreach ($ComputerName in $global:PowerResponse.Parameters.ComputerName.ToUpper()) {
+                try {
+                    # Create the $Sessions array
+                    $Session += New-PSSession -ComputerName $ComputerName -Name $ComputerName @SessionParameters
+                } catch [System.Management.Automation.Remoting.PSRemotingTransportException] {
+                    # Format connection warning message
+                    $Message = 'Unable to connect to computer: {0}' -f $ComputerName
 
-                # Write log $Message
-                Write-Log -Message $Message
+                    # Write $Message to host
+                    Write-Host -Object $Message
 
-                return
+                    # Write log $Message
+                    Write-Log -Message $Message
+                } catch {
+                    # Format warning $Message
+                    $Message = 'Error creating Session: {0}' -f $PSItem
+
+                    # Write warning $Message
+                    Write-Warning -Message ("{0}`n`tSkipping plugin execution" -f $Message)
+
+                    # Write log $Message
+                    Write-Log -Message $Message
+
+                    return
+                }
             }
+
+            # # Parse $OfflineComputer list from PSRemotingTransportException errors
+            # $OfflineComputer = $Error.Exception | Foreach-Object { if ($PSItem -is [System.Management.Automation.Remoting.PSRemotingTransportException] -and $PSItem.Message -Match 'Connecting to remote server (\S+) failed' -and $Matches.Count -gt 1) { $Matches[1] } }
+            # foreach ($Computer in $OfflineComputer) {
+            #     # Format the offline $Message
+            #     $Message = 'Skipping offline machine: {0}' -f $Computer
+
+            # }
 
             # Format execution $Message
             $Message = 'Plugin Execution Started at {0}' -f (Get-Date)
@@ -649,13 +587,7 @@ function Invoke-RunCommand {
             Remove-PSSession -Session $Session
 
             # Write plugin execution completion message and verify with input prior to clearing
-            Write-Host -Object ('Plugin execution complete at {0}' -f (Get-Date))
-        } elseif (!$OnlineComputers) {
-            # Format all computers offline $Message
-            $Message = 'All tracked computers are offline, skipping plugin execution'
-
-            # Write warning $Message
-            Write-Warning -Message $Message
+            Write-Host -Object ('Plugin Execution Complete at {0}' -f (Get-Date))
         } else {
             # Write the warning for no plugin selected
             Write-Warning -Message 'No plugin selected for execution. Press Enter to Continue.'
@@ -1224,7 +1156,7 @@ try {
         # Until the $global:PowerResponse.Location is no longer a file, interpret $UserInput as commands
         do {
             # Get $UserInput
-            $UserInput = Read-PRHost
+            $UserInput = (Read-PRHost).Trim()
 
             # Interpret $UserInput as a command and pass the $global:PowerResponse.Location
             if ($UserInput) {
