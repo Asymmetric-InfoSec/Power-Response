@@ -103,17 +103,17 @@ process{
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem (Get-PRPath -Output)
 
-    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
+    #Loop through and analyze shimcache files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
 
-        #Path to verify for existence before processing prefetch
+        #Path to verify for existence before processing shimcache
         $ShimCachePath = ("{0}\{1}\Execution\ShimCache_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
         $ShimDataPath = ("{0}\{1}\Disk\RegistryHives_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
-        #Determine if prefetch output directory exists
+        #Determine if shimcache output directory exists
         if (Test-Path $ShimCachePath){
 
-            #Verify that prefetch has not already been analyzed
+            #Verify that shimcache has not already been analyzed
             $ShimCacheProcessed = "$ShimCachePath\Analysis"
 
             if (!(Test-Path $ShimCacheProcessed)) {
@@ -138,7 +138,7 @@ process{
 
             } else {
 
-                #Prevent additional processing of prefetch already analyzed
+                #Prevent additional processing of shimcache already analyzed
                 continue
             }
         }
