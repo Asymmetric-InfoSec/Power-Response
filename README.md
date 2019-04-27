@@ -31,6 +31,8 @@ Power-Response depends on PowerShell remoting. All remote hosts will need to hav
 
 ### Run the Config Script
 
+If you downloaded the zip from GitHub, Unblock `Config-PR.ps1` by executing `Unblock-File .\Config-PR.ps1`
+
 Execute `Config-PR.ps1` located in the Power-Response root directory to satisfy all dependencies
 
 Big shout outs to Eric Zimmerman, Michael Cohen, and the Sysinternals crew for making amazing tools we can incorporate into our framework!
