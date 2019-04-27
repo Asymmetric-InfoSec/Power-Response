@@ -79,7 +79,7 @@ process{
                 New-Item -Type Directory -Path $PrefetchProcessed | Out-Null
 
                 #Process Prefetch and store in analysis directory
-                $Command = ("& '{0}\PECmd.exe -d {1} --csv {2}'") -f (Get-PRPath -Bin),$PrefetchPath,$PrefetchProcessed
+                $Command = ("& '{0}\PECmd.exe' -d {1} --csv {2}") -f (Get-PRPath -Bin),$PrefetchPath,$PrefetchProcessed
 
                 Invoke-Expression -Command $Command | Out-Null
 

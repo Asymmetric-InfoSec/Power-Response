@@ -912,7 +912,7 @@ function Invoke-PRPlugin {
                 foreach ($RemoteError in $RemoteErrors) {
                     # Format the remote error $Message
                     $Message = 'Plugin Execution Error for {0}: {1}' -f $RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
-
+                    
                     # Write warning $Message
                     Write-Warning -Message $Message
 

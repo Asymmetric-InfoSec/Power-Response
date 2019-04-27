@@ -145,13 +145,13 @@ process{
 
     # Execute winpmem on remote machine to capture memory
 
-    $ScriptBlock_Mem = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0} -o C:\ProgramData\{1}_memory.raw --volume_format raw -dd -t'") -f (($RemotePathWinpmem), $Session.ComputerName))
+    $ScriptBlock_Mem = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}' -o C:\ProgramData\{1}_memory.raw --volume_format raw -dd -t") -f (($RemotePathWinpmem), $Session.ComputerName))
 
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock_Mem
 
     # Compress winpmem capture
 
-    $ScriptBlock_Compress = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0} a C:\ProgramData\{1}_memory.zip C:\ProgramData\{1}_memory.raw'") -f ($RemotePath7za, $Session.ComputerName))
+    $ScriptBlock_Compress = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}' a C:\ProgramData\{1}_memory.zip C:\ProgramData\{1}_memory.raw") -f ($RemotePath7za, $Session.ComputerName))
 
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock_Compress
 
