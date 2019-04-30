@@ -7,7 +7,9 @@ Please note that Power-Response is **still under active development**. We will c
 
 ## What is Power-Response?
 
-Power-Response is a modular PowerShell Framework for Incident Response. The aim of Power-Response is to provide a framework that acts as a constient and highly usable tool by all members of an incident response team, or other roles that require the ability to rapidly collect data during security incidents while focusing on consolidated output methods, increased logging, and ease of data collection. 
+Power-Response is a modular PowerShell Framework for Incident Response. The aim of Power-Response is to provide a framework that acts as a constient and highly usable tool by all members of an incident response team, or other roles that require the ability to rapidly collect data during security incidents while focusing on consolidated output methods, increased logging, and ease of data collection.
+
+Kansa was an inspiration for Power-Response, so a huge shout out to Dave Hull for his work on that project!
 
 ## The Power is in the Plugins
 
