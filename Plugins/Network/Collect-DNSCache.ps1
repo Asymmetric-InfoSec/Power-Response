@@ -32,8 +32,17 @@ param (
 
 process {
 
-    # Get-DNSClientCache
+    # Get-DNSClientCache - Windows 10 Cmdlet
 
-    Get-DNSClientCache
+    try {
+
+        Get-DNSClientCache
+
+    } catch {
+
+        Write-Warning "Could not collect DNS Client cache."
+    }
+
+    
 
 }

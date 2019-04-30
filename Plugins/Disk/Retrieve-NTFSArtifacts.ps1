@@ -1,17 +1,16 @@
 ﻿<#
 
 .SYNOPSIS
-    Plugin-Name: Retrieve-Amcache.ps1
+    Plugin-Name: Retrieve-NTFSArtifacts.ps1
     
 .Description
-
-    This plugin collects the amcache.hve. The file is copied by pushing the 
-    Velociraptor binary to the the remote system, where it copies the files 
-    to C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied to the system, 
-    to then zip the directory containing the amcache.hve before moving them 
-    back to your local system for further analysis and processing. This plugin 
-    will remove the Velociraptor, 7zip PE, and all locally created files after 
-    successfully pulling the artifacts back to the output destination in Power-Response.
+    This plugin collects NTFS artifacts from a remote system. The file is copied by pushing 
+    the Velociraptor binary to the the remote system, where it copies the files to 
+    C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied to the system, to then zip 
+    the directory containing the artifacts before moving them back to your local system for 
+    further analysis and processing. This plugin will remove the Velociraptor, 7zip PE, 
+    and all locally created files after successfully pulling the artifacts back to the 
+    output destination in Power-Response.
 
 .EXAMPLE
 
@@ -22,7 +21,7 @@
 
 .NOTES
     Author: Matt Weikert
-    Date Created: 2/22/2019
+    Date Created: 2/18/2019
     Twitter: @5k33tz
     
     Last Modified By: Drew Schmitt
@@ -40,7 +39,7 @@ param (
 
 process{
 
-    # Verify that 7za executables are located in (Get-PRPath -Bin)
+   # Verify that 7za executables are located in (Get-PRPath -Bin)
 
     $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
     $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
@@ -75,7 +74,7 @@ process{
     }
 
     # Set $Output for where to store recovered artifacts
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('Amcache_{0:yyyyMMdd}' -f (Get-Date)))
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('NTFS_{0:yyyyMMdd}' -f (Get-Date)))
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
     If (!(Test-Path $Output)){
@@ -159,24 +158,28 @@ process{
     #Collect System Artifacts    
     $SystemArtifacts = @(
 
-        "$env:SystemRoot\Appcompat\Programs\*"
-
-    )
+        "$env:SystemDrive\```$MFT",
+        "$env:SystemDrive\```$Boot",
+        "$env:SystemDrive\```$Secure:```$SDS",
+        "$env:SystemDrive\```$LogFile",
+        "$env:SystemDrive\```$Extend\```$UsnJrnl:```$J"
+    
+     )
            
     foreach ($Artifact in $SystemArtifacts){
 
         $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue  | Out-Null
+        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
     }
-
+        
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_Amcache.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_NTFS.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)
     try {
 
-        Copy-Item -Path (("C:\ProgramData\{0}_Amcache.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
+        Copy-Item -Path (("C:\ProgramData\{0}_NTFS.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
 
     } catch {
 
@@ -184,7 +187,7 @@ process{
     }
     
     # Delete initial artifacts, 7za, and velociraptor binaries from remote machine
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}, C:\ProgramData\{1}, C:\ProgramData\{2}_Amcache.zip, C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), (Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}, C:\ProgramData\{1}, C:\ProgramData\{2}_NTFS.zip, C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), (Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
 }

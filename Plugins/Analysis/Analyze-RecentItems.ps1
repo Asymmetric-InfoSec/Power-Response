@@ -47,7 +47,7 @@ param (
 process{
 
     #Format String Properly for use
-    $AnalysisDate = ($AnalyzeDate.ToString('yyyy-MM-dd'))
+    $AnalysisDate = ('{0:yyyyMMdd}' -f $AnalyzeDate)
 
     #Verify that bin dependencies are met
     $TestBin = Test-Path ("{0}\LECmd.exe" -f (Get-PRPath -Bin))
@@ -58,41 +58,45 @@ process{
     }
 
     #Build list of hosts that have been analyzed with Power-Response
-    $Machines = Get-ChildItem $global:PowerResponse.OutputPath
+    $Machines = Get-ChildItem (Get-PRPath -Output)
 
-    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
+    #Loop through and analyze files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
-        #Path to verify for existence before processing prefetch
-        $RecentItemsPath = ("{0}\{1}\{2}\RecentItems\") -f $global:PowerResponse.OutputPath,$Machine,$AnalysisDate
+
+        #Path to verify for existence before processing
+        $RecentItemsPath = ("{0}\{1}\Execution\RecentItems_{2}\") -f (Get-PRPath -Output),$Machine,$AnalysisDate
+
+        if (Test-Path $RecentItemsPath) {
         
-        #Get Users that have recent items data collected
-        $Users = Get-ChildItem $RecentItemsPath
+            #Get Users that have recent items data collected
+            $Users = Get-ChildItem $RecentItemsPath
 
-        foreach ($User in $Users){
+            foreach ($User in $Users){
 
-            #Path to data
-            $RecentItemsData = "$RecentItemsPath\$User"
+                #Path to data
+                $RecentItemsData = "$RecentItemsPath\$User"
 
-            #Determine if prefetch output directory exists
-            if (Test-Path $RecentItemsData){
+                #Determine if output directory exists
+                if (Test-Path $RecentItemsData){
 
-                #Verify that prefetch has not already been analyzed
-                $RecentItemsProcessed = "$RecentItemsData\Analysis\"
+                    #Verify that has not already been analyzed
+                    $RecentItemsProcessed = "$RecentItemsData\Analysis\"
 
-                if (!(Test-Path $RecentItemsProcessed)) {
+                    if (!(Test-Path $RecentItemsProcessed)) {
 
-                    #Create Analysis Directory
-                    New-Item -Type Directory -Path $RecentItemsProcessed | Out-Null
+                        #Create Analysis Directory
+                        New-Item -Type Directory -Path $RecentItemsProcessed | Out-Null
 
-                    #Process Prefetch and store in analysis directory
-                    $Command = ("{0}\LECmd.exe -d {1} --csv {2}") -f (Get-PRPath -Bin),$RecentItemsData,$RecentItemsProcessed
+                        #Process data and store in analysis directory
+                        $Command = ("& '{0}\LECmd.exe' -d {1} --csv {2}") -f (Get-PRPath -Bin),$RecentItemsData,$RecentItemsProcessed
 
-                    Invoke-Expression -Command $Command | Out-Null
+                        Invoke-Expression -Command $Command | Out-Null
 
-                } else {
+                    } else {
 
-                    #Prevent additional processing of prefetch already analyzed
-                    continue
+                        #Prevent additional processing of data already analyzed
+                        continue
+                    }
                 }
             }
         }

@@ -38,6 +38,7 @@
     Twitter:
   
 #>
+[CmdletBinding(DefaultParameterSetName="Items")]
 
 param (
 
@@ -45,7 +46,7 @@ param (
     [Parameter(ParameterSetName = "List", Position = 0, Mandatory = $true)]
     [System.Management.Automation.Runspaces.PSSession]$Session,
 
-    [Parameter(ParameterSetName = "Items", Position = 1, Mandatory = $true)]
+    [Parameter(ParameterSetName = "Items", Position = 1, Mandatory = $false)]
     [string[]]$ItemPath,
 
     [Parameter(ParameterSetName = "List", Position = 1, Mandatory = $true)]
@@ -74,8 +75,8 @@ process{
 
     #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
 
-    $Velo_64 = ("{0}\Velociraptor-amd64.exe" -f (Get-PRPath -Bin))
-    $Velo_32 = ("{0}\Velociraptor-386.exe" -f (Get-PRPath -Bin))
+    $Velo_64 = ("{0}\Velociraptor_x64.exe" -f (Get-PRPath -Bin))
+    $Velo_32 = ("{0}\Velociraptor_x86.exe" -f (Get-PRPath -Bin))
 
     $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
     $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
@@ -89,8 +90,8 @@ process{
         Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
     }
 
-    # Set $Output for where to store recovered prefetch files
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'CollectedItems')
+    # Set $Output for where to store recovered files
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('CollectedItems_{0:yyyyMMdd}' -f $(Get-Date))
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing items
     If (!(Test-Path $Output)) {
@@ -102,6 +103,11 @@ process{
 
         "Items" {[string[]]$Items = $ItemPath}
         "List" {[string[]]$Items = (Import-CSV $ListPath | Select -ExpandProperty "Path")}
+    }
+
+    if (!$Items) {
+
+        Throw ("Value for ItemPath not detected for {0}. Add item path and try again" -f $Session.ComputerName)
     }
 
     #Determine system architecture and select proper 7za.exe and Velociraptor executables
@@ -309,7 +315,7 @@ process{
 
             Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path $($args[0])} -Argumentlist $FinalPath | Out-Null
 
-            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& {0}\{1} fs --accessor ntfs cp \\.\{2} {3}') -f ($env:ProgramData, (Split-Path -Path $Velo_exe -Leaf), $Item, $FinalPath))
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}\{1}' fs --accessor ntfs cp \\.\{2} {3}") -f ($env:ProgramData, (Split-Path -Path $Velo_exe -Leaf), $Item, $FinalPath))
             Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
            
             #Compress    
@@ -318,7 +324,7 @@ process{
                 #Create archive of Item and MetaData (separately)
                 $ArchivePath = ("C:\ProgramData\{0}.zip" -f (Split-Path $($args[1]) -Leaf))
                 
-                $Command_Compress = ("C:\ProgramData\{0} a -pinfected -tzip {1} {2} {3}" -f ($($args[0]), $ArchivePath, $ExportPath, ($($args[1]))))
+                $Command_Compress = ("& 'C:\ProgramData\{0}' a -pinfected -tzip {1} {2} {3}" -f ($($args[0]), $ArchivePath, $ExportPath, ($($args[1]))))
                 
                 Invoke-Expression -Command $Command_Compress | Out-Null
 

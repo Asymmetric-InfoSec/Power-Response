@@ -48,7 +48,7 @@ param (
 process{
     
     # Set $Output for where to store recovered prefetch files
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'Prefetch')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('Prefetch_{0:yyyyMMdd}' -f (Get-Date)))
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing prefetch
     If (-not (Test-Path $Output)) {
@@ -67,7 +67,7 @@ process{
     foreach ($File in $PrefetchName){
 
         #Get Prefetch File Attributes
-        $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item C:\Windows\Prefetch\$($args[0])).CreationTime} -ArgumentList $File 
+        $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item "C:\Windows\Prefetch\$($args[0])").CreationTime} -ArgumentList $File 
 
         #Copy specified prefetch file to $Output
         Copy-Item "C:\Windows\Prefetch\$File" -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
