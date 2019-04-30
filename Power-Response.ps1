@@ -450,12 +450,12 @@ function Import-Config {
         $global:PowerResponse.Regex = @{}
         foreach ($DirPath in $Config.Path.GetEnumerator()) {
             # If the $DirPath doesn't exist, create it and get rid of the output
-            if (!(Test-Path $DirPath.Key)) {
-                $null = New-Item -Path $DirPath.Key -ItemType 'Directory'
+            if (!(Test-Path $DirPath.Value)) {
+                $null = New-Item -Path $DirPath.Value -ItemType 'Directory'
             }
 
             # Store each path as a regular expressions for string replacing later
-            $global:PowerResponse.Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}$' -f $DirPath.Key))
+            $global:PowerResponse.Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}\\?$' -f $DirPath.Key))
         }
     }
 }
