@@ -239,20 +239,6 @@ function Get-Menu {
         [Switch]$Back
     )
 
-<<<<<<< HEAD
-        return $Config
-    }
-}
-
-function Get-Menu {
-    param (
-        [String]$Title,
-        [String[]]$Choice,
-        [Switch]$Back
-    )
-
-=======
->>>>>>> eb540343fd479dc53f3d4d0eb42550f8887a2660
     process {
         # Add the 'Back' option to $Choice
         if ($Back) {
@@ -285,47 +271,6 @@ function Get-Menu {
         } while (!$UserInput -or (0..($Choice.Length-1)) -NotContains $UserInput)
 
         return $Choice[$UserInput]
-<<<<<<< HEAD
-    }
-}
-
-function Get-OnlineComputer {
-    param (
-        [String[]]$ComputerName
-    )
-
-    process {
-        # Initialize $OnlineComputers array
-        $OnlineComputers = @()
-
-        # Loop through tracked $global:PowerResponse.Parameters.ComputerName
-        foreach ($Computer in $ComputerName) {
-            # If the $ComputerName is online
-            if (Test-Connection -ComputerName $Computer -Count 1 -Quiet) {
-                # Add $ComputerName to $ReleventParameters.ComputerName
-                $OnlineComputers += $Computer
-
-                # Format the online $Message
-                $Message = 'Machine: {0} is online and ready for processing' -f $Computer
-
-                # Write the $Message to verbose
-                Write-Verbose -Message $Message
-            } else {
-                # Format the offline $Message
-                $Message = 'Skipping offline machine: {0}' -f $Computer
-
-                # Write $Message to host
-                Write-Host -Object $Message
-            }
-
-            # Write the $Message to log
-            Write-Log -Message $Message
-        }
-
-        # Return $OnlineComputers array
-        return $OnlineComputers
-=======
->>>>>>> eb540343fd479dc53f3d4d0eb42550f8887a2660
     }
 }
 
@@ -426,12 +371,12 @@ function Import-Config {
         $global:PowerResponse.Regex = @{}
         foreach ($DirPath in $Config.Path.GetEnumerator()) {
             # If the $DirPath doesn't exist, create it and get rid of the output
-            if (!(Test-Path $DirPath.Value)) {
-                $null = New-Item -Path $DirPath.Value -ItemType 'Directory'
+            if (!(Test-Path $DirPath.Key)) {
+                $null = New-Item -Path $DirPath.Key -ItemType 'Directory'
             }
 
             # Store each path as a regular expressions for string replacing later
-            $global:PowerResponse.Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}\\?$' -f $DirPath.Key))
+            $global:PowerResponse.Regex.($DirPath.Key) = '^{0}' -f [Regex]::Escape($DirPath.Value -Replace ('{0}$' -f $DirPath.Key))
         }
     }
 }
@@ -571,11 +516,7 @@ function Invoke-RunCommand {
 
     process {
         # If we have selected a file $global:PowerResponse.Location
-<<<<<<< HEAD
-        if ($OnlineComputers -and $global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
-=======
         if ($global:PowerResponse.Parameters.ComputerName -and $global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
->>>>>>> eb540343fd479dc53f3d4d0eb42550f8887a2660
             # Gather the $SessionOption from $global:PowerResponse.Config.PSSession
             $SessionOption = $global:PowerResponse.Config.PSSession
 
@@ -711,12 +652,9 @@ function Invoke-ShowCommand {
         if (!$global:PowerResponse.Location.PSIsContainer) {
             # Gather to $global:PowerResponse.Location's $CommandParameters
             $CommandParameters = Get-CommandParameter -Path $global:PowerResponse.Location
-<<<<<<< HEAD
-=======
 
             # Remove the 'Session' parameter
             $null = $CommandParameters.Remove('Session')
->>>>>>> eb540343fd479dc53f3d4d0eb42550f8887a2660
 
             # If $CommandParameters does not contain a 'ComputerName' entry
             if ($CommandParameters.Keys -NotContains 'ComputerName') {
