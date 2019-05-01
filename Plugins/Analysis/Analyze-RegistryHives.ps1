@@ -95,7 +95,7 @@ process{
 
         } else {
         
-            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered.)" -f $Architecture)
+            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered." -f $Architecture)
             Continue
         }
 
