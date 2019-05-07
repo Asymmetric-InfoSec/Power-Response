@@ -182,6 +182,9 @@ process{
                 }
         )
 
+        #Introduction Message 
+
+        Write-Host "Collecting Dependencies..."
         #Accept all TLS versions
         [System.Net.ServicePointManager]::SecurityProtocol = "Tls12","Tls11","Tls" 
 
