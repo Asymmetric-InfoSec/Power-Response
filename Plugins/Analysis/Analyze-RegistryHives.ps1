@@ -95,7 +95,7 @@ process{
 
         } else {
         
-            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered.)" -f $Architecture
+            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered." -f $Architecture)
             Continue
         }
 
@@ -125,16 +125,16 @@ process{
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem (Get-PRPath -Output)
 
-    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
+    #Loop through and analyze registry hive files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
 
-        #Path to verify for existence before processing prefetch
+        #Path to verify for existence before processing registry hives
         $RegPath = ("{0}\{1}\Disk\RegistryHives_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
-        #Determine if prefetch output directory exists
+        #Determine if registry explorer output directory exists
         if (Test-Path $RegPath){
 
-            #Verify that prefetch has not already been analyzed
+            #Verify that registry hives have not already been analyzed
             $RegProcessed = "$RegPath\Analysis\"
 
             if (!(Test-Path $RegProcessed)) {
@@ -142,19 +142,25 @@ process{
                 #Create Analysis Directory
                 New-Item -Type Directory -Path $RegProcessed | Out-Null
 
-                #Decompress zipped archive
-                $Command = ("{0}\{1} x {2}\{3}_RegistryHives.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RegPath,$Machine
+                $RegistryDataExtracted = ("{0}\{1}" -f $RegPath,$Machine)
 
-                Invoke-Expression -Command $Command | Out-Null
+                if (!(Test-Path $RegistryDataExtracted)){
+
+                    #Decompress zipped archive
+                    $Command = ("& '{0}\{1}' x {2}\{3}_RegistryHives.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RegPath,$Machine
+
+                    Invoke-Expression -Command $Command | Out-Null
+
+                }
 
                 #Process and store in analysis directory
-                $Command = ("{0}\RegistryExplorer\RECmd.exe --bn {1} -d {2}\{3} --csv {4}") -f (Get-PRPath -Bin),$BatchFile,$RegPath,$Machine,$RegProcessed
+                $Command = ("& '{0}\RegistryExplorer\RECmd.exe' --bn {1} -d {2}\{3} --csv {4}") -f (Get-PRPath -Bin),$BatchFile,$RegPath,$Machine,$RegProcessed
 
                 Invoke-Expression -Command $Command | Out-Null
 
             } else {
 
-                #Prevent additional processing of prefetch already analyzed
+                #Prevent additional processing of registry hives already analyzed
                 continue
             }
         }

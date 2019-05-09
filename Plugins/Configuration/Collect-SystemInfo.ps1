@@ -33,7 +33,14 @@ param (
 process{
 
     #Gets system information for remote host 
-    
-    Get-ComputerInfo | Select CsName, CsDNSHostName, CsPartOfDomain, CsDomain, LogonServer, OsArchitecture, CsProcessors, CsNumberofProcessors, CsNumberofLogicalProcessors, CsPhysicallyInstalledMemory, CstotalPhysicalMemory, OsName, WindowsCurrentVersion, OsVersion, WindowsVersion, OsBuildNumber, OsServicePackMajorVersion, OsServicePackMinorVersion, WindowsInstallDateFromRegistry, OsCountryCode, OsLocalDateTime, OsLocale, TimeZone, OsBootDevice, OsSystemDrive, WindowsSystemRoot, OsUptime, HyperVisorPresent, DeviceGuardServicesRunning, CSManufacturer, CsModel
 
+    try {
+
+        Get-ComputerInfo | Select CsName, CsDNSHostName, CsPartOfDomain, CsDomain, LogonServer, OsArchitecture, CsProcessors, CsNumberofProcessors, CsNumberofLogicalProcessors, CsPhysicallyInstalledMemory, CstotalPhysicalMemory, OsName, WindowsCurrentVersion, OsVersion, WindowsVersion, OsBuildNumber, OsServicePackMajorVersion, OsServicePackMinorVersion, WindowsInstallDateFromRegistry, OsCountryCode, OsLocalDateTime, OsLocale, TimeZone, OsBootDevice, OsSystemDrive, WindowsSystemRoot, OsUptime, HyperVisorPresent, DeviceGuardServicesRunning, CSManufacturer, CsModel
+
+    } catch {
+
+        Write-Warning "Could not collect system information."
+   
+   }  
 }

@@ -35,6 +35,15 @@ param (
 process{
 
     #Get Scheduled Task Information (Will be successful on Windows 10 only)
-    Get-ScheduledTask | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns
+
+    try {
+
+        Get-ScheduledTask | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns
+    
+    } catch {
+
+        Write-Warning "Could not collect scheduled task info."
+    }
+    
     
 }

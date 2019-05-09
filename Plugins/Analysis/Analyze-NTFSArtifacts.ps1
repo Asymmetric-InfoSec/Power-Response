@@ -107,16 +107,16 @@ process{
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem (Get-PRPath -Output)
 
-    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
+    #Loop through and analyze NTFS files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
 
-        #Path to verify for existence before processing prefetch
+        #Path to verify for existence before processing NTFS
         $NTFSPath = ("{0}\{1}\Disk\NTFS_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
-        #Determine if prefetch output directory exists
+        #Determine if NTFS output directory exists
         if (Test-Path $NTFSPath){
 
-            #Verify that prefetch has not already been analyzed
+            #Verify that NTFS has not already been analyzed
             $NTFSProcessed = "$NTFSPath\Analysis\"
 
             if (!(Test-Path $NTFSProcessed)) {
@@ -125,38 +125,38 @@ process{
                 New-Item -Type Directory -Path $NTFSProcessed | Out-Null
 
                 #Decompress zipped archive
-                $Command = ("{0}\{1} x {2}\{3}_NTFS.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$NTFSPath,$Machine
+                $Command = ("& '{0}\{1}' x {2}\{3}_NTFS.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$NTFSPath,$Machine
 
                 Invoke-Expression -Command $Command | Out-Null 
 
                 #Process and store MFT
-                $Command = ('{0}\MFTECmd.exe -f {1}\{2}\c\`$MFT --csv {3}') -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$MFT --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
 
                 Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
 
                 #Process and store $Secure:$SDS
-                $Command = ('{0}\MFTECmd.exe -f {1}\{2}\c\`$Secure`%3A`$SDS --csv {3}') -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$Secure`%3A`$SDS --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
 
                 Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
 
                 #Process and store $LogFile
-                $Command = ('{0}\MFTECmd.exe -f {1}\{2}\c\`$LogFile --csv {3}') -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$LogFile --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
 
                 Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
 
                 #Process and store $UsnJrnl:$J
-                $Command = ('{0}\MFTECmd.exe -f {1}\{2}\c\`$Extend\`$UsnJrnl`%3A`$J --csv {3}') -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$Extend\`$UsnJrnl`%3A`$J --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
 
                 Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
 
                 #Process and store $Boot
-                $Command = ('{0}\MFTECmd.exe -f {1}\{2}\c\`$Extend\`$Boot --csv {3}') -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$Extend\`$Boot --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
 
                 Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
 
             } else {
 
-                #Prevent additional processing of prefetch already analyzed
+                #Prevent additional processing of NTFS already analyzed
                 continue
             }
         }

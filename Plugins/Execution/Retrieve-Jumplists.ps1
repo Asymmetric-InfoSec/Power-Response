@@ -39,7 +39,7 @@ param (
 
 process{
 
-    # Set $Output for where to store recovered prefetch files
+    # Set $Output for where to store recovered jumplist files
     $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('Jumplists_{0:yyyyMMdd}' -f (Get-Date)))
 
     # Create jumplists subdirectory in $global:PowerResponse.OutputPath for storing jumplists
@@ -61,17 +61,17 @@ process{
         }
 
         #Collect Jumplist for specific user
-        $JumpFiles = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\ -ErrorAction SilentlyContinue} -ArgumentList $User
+        $JumpFiles = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem "C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\" -ErrorAction SilentlyContinue} -ArgumentList $User
 
         foreach ($File in $JumpFiles){
 
             #Get Jumplist File Attributes
-            $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$($args[1])).CreationTime} -ArgumentList $User,$File
+            $CreationTime = Invoke-Command -Session $Session -ScriptBlock {(Get-Item "C:\users\$($args[0])\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$($args[1])").CreationTime} -ArgumentList $User,$File
             
             #Copy specified jumplist file to $Output
             Copy-Item "C:\users\$User\AppData\Roaming\Microsoft\Windows\Recent\AutomaticDestinations\$File" -Destination "$Output\$User" -FromSession $Session -Force -ErrorAction SilentlyContinue
 
-            #Set original creation time on copied prefetch file
+            #Set original creation time on copied jumplist file
             (Get-Item "$Output\$User\$File").CreationTime = $CreationTime          
         }
     }

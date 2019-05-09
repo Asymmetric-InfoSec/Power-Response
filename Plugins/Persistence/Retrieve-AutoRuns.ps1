@@ -132,7 +132,7 @@ process{
 
 
     #Run Autorunsc on the remote host and collect ASEP data
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& {0} /accepteula -a * -h -nobanner -vt -s -t -c *") -f ($RemotePath))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}' /accepteula -a * -h -nobanner -vt -s -t -c *") -f ($RemotePath))
     
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | ConvertFrom-CSV
 

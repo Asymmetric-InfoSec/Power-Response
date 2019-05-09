@@ -4,7 +4,36 @@
     Plugin-Name: Retrieve-ShimCache.ps1
     
 .Description
-    This plugin retrieves the Shimcache for remote machines in two ways:
+    This plugin retrives system and user registry hives from a remote machine and 
+    copies them back to the analysis machine for further review. Note, this plugin
+    copies all forensically relevant registry hives if they have not been previously collected.
+    This prevents hives from being manually retrieved multiple times for different
+    plugins.
+
+    Collected registry hives:
+
+    %SYSTEMROOT%\System32\config\SAM
+    %SYSTEMROOT%\System32\config\SAM.LOG1
+    %SYSTEMROOT%\System32\config\SAM.LOG2
+    %SYSTEMROOT%\System32\config\SYSTEM
+    %SYSTEMROOT%\System32\config\SYSTEM.LOG1
+    %SYSTEMROOT%\System32\config\SYSTEM.LOG2
+    %SYSTEMROOT%\System32\config\SOFTWARE
+    %SYSTEMROOT%\System32\config\SOFTWARE.LOG1
+    %SYSTEMROOT%\System32\config\SOFTWARE.LOG2
+    %SYSTEMROOT%\System32\config\SECURITY
+    %SYSTEMROOT%\System32\config\SECURITY.LOG1
+    %SYSTEMROOT%\System32\config\SECURITY.LOG2
+    %SYSTEMROOT%\System32\config\RegBack\*
+
+    %UserProfile%\NTUSER.DAT
+    %UserProfile%\NTUSER.DAT.LOG1
+    %UserProfile%\NTUSER.DAT.LOG2
+    %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat
+    %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1
+    %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2
+
+    Shimcache Plugin Specific Notes:  
     1) The system registry hive is retrieved for further analysis (Eric Zimmerman's AppCompatParser)
     2) The Shimcache is exported to a .reg file for further analysis (Mandiant's shimcacheparser.py)
 
@@ -35,164 +64,236 @@ param (
 
 process{
 
-    # Verify that 7za executables are located in (Get-PRPath -Bin)
+    #Determine if registry hives were already collected, if not, collect all of them
 
-    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
-    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
+    $FinalOutputPath = (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RegistryHives_{0:yyyyMMdd}' -f (Get-Date)))
 
-    $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
-    $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
+    if (!(Test-Path $FinalOutputPath)) {
 
-    if (!$7z64bitTestPath) {
+         # Verify that 7za executables are located in (Get-PRPath -Bin)
 
-        Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
+        $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
+        $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
 
-    } elseif (!$7z32bitTestPath) {
+        $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
+        $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
 
-        Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-    }
+        if (!$7z64bitTestPath) {
 
-    #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
+            Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
 
-    $Velo_64 = ("{0}\Velociraptor-amd64.exe" -f (Get-PRPath -Bin))
-    $Velo_32 = ("{0}\Velociraptor-386.exe" -f (Get-PRPath -Bin))
+        } elseif (!$7z32bitTestPath) {
 
-    $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
-    $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
+            Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
+        }
 
-    if (!$Velo_64TestPath) {
+        #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
 
-        Throw "64 bit version of Velociraptor not detected in Bin. Place 64bit executable in Bin directory and try again."
+        $Velo_64 = ("{0}\Velociraptor_x64.exe" -f (Get-PRPath -Bin))
+        $Velo_32 = ("{0}\Velociraptor_x86.exe" -f (Get-PRPath -Bin))
 
-    } elseif (!$Velo_32TestPath) {
+        $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
+        $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
 
-        Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
-    }
+        if (!$Velo_64TestPath) {
 
-    # Set $Output for where to store recovered artifacts
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('ShimCache_{0:yyyyMMdd}' -f (Get-Date)))
+            Throw "64 bit version of Velociraptor not detected in Bin. Place 64bit executable in Bin directory and try again."
 
-    # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
-    If (!(Test-Path $Output)){
+        } elseif (!$Velo_32TestPath) {
 
-        New-Item -Type Directory -Path $Output | Out-Null
-    }
+            Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
+        }
 
-    #Determine system architecture and select proper 7za.exe and Velociraptor executables
-    try {
-     
-        $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
-    
-        if ($Architecture -eq "64-bit") {
+        # Set $Output for where to store recovered artifacts
+        $Output= (Get-PRPath -ComputerName $Session.ComputerName -Plugin 'Retrieve-RegistryHives.ps1' -Directory ('RegistryHives_{0:yyyyMMdd}' -f (Get-Date)))
 
-            $Installexe = $7za64
-            $Velo_exe = $Velo_64
+        # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
+        If (!(Test-Path $Output)){
 
-        } elseif ($Architecture -eq "32-bit") {
+            New-Item -Type Directory -Path $Output -Force | Out-Null
+        }
 
-            $Installexe = $7za32
-            $Velo_exe = $Velo_32
-
-        } else {
+        #Determine system architecture and select proper 7za.exe and Velociraptor executables
+        try {
+         
+            $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
         
-            Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Session.ComputerName)
+            if ($Architecture -eq "64-bit") {
+
+                $Installexe = $7za64
+                $Velo_exe = $Velo_64
+
+            } elseif ($Architecture -eq "32-bit") {
+
+                $Installexe = $7za32
+                $Velo_exe = $Velo_32
+
+            } else {
+            
+                Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Session.ComputerName)
+                Continue
+            }
+
+        } catch {
+        
+         Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Session.ComputerName)
             Continue
         }
 
-    } catch {
-    
-     Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Session.ComputerName)
-        Continue
-    }
+        # Copy 7zip and Velociraptor to remote machine
 
-    # Copy 7zip and Velociraptor to remote machine
+        try {
 
-    try {
+            Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
 
-        Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
+        } catch {
 
-    } catch {
+            Throw "Could not copy 7zip to remote machine. Quitting..."
+        }
 
-        Throw "Could not copy 7zip to remote machine. Quitting..."
-    }
+        try {
 
-    try {
+            Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
 
-        Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
+        } catch {
 
-    } catch {
-
-        Throw "Could not copy Velociraptor to remote machine. Quitting..."
-    }
-       
-    #Verify that 7zip and Velociraptor installed properly
-
-    $VeloTest = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0]))} -ArgumentList (Split-Path $Velo_exe -Leaf)
-    $7zTest = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0]))} -ArgumentList (Split-Path $Installexe -Leaf)
-
-    if (!$VeloTest){
-
-        Throw ("Velociraptor not found on {0}. There may have been a problem during the copy process. Artifacts were not acquired." -f $Session.ComputerName)   
-    
-    }
-
-    if (!$7zTest){
-
-        Throw ("7zip not found on {0}. There may have been a problem during the copy process. Artifacts were not acquired." -f $Session.ComputerName)
-    
-    }
-
-    #Create Output directory structure on remote host
-    $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0])) -ErrorAction SilentlyContinue} -ArgumentList $Session.ComputerName
-
-    If (!$TestRemoteDumpPath){
-
-        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ("C:\ProgramData\{0}" -f $($args[0])) | Out-Null} -ArgumentList $Session.ComputerName
-    
-    }
-
-    #Collect System Artifacts    
-    $SystemArtifacts = @(
-
-        "$env:SystemRoot\System32\config\SYSTEM",
-        "$env:SystemRoot\System32\config\SYSTEM.LOG1",
-        "$env:SystemRoot\System32\config\SYSTEM.LOG2"
-
-    )
+            Throw "Could not copy Velociraptor to remote machine. Quitting..."
+        }
            
-    foreach ($Artifact in $SystemArtifacts){
+        #Verify that 7zip and Velociraptor installed properly
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(('& C:\ProgramData\{0} fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}') -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
+        $VeloTest = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0]))} -ArgumentList (Split-Path $Velo_exe -Leaf)
+        $7zTest = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0]))} -ArgumentList (Split-Path $Installexe -Leaf)
+
+        if (!$VeloTest){
+
+            Throw ("Velociraptor not found on {0}. There may have been a problem during the copy process. Artifacts were not acquired." -f $Session.ComputerName)   
+        
+        }
+
+        if (!$7zTest){
+
+            Throw ("7zip not found on {0}. There may have been a problem during the copy process. Artifacts were not acquired." -f $Session.ComputerName)
+        
+        }
+
+        #Create Output directory structure on remote host
+        $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0])) -ErrorAction SilentlyContinue} -ArgumentList $Session.ComputerName
+
+        If (!$TestRemoteDumpPath){
+
+            Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ("C:\ProgramData\{0}" -f $($args[0])) | Out-Null} -ArgumentList $Session.ComputerName
+        
+        }
+
+        #Collect System Artifacts    
+        $SystemArtifacts = @(
+
+            "$env:SystemRoot\System32\config\SAM",
+            "$env:SystemRoot\System32\config\SAM.LOG1",
+            "$env:SystemRoot\System32\config\SAM.LOG2",
+            "$env:SystemRoot\System32\config\SYSTEM",
+            "$env:SystemRoot\System32\config\SYSTEM.LOG1",
+            "$env:SystemRoot\System32\config\SYSTEM.LOG2",
+            "$env:SystemRoot\System32\config\SOFTWARE",
+            "$env:SystemRoot\System32\config\SOFTWARE.LOG1",
+            "$env:SystemRoot\System32\config\SOFTWARE.LOG2",
+            "$env:SystemRoot\System32\config\SECURITY",
+            "$env:SystemRoot\System32\config\SECURITY.LOG1",
+            "$env:SystemRoot\System32\config\SECURITY.LOG2",
+            "$env:SystemRoot\System32\config\*"
+
+        )
+               
+        foreach ($Artifact in $SystemArtifacts){
+
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
+            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
+        }
+        
+        #Collect User Artifacts
+
+        $UserArtifacts = @(
+
+            "NTUSER.DAT",
+            "NTUSER.DAT.LOG1",
+            "NTUSER.DAT.LOG2",
+            "AppData\Local\Microsoft\Windows\UsrClass.dat",
+            "AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1",
+            "AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2"
+
+            )
+
+        # Grab list of user profiles
+        $Users = Invoke-Command -Session $Session -Scriptblock {Get-CimInstance -ClassName Win32_UserProfile | Select-Object -ExpandProperty LocalPath | Select-String Users}
+
+        # Iterate through each user profile grabbing the artifacts
+        foreach ($User in $Users){
+
+            foreach ($Artifact in $UserArtifacts) {
+
+                $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\{1}\{2} C:\ProgramData\{3}") -f ((Split-Path $Velo_exe -Leaf), $User, $Artifact,$Session.ComputerName))
+                Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
+            }
+         
+        }
+            
+        # Compress artifacts directory      
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_RegistryHives.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
-    }
-    
-    #Export Shimcache to .reg located in C:\ProgramData\<MachineName> (Analyze with Mandiant ShimCacheParser.py)
 
+        # Copy artifacts back to $Output (Uses $Session)
+        try {
+
+            Copy-Item -Path (("C:\ProgramData\{0}_RegistryHives.zip") -f ($Session.ComputerName)) -Destination "$Output" -FromSession $Session -Force -ErrorAction Stop
+
+        } catch {
+
+            throw "There was an error copying zipped archive back to data collection machine. Retrieve data manually through PS Session."
+        }
+        
+        # Delete initial artifacts, 7za, and velociraptor binaries from remote machine
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}, C:\ProgramData\{1}, C:\ProgramData\{2}_RegistryHives.zip, C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), (Split-Path $Installexe -Leaf), $Session.ComputerName))
+        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
+
+    }
+
+    # Set $Output for where to store recovered artifacts
+    $ShimOutput= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('ShimCache_{0:yyyyMMdd}' -f (Get-Date)))
+
+    if (!(Test-Path $ShimOutput)){
+
+        New-Item -Type Directory -Path $ShimOutput -Force | Out-Null
+    }
+
+    # Export shimcache into .reg file
     try{
 
-        Invoke-Command -Session $Session -ScriptBlock {reg export 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache' ('C:\ProgramData\{0}\Shimcache.reg' -f ($($args[0])))} -ArgumentList $Session.ComputerName | Out-Null
+        Invoke-Command -Session $Session -ScriptBlock {reg export 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache' 'C:\ProgramData\Shimcache.reg'} | Out-Null
 
     } catch {
 
-
+        Write-Warning "There was a problem exporting stand alone Shimcache reg key or value on {0)" -f $Session.ComputerName
     }
-    
-    # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& C:\ProgramData\{0} a C:\ProgramData\{1}_ShimCache.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
-    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
-    # Copy artifacts back to $Output (Uses $Session)
+    #Copy .reg file back to output directory on local machine
     try {
 
-        Copy-Item -Path (("C:\ProgramData\{0}_ShimCache.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
+        Copy-Item -Path 'C:\ProgramData\Shimcache.reg' -Destination $ShimOutput -FromSession $Session -Force
 
     } catch {
 
-        throw "There was an error copying zipped archive back to data collection machine. Retrieve data manually through PS Session."
+        Write-Warning "There was a problem copying Shimcache reg export on {0}" -f $Session.ComputerName
     }
-    
-    # Delete initial artifacts, 7za, and velociraptor binaries from remote machine
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}, C:\ProgramData\{1}, C:\ProgramData\{2}_ShimCache.zip, C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), (Split-Path $Installexe -Leaf), $Session.ComputerName))
-    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
+    #Remove .reg from remote machine
+    try {
+
+        Invoke-Command -Session $Session -ScriptBlock {Remove-Item 'C:\ProgramData\ShimCache.reg' -Force}
+
+    } catch {
+
+        Write-Warning ("Could not delete .reg file on {0}, manual removal is needed." -f $Session.ComputerName)
+    }
 }
+

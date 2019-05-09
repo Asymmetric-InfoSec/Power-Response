@@ -103,16 +103,16 @@ process{
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem (Get-PRPath -Output)
 
-    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
+    #Loop through and analyze recyclebin files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
 
-        #Path to verify for existence before processing prefetch
+        #Path to verify for existence before processing recyclebin
         $RecyclePath = ("{0}\{1}\Disk\RecycleBin_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
-        #Determine if prefetch output directory exists
+        #Determine if recyclebin output directory exists
         if (Test-Path $RecyclePath){
 
-            #Verify that prefetch has not already been analyzed
+            #Verify that recyclebin has not already been analyzed
             $RecycleProcessed = "$RecyclePath\Analysis\"
 
             if (!(Test-Path $RecycleProcessed)) {
@@ -121,18 +121,18 @@ process{
                 New-Item -Type Directory -Path $RecycleProcessed | Out-Null
 
                 #Decompress zipped archive
-                $Command = ("{0}\{1} x {2}\{3}_RecycleBin.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RecyclePath,$Machine
+                $Command = ("& '{0}\{1}' x {2}\{3}_RecycleBin.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RecyclePath,$Machine
 
                 Invoke-Expression -Command $Command | Out-Null
 
                 #Process and store in analysis directory
-                $Command = ('{0}\RBCmd.exe -d {1}\{2}\c\`$Recycle.Bin --csv {3}') -f (Get-PRPath -Bin),$RecyclePath,$Machine,$RecycleProcessed
+                $Command = ("& '{0}\RBCmd.exe' -d {1}\{2}\c\`$Recycle.Bin --csv {3}") -f (Get-PRPath -Bin),$RecyclePath,$Machine,$RecycleProcessed
 
                 Invoke-Expression -Command $Command | Out-Null
 
             } else {
 
-                #Prevent additional processing of prefetch already analyzed
+                #Prevent additional processing of recyclebin already analyzed
                 continue
             }
         }

@@ -79,7 +79,7 @@ process{
                 #Determine if output directory exists
                 if (Test-Path $JumpItemsData){
 
-                    #Verify that prefetch has not already been analyzed
+                    #Verify that jumplist has not already been analyzed
                     $JumpItemsProcessed = "$JumpItemsData\Analysis\"
 
                     if (!(Test-Path $JumpItemsProcessed)) {
@@ -88,7 +88,7 @@ process{
                         New-Item -Type Directory -Path $JumpItemsProcessed | Out-Null
 
                         #Process data and store in analysis directory
-                        $Command = ("{0}\JLECmd.exe -d {1} --csv {2}") -f (Get-PRPath -Bin),$JumpItemsData,$JumpItemsProcessed
+                        $Command = ("& '{0}\JLECmd.exe' -d {1} --csv {2}") -f (Get-PRPath -Bin),$JumpItemsData,$JumpItemsProcessed
 
                         Invoke-Expression -Command $Command | Out-Null
 
