@@ -578,7 +578,25 @@ function Invoke-RunCommand {
             Write-Log -Message $Message
 
             # Invoke the PR Plugin
-            Invoke-PRPlugin -Path $global:PowerResponse.Location -Session $Session
+
+            try {
+
+                Invoke-PRPlugin -Path $global:PowerResponse.Location -Session $Session
+
+            } catch {
+                    
+                    # Format warning $Message
+                    $Message = 'Error Invoking Plugin: Session, privilege, or availability error cccurred'
+
+                    # Write warning $Message
+                    Write-Warning -Message ("{0}`n`tSkipping plugin execution" -f $Message)
+
+                    # Write log $Message
+                    Write-Log -Message $Message
+
+                    return
+            }
+            
 
             # Protect any files that were copied to this particular $global:PowerResponse.OutputPath
             Protect-PRFile
