@@ -160,7 +160,7 @@ process{
            
     foreach ($SID in $SIDS){
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\C:\`$Recycle.Bin\{1}\* C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $SID, $Session.ComputerName))
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\C:\```$Recycle.Bin\{1}\* C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $SID, $Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
     }
         
