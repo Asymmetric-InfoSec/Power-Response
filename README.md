@@ -82,6 +82,8 @@ At anytime you can execute the `show` command to see what is available to you in
 
 #### For a quick video tutorial, take a look at this video
 
+[Intro to Power-Response](https://www.youtube.com/watch?v=BMOyyZsQvPs&t=2s)
+
 ### Contact Information ###
 
 Drew Schmitt - @5ynax (Twitter)
