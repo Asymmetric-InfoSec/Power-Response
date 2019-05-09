@@ -108,7 +108,7 @@ process{
     #Format String Properly for use
     $AnalysisDate = ('{0:yyyyMMdd}' -f $AnalyzeDate)
 
-    $TestPlugins = Test-Path ("{0}\RegistryExplorer\Plugins\" -f (Get-PRPath -Bin))
+    $TestPlugins = Test-Path ("{0}\RegistryExplorer\Plugins" -f (Get-PRPath -Bin))
 
     if (!$TestPlugins){
 
@@ -129,13 +129,13 @@ process{
     foreach ($Machine in $Machines){
 
         #Path to verify for existence before processing registry hives
-        $RegPath = ("{0}\{1}\Disk\RegistryHives_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
+        $RegPath = ("{0}\{1}\Disk\RegistryHives_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
         #Determine if registry explorer output directory exists
         if (Test-Path $RegPath){
 
             #Verify that registry hives have not already been analyzed
-            $RegProcessed = "$RegPath\Analysis\"
+            $RegProcessed = "$RegPath\Analysis"
 
             if (!(Test-Path $RegProcessed)) {
 
@@ -156,7 +156,7 @@ process{
                 #Process and store in analysis directory
                 $Command = ("& '{0}\RegistryExplorer\RECmd.exe' --bn {1} -d {2}\{3} --csv {4}") -f (Get-PRPath -Bin),$BatchFile,$RegPath,$Machine,$RegProcessed
 
-                Invoke-Expression -Command $Command | Out-Null
+                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\RBECmd_Log.txt" -f $RegProcessed)
 
             } else {
 

@@ -64,7 +64,7 @@ process{
     foreach ($Machine in $Machines){
 
         #Path to verify for existence before processing
-        $RecentItemsPath = ("{0}\{1}\Execution\RecentItems_{2}\") -f (Get-PRPath -Output),$Machine,$AnalysisDate
+        $RecentItemsPath = ("{0}\{1}\Execution\RecentItems_{2}") -f (Get-PRPath -Output),$Machine,$AnalysisDate
 
         if (Test-Path $RecentItemsPath) {
         
@@ -80,7 +80,7 @@ process{
                 if (Test-Path $RecentItemsData){
 
                     #Verify that has not already been analyzed
-                    $RecentItemsProcessed = "$RecentItemsData\Analysis\"
+                    $RecentItemsProcessed = "$RecentItemsData\Analysis"
 
                     if (!(Test-Path $RecentItemsProcessed)) {
 
@@ -90,7 +90,7 @@ process{
                         #Process data and store in analysis directory
                         $Command = ("& '{0}\LECmd.exe' -d {1} --csv {2}") -f (Get-PRPath -Bin),$RecentItemsData,$RecentItemsProcessed
 
-                        Invoke-Expression -Command $Command | Out-Null
+                        Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\LECmd_Log.txt" -f $RecentItemsProcessed)
 
                     } else {
 

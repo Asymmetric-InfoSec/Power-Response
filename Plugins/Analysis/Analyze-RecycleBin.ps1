@@ -107,13 +107,13 @@ process{
     foreach ($Machine in $Machines){
 
         #Path to verify for existence before processing recyclebin
-        $RecyclePath = ("{0}\{1}\Disk\RecycleBin_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
+        $RecyclePath = ("{0}\{1}\Disk\RecycleBin_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
         #Determine if recyclebin output directory exists
         if (Test-Path $RecyclePath){
 
             #Verify that recyclebin has not already been analyzed
-            $RecycleProcessed = "$RecyclePath\Analysis\"
+            $RecycleProcessed = "$RecyclePath\Analysis"
 
             if (!(Test-Path $RecycleProcessed)) {
 
@@ -126,9 +126,9 @@ process{
                 Invoke-Expression -Command $Command | Out-Null
 
                 #Process and store in analysis directory
-                $Command = ("& '{0}\RBCmd.exe' -d {1}\{2}\c\`$Recycle.Bin --csv {3}") -f (Get-PRPath -Bin),$RecyclePath,$Machine,$RecycleProcessed
+                $Command = ("& '{0}\RBCmd.exe' -d '{1}\{2}\c\`$Recycle.Bin' --csv {3}") -f (Get-PRPath -Bin),$RecyclePath,$Machine,$RecycleProcessed
 
-                Invoke-Expression -Command $Command | Out-Null
+                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\RBCmd_Log.txt" -f $RecycleProcessed)
 
             } else {
 

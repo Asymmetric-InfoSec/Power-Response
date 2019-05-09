@@ -64,7 +64,7 @@ process{
     foreach ($Machine in $Machines){
 
         #Path to verify for existence before processing 
-        $JumpItemsPath = ("{0}\{1}\Execution\Jumplists_{2}\") -f (Get-PRPath -Output),$Machine,$AnalysisDate
+        $JumpItemsPath = ("{0}\{1}\Execution\Jumplists_{2}") -f (Get-PRPath -Output),$Machine,$AnalysisDate
 
         if (Test-Path $JumpItemsPath) {
         
@@ -80,7 +80,7 @@ process{
                 if (Test-Path $JumpItemsData){
 
                     #Verify that jumplist has not already been analyzed
-                    $JumpItemsProcessed = "$JumpItemsData\Analysis\"
+                    $JumpItemsProcessed = "$JumpItemsData\Analysis"
 
                     if (!(Test-Path $JumpItemsProcessed)) {
 
@@ -90,7 +90,7 @@ process{
                         #Process data and store in analysis directory
                         $Command = ("& '{0}\JLECmd.exe' -d {1} --csv {2}") -f (Get-PRPath -Bin),$JumpItemsData,$JumpItemsProcessed
 
-                        Invoke-Expression -Command $Command | Out-Null
+                        Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\JLECmd_Log.txt" -f $JumpItemsProcessed)
 
                     } else {
 
