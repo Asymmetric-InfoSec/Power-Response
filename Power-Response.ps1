@@ -560,14 +560,6 @@ function Invoke-RunCommand {
                 }
             }
 
-            # # Parse $OfflineComputer list from PSRemotingTransportException errors
-            # $OfflineComputer = $Error.Exception | Foreach-Object { if ($PSItem -is [System.Management.Automation.Remoting.PSRemotingTransportException] -and $PSItem.Message -Match 'Connecting to remote server (\S+) failed' -and $Matches.Count -gt 1) { $Matches[1] } }
-            # foreach ($Computer in $OfflineComputer) {
-            #     # Format the offline $Message
-            #     $Message = 'Skipping offline machine: {0}' -f $Computer
-
-            # }
-
             # Format execution $Message
             $Message = 'Plugin Execution Started at {0}' -f (Get-Date)
 
