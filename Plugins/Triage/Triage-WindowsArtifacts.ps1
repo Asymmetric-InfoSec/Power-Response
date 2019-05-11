@@ -10,7 +10,7 @@
     plugins to gather information:
 
     Invoke-PRPlugin -Name Retrive-NTFSArtifacts.ps1 -Session $Session
-    Invoke-PRPlugin -Name Retrive-RegistryFiles.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-RegistryHives.ps1 -Session $Session
     Invoke-PRPlugin -Name Retrive-EventLogFiles.ps1 -Session $Session
     Invoke-PRPlugin -Name Retrive-Amcache.ps1 -Session $Session
     Invoke-PRPlugin -Name Retrive-Prefetch.ps1 -Session $Session
