@@ -839,7 +839,7 @@ function Invoke-PRPlugin {
                     $Result.Group | Out-PRFile -ComputerName $Result.Name -Plugin $Path
 
                     # Format the remote execution success $Message
-                    $Message = 'Plugin Execution Succeeded for {0}' -f $Result.Name
+                    $Message = 'Plugin {0} Execution Succeeded for {1}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$Result.Name
 
                     # Write host $Message
                     Write-Host -Object $Message
@@ -853,8 +853,8 @@ function Invoke-PRPlugin {
 
                 foreach ($RemoteError in $RemoteErrors) {
                     # Format the remote error $Message
-                    $Message = 'Plugin Execution Error for {0}: {1}' -f $RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
-                    
+                    $Message = 'Plugin {0} Execution Error for {1}: {2}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
+
                     # Write warning $Message
                     Write-Warning -Message $Message
 
@@ -882,13 +882,13 @@ function Invoke-PRPlugin {
                     & $Path @ReleventParameters | Out-PRFile -ComputerName $SessionInstance.ComputerName -Plugin $Path
 
                     # Format host success $Message
-                    $Message = 'Plugin Execution Succeeded for {0} at {1}' -f $SessionInstance.ComputerName, (Get-Date)
+                    $Message = 'Plugin {0} Execution Succeeded for {1} at {2}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$SessionInstance.ComputerName, (Get-Date)
 
                     # Write execution success message
                     Write-Host -Object $Message
                 } catch {
                     # Format warning $Message
-                    $Message = 'Plugin Execution Error for {0}: {1}' -f $SessionInstance.ComputerName,$PSItem
+                    $Message = 'Plugin {0} Execution Error for {1}: {2}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$SessionInstance.ComputerName,$PSItem
 
                     # Write warning $Message to screen along with some admin advice
                     Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
@@ -902,11 +902,11 @@ function Invoke-PRPlugin {
 
     end {
         # Compute $AnalysisPath
-        $AnalysisPath = '{0}\Analysis\{1}' -f (Get-PRPath -Plugins),($Path -Replace '.+-','Analyze-')
+        $AnalysisPath = '{0}\Analysis\{1}' -f (Get-PRPath -Plugins),($Path -Replace '.+?-','Analyze-')
 
         # If auto execution of analysis plugins is set and we have a valid $AnalysisPath
         if ($global:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $Path -and (Test-Path -Path $AnalysisPath)) {
-            Write-Host -Object 'Detected Analysis Plugin'
+            Write-Host -Object ('Detected Analysis Plugin {0}' -f (Get-Item -Path $AnalysisPath).BaseName.ToUpper())
 
             # Invoke the $AnalysisPath plugin
             Invoke-PRPlugin -Path $AnalysisPath -Session $Session
@@ -922,7 +922,7 @@ function Out-PRFile {
         [Parameter(Mandatory=$true)]
         [String]$ComputerName,
 
-        [String]$Plugin,
+        [String]$Plugin = $global:PowerResponse.Location.FullName,
 
         [ValidateSet('CSV','XML')]
         [String[]]$OutputType = $global:PowerResponse.Parameters.OutputType,
@@ -936,8 +936,13 @@ function Out-PRFile {
         # Get UTC $Date
         $Date = (Get-Date).ToUniversalTime()
 
+        # Resolve $Plugin that is passed as a name reference
+        if (!(Test-Path -Path $Plugin)) {
+            $Plugin = Get-PRPlugin -Name $Plugin
+        }
+
         # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}_{APPEND}
-        $Name = ('{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}_{2}' -f $Date, $global:PowerResponse.Location.BaseName.ToLower(),$Append) -Replace '_$'
+        $Name = ('{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}_{2}' -f $Date, (Get-Item -Path $Plugin).BaseName.ToLower(),$Append) -Replace '_$'
 
         # Remove irrelevent keys from $PSBoundParameters
         $null = $PSBoundParameters.Remove('InputObject')
