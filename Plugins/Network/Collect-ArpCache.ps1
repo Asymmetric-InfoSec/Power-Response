@@ -39,7 +39,7 @@ process {
 
     } catch {
 
-        Write-Warning "Arp Cache information could not be colleted."
+        Write-Warning "Arp Cache information could not be collected."
     }
     
 
