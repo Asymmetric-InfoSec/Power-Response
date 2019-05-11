@@ -60,16 +60,25 @@ param (
 
 process{
 
-    #Determine if registry hives were already collected, if not, collect all of them
+    #7zip checks
+    $7zTestPath = "C:\ProgramData\7za*.exe"
+    $7zFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $7zTestPath
 
-    $FinalOutputPath = (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RegistryHives_{0:yyyyMMdd}' -f (Get-Date)))
+    #7zip BIN locations
+    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
+    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
 
-    if (!(Test-Path $FinalOutputPath)) {
+    #Velociraptor checks
+    $VeloTestPath = "C:\ProgramData\Velociraptor*.exe"
+    $VeloFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $VeloTestPath
 
-         # Verify that 7za executables are located in (Get-PRPath -Bin)
+    #Velociraptor BIN locations
+    $Velo_64 = ("{0}\Velociraptor_x64.exe" -f (Get-PRPath -Bin))
+    $Velo_32 = ("{0}\Velociraptor_x86.exe" -f (Get-PRPath -Bin))
 
-        $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
-        $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
+    if (!$7zFlag){
+
+        # Verify that 7za executables are located in (Get-PRPath -Bin)
 
         $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
         $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
@@ -82,11 +91,11 @@ process{
 
             Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
         }
+    }
+
+    if (!$VeloFlag){
 
         #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
-
-        $Velo_64 = ("{0}\Velociraptor_x64.exe" -f (Get-PRPath -Bin))
-        $Velo_32 = ("{0}\Velociraptor_x86.exe" -f (Get-PRPath -Bin))
 
         $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
         $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
@@ -99,6 +108,13 @@ process{
 
             Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
         }
+    }
+
+    #Determine if registry hives were already collected, if not, collect all of them
+
+    $FinalOutputPath = (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RegistryHives_{0:yyyyMMdd}' -f (Get-Date)))
+
+    if (!(Test-Path $FinalOutputPath)) {
 
         # Set $Output for where to store recovered artifacts
         $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RegistryHives_{0:yyyyMMdd}' -f (Get-Date)))
@@ -137,40 +153,30 @@ process{
         }
 
         # Copy 7zip and Velociraptor to remote machine
+        if (!$7zFlag){
 
-        try {
+            try {
 
-            Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
+                Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
 
-        } catch {
+            } catch {
 
-            Throw "Could not copy 7zip to remote machine. Quitting..."
+                Throw "Could not copy 7zip to remote machine. Quitting..."
+            }
+
         }
 
-        try {
+        if (!$VeloFlag){
 
-            Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
+          try {
 
-        } catch {
+                Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
 
-            Throw "Could not copy Velociraptor to remote machine. Quitting..."
-        }
-           
-        #Verify that 7zip and Velociraptor installed properly
+            } catch {
 
-        $VeloTest = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0]))} -ArgumentList (Split-Path $Velo_exe -Leaf)
-        $7zTest = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0]))} -ArgumentList (Split-Path $Installexe -Leaf)
-
-        if (!$VeloTest){
-
-            Throw ("Velociraptor not found on {0}. There may have been a problem during the copy process. Artifacts were not acquired." -f $Session.ComputerName)   
-        
-        }
-
-        if (!$7zTest){
-
-            Throw ("7zip not found on {0}. There may have been a problem during the copy process. Artifacts were not acquired." -f $Session.ComputerName)
-        
+                Throw "Could not copy Velociraptor to remote machine. Quitting..."
+            }
+          
         }
 
         #Create Output directory structure on remote host
@@ -247,9 +253,23 @@ process{
 
             throw "There was an error copying zipped archive back to data collection machine. Retrieve data manually through PS Session."
         }
+
+        #Delete 7zip if deployed by plugin
+        if (!$7zFlag){
+
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Installexe -Leaf))
+            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
+        }
         
-        # Delete initial artifacts, 7za, and velociraptor binaries from remote machine
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}, C:\ProgramData\{1}, C:\ProgramData\{2}_RegistryHives.zip, C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), (Split-Path $Installexe -Leaf), $Session.ComputerName))
+        #Delete Velociraptor if deployed by plugin
+        if (!$VeloFlag){
+
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Velo_exe -Leaf))
+            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
+        }
+    
+        # Delete remaining artifacts from remote machine
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}_RegistryHives.zip, C:\ProgramData\{0}") -f ( $Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
     }

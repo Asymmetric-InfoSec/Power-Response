@@ -125,7 +125,7 @@ process{
                 New-Item -Type Directory -Path $NTFSProcessed | Out-Null
 
                 #Decompress zipped archive
-                $Command = ("& '{0}\{1}' x {2}\{3}_NTFS.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$NTFSPath,$Machine
+                $Command = ("& '{0}\{1}' x '{2}\{3}_NTFS.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$NTFSPath,$Machine
 
                 Invoke-Expression -Command $Command | Out-Null 
 

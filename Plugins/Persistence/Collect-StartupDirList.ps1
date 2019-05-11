@@ -1,11 +1,11 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Collect-StartupDirListing.ps1
+    Plugin-Name: Collect-StartupList.ps1
     
 .Description
 
-	Collects the startup directory contents (listing only) for each user
+	Collects the list of startup directory contents for each user and all users (public)
 	to use as part of an investigation to determine if there are persistence
     mechanisms established via the startup directory
 
@@ -64,15 +64,15 @@ process {
 
     foreach ($Item in $AllUsersStartup) {
 
-            $OutHash = @{
+        $OutHash = @{
 
-                "User" = "All Users"
-                "Name" = $Item.Name
-                "Mode" = $Item.Mode
-                "CreationTime" = $Item.CreationTimeUtc
-                "ModificationTime" = $Item.LastWriteTimeUtc
-            }
-
-            [PSCustomObject]$OutHash | Select User, Name, Mode, CreationTime, ModificationTime
+            "User" = "All Users"
+            "Name" = $Item.Name
+            "Mode" = $Item.Mode
+            "CreationTime" = $Item.CreationTimeUtc
+            "ModificationTime" = $Item.LastWriteTimeUtc
         }
+
+        [PSCustomObject]$OutHash | Select User, Name, Mode, CreationTime, ModificationTime
+    }
 }
