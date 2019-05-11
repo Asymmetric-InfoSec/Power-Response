@@ -158,6 +158,8 @@ process{
     Invoke-PRPlugin -Name Collect-WMIBindings.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-WMIConsumers.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-WMIFilters.ps1 -Session $Session
+    Invoke-PRPlugin -Name Collect-LocalUsers.ps1 -Session $Session
+    Invoke-PRPlugin -Name Collect-UserProfileListing.ps1 -Session $Session
 
 
     #Delete 7zip if deployed by plugin
