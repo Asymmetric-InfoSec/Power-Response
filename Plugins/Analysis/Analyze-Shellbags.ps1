@@ -125,7 +125,7 @@ process{
                 if (!(Test-Path $ShellbagsDataExtracted)){
 
                     #Decompress zipped archive
-                    $Command = ("& '{0}\{1}' x {2}\{3}_RegistryHives.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShellbagsPath,$Machine
+                    $Command = ("& '{0}\{1}' x '{2}\{3}_RegistryHives.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShellbagsPath,$Machine
 
                     Invoke-Expression -Command $Command | Out-Null
                 }
@@ -133,7 +133,7 @@ process{
                 #Process and store in analysis directory
                 $Command = ("& '{0}\SBECmd.exe' -d {2}\{3} --csv {4}") -f (Get-PRPath -Bin),$BatchFile,$ShellbagsPath,$Machine,$ShellbagsProcessed
 
-                Invoke-Expression -Command $Command | Out-Null
+                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\Shellbags_Log.txt" -f $ShimCacheProcessed)
 
             } else {
 

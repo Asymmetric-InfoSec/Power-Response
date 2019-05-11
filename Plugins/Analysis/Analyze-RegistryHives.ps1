@@ -147,7 +147,7 @@ process{
                 if (!(Test-Path $RegistryDataExtracted)){
 
                     #Decompress zipped archive
-                    $Command = ("& '{0}\{1}' x {2}\{3}_RegistryHives.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RegPath,$Machine
+                    $Command = ("& '{0}\{1}' x '{2}\{3}_RegistryHives.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RegPath,$Machine
 
                     Invoke-Expression -Command $Command | Out-Null
 

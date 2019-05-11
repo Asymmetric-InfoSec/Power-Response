@@ -38,36 +38,46 @@ param (
 
 process{
 
+    #7zip checks
+    $7zTestPath = "C:\ProgramData\7za*.exe"
+    $7zFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $7zTestPath
+
+    #7zip BIN locations
+    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
+    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
+
+    if (!$7zFlag){
+
+        # Verify that 7za executables are located in (Get-PRPath -Bin)
+
+        $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
+        $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
+
+        if (!$7z64bitTestPath) {
+
+            Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
+
+        } elseif (!$7z32bitTestPath) {
+
+            Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
+        }
+    }
+
+    $Winpmem = ("{0}\winpmem.exe" -f (Get-PRPath -Bin))
+    $WinpmemTestPath = Get-Item -Path $Winpmem -ErrorAction SilentlyContinue
+
+    if (!$WinpmemTestPath) {
+
+        Throw "winpmem not detected in Bin. Place executable in Bin directory and try again."
+    }
+
     # Set $Output for where to store recovered memory
-    $Output= Get-PRPath -ComputerName $Session.ComputerName -Directory 'Memory'
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('Memory_{0:yyyyMMdd}' -f (Get-Date)))
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing memory
     If (!(Test-Path $Output)) {
 
         New-Item -Type Directory -Path $Output | Out-Null
-    }
-
-    # Verify that 7za and winpmem executables are located in (Get-PRPath -Bin)
-
-    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
-    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
-    $Winpmem = ("{0}\winpmem.exe" -f (Get-PRPath -Bin))
-
-    $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
-    $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
-    $WinpmemTestPath = Get-Item -Path $Winpmem -ErrorAction SilentlyContinue
-
-    if (-not $7z64bitTestPath) {
-
-        Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-    } elseif (-not $7z32bitTestPath) {
-
-        Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-
-    } elseif (-not $WinpmemTestPath) {
-
-        Throw "winpmem not detected in Bin. Place executable in Bin directory and try again."
     }
 
     #Determine system architecture and select proper 7za.exe executable
@@ -96,73 +106,53 @@ process{
     }
 
     #Copy winpmem to remote host
-    $RemotePathWinpmem = ("C:\ProgramData\{0}" -f (Split-Path -Path $Winpmem -Leaf))
-    
     try {
     
-    Copy-Item -Path $Winpmem -Destination $RemotePathWinpmem -ToSession $Session -ErrorAction Stop
-    
-    $RemoteFileWinpmem = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $($args[0]) -ErrorAction Stop} -ArgumentList $RemotePathWinpmem
+        Copy-Item -Path $Winpmem -Destination "C:\ProgramData" -ToSession $Session -ErrorAction Stop
 
-    # verify that the file copy succeeded to the remote host
-        if (!$RemoteFileWinpmem) {
-        
-            Write-Error ("Winpmem not found on {0}. There may have been a problem during the copy process. Memory was not acquired." -f $Session.ComputerName)
-            Continue
+    } catch {
 
-            }
-
-        } catch {
-    
-            Write-Error ("An unexpected error occurred while copying winpmem to {0}. Memory not acquired." -f $Session.ComputerName)
-            Continue
-        }
+            Throw "Could not copy Winpmem to remote machine. Quitting..."
+    }
 
     # Copy 7za.exe to remote system
 
-    $RemotePath7za = ("C:\ProgramData\{0}" -f (Split-Path -Path $Installexe -Leaf))
-    
-    try {
-    
-    Copy-Item -Path $Installexe -Destination $RemotePath7za -ToSession $Session -ErrorAction Stop
-    
-    $RemoteFile7za = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path $($args[0]) -ErrorAction Stop} -ArgumentList $RemotePath7za
+    if (!$7zFlag){
 
-    # verify that the file copy succeeded to the remote host
-    if (!$RemoteFile7za) {
-        
-        Write-Error ("7za.exe not found on {0}. There may have been a problem during the copy process. Memory cannot be compressed." -f $Session.ComputerName)
-        Continue
+        try {
 
+            Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
+
+        } catch {
+
+            Throw "Could not copy 7zip to remote machine. Quitting..."
         }
-
-    } catch {
-    
-        Write-Error ("An unexpected error occurred while copying 7za.exe to {0}. Memory cannot be compressed." -f $Session.ComputerName)
-        Continue
-
     }
 
     # Execute winpmem on remote machine to capture memory
 
-    $ScriptBlock_Mem = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}' -o C:\ProgramData\{1}_memory.raw --volume_format raw -dd -t") -f (($RemotePathWinpmem), $Session.ComputerName))
+    $ScriptBlock_Mem = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' -o C:\ProgramData\{1}_memory.raw --volume_format raw -dd -t") -f ((Split-Path $Winpmem -Leaf), $Session.ComputerName))
 
-    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock_Mem
+    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock_Mem | Out-Null
 
     # Compress winpmem capture
 
-    $ScriptBlock_Compress = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}' a C:\ProgramData\{1}_memory.zip C:\ProgramData\{1}_memory.raw") -f ($RemotePath7za, $Session.ComputerName))
+    $ScriptBlock_Compress = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_memory.zip C:\ProgramData\{1}_memory.raw") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
 
-    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock_Compress
+    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock_Compress | Out-Null
 
     # Copy winpmem capture back to $Output (Uses $Session)
 
-    Copy-Item -Path (("C:\ProgramData\{0}_memory.zip") -f $Session.ComputerName) -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+    Copy-Item -Path (("C:\ProgramData\{0}_memory.zip") -f $Session.ComputerName) -Destination $Output -FromSession $Session -Force -ErrorAction SilentlyContinue
+
+    #Delete 7zip if deployed by plugin
+    if (!$7zFlag){
+
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Installexe -Leaf))
+        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
+    }
 
     # Delete initial winpmem capture and remove winpmem from remote machine
-
-    $ScriptBlock_Remove = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Path {0}, {1}, C:\ProgramData\{2}_memory.zip, C:\ProgramData\{2}_memory.raw") -f ($RemotePathWinpmem, $RemotePath7za, $Session.ComputerName))
-
-    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock_Remove
-
+    $ScriptBlock_Remove = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Path C:\ProgramData\{0}, C:\ProgramData\{1}_memory.zip, C:\ProgramData\{1}_memory.raw") -f ((Split-Path $Winpmem -Leaf), $Session.ComputerName))
+    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock_Remove | Out-Null
 }

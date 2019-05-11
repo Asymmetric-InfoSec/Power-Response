@@ -37,7 +37,7 @@ param (
 process{
 
     #Set $Output for where to store recovered browsing history
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'PSReadLine')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('PSReadLine_{0:yyyyMMdd}' -f (Get-Date)))
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing PSReadLine
     If (-not (Test-Path $Output)) {
