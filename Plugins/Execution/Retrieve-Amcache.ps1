@@ -165,7 +165,8 @@ process{
     #Collect System Artifacts    
     $SystemArtifacts = @(
 
-        "$env:SystemRoot\Appcompat\Programs\*"
+        "$env:SystemRoot\Appcompat\Programs\Amcache.hve",
+        "$env:SystemRoot\Appcompat\Programs\Amcache.hve.LOG*"
 
     )
            
