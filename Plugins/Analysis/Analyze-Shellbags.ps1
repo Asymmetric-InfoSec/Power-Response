@@ -1,17 +1,17 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Analyze-RecycleBin.ps1
+    Plugin-Name: Analyze-Shellbags.ps1
     
 .Description
-    Analyzes recovered Recycle.Bin for all hosts that you have collected data from.
+    Analyzes recovered shellbags for all users on all hosts that you have collected data from.
     There are checks built in to not analyze twice. By default, the plugin will look for 
     results from the current date. You can specify the analysis date with the
     $AnalyzeDate parameter. When using the $AnalyzeDate parameter, you must put your
     date in the format of yyyyMMdd.
 
     Dependencies
-    RBCmd.exe (From Eric Zimmerman's Tools. Stored in the Power-Response Bin directory)
+    SBECmd.exe (From Eric Zimmerman's Tools. Stored in the Power-Response Bin directory)
 
 .EXAMPLE
     
@@ -26,7 +26,7 @@
 
 .NOTES
     Author: Drew Schmitt
-    Date Created: 4/11/2019
+    Date Created: 4/27/2019
     Twitter: @5ynax
     
     Last Modified By:
@@ -65,11 +65,11 @@ process{
     }
 
     #Verify that analysis bin dependencies are met
-    $TestBin = Test-Path ("{0}\RBCmd.exe" -f (Get-PRPath -Bin))
+    $TestBin = Test-Path ("{0}\SBECmd.exe" -f (Get-PRPath -Bin))
 
     if (!$TestBin){
 
-        Throw "RBCmd not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
+        Throw "SBECmd not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
     }
 
      #Determine system architecture and select proper 7za.exe and Velociraptor executables
@@ -103,36 +103,41 @@ process{
     #Build list of hosts that have been analyzed with Power-Response
     $Machines = Get-ChildItem (Get-PRPath -Output)
 
-    #Loop through and analyze recyclebin files, while skipping if the analysis directory exists
+    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
     foreach ($Machine in $Machines){
 
-        #Path to verify for existence before processing recyclebin
-        $RecyclePath = ("{0}\{1}\Disk\RecycleBin_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
+        #Path to verify for existence before processing prefetch
+        $ShellbagsPath = ("{0}\{1}\Disk\RegistryHives_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
-        #Determine if recyclebin output directory exists
-        if (Test-Path $RecyclePath){
+        #Determine if prefetch output directory exists
+        if (Test-Path $ShellbagsPath){
 
-            #Verify that recyclebin has not already been analyzed
-            $RecycleProcessed = "$RecyclePath\Analysis"
+            #Verify that prefetch has not already been analyzed
+            $ShellbagsProcessed = ("{0}\{1}\Disk\Shellbags_{2}\Analysis") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
-            if (!(Test-Path $RecycleProcessed)) {
+            if (!(Test-Path $ShellbagsProcessed)) {
 
                 #Create Analysis Directory
-                New-Item -Type Directory -Path $RecycleProcessed | Out-Null
+                New-Item -Type Directory -Path $ShellbagsProcessed | Out-Null
 
-                #Decompress zipped archive
-                $Command = ("& '{0}\{1}' x '{2}\{3}_RecycleBin.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RecyclePath,$Machine
+                $ShellbagsDataExtracted = ("{0}\{1}" -f $ShellbagsPath,$Machine)
 
-                Invoke-Expression -Command $Command | Out-Null
+                if (!(Test-Path $ShellbagsDataExtracted)){
+
+                    #Decompress zipped archive
+                    $Command = ("& '{0}\{1}' x '{2}\{3}_RegistryHives.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShellbagsPath,$Machine
+
+                    Invoke-Expression -Command $Command | Out-Null
+                }
 
                 #Process and store in analysis directory
-                $Command = ("& '{0}\RBCmd.exe' -d '{1}\{2}\c\`$Recycle.Bin' --csv {3}") -f (Get-PRPath -Bin),$RecyclePath,$Machine,$RecycleProcessed
+                $Command = ("& '{0}\SBECmd.exe' -d {2}\{3} --csv {4}") -f (Get-PRPath -Bin),$BatchFile,$ShellbagsPath,$Machine,$ShellbagsProcessed
 
-                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\RBCmd_Log.txt" -f $RecycleProcessed)
+                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\Shellbags_Log.txt" -f $ShimCacheProcessed)
 
             } else {
 
-                #Prevent additional processing of recyclebin already analyzed
+                #Prevent additional processing of prefetch already analyzed
                 continue
             }
         }

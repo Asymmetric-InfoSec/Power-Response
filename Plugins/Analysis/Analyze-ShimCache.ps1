@@ -126,15 +126,15 @@ process{
 
                 if (!(Test-Path $ShimDataExtracted)){
 
-                    $Command = ("& '{0}\{1}' x {2}\{4}_RegistryHives.zip -o{2}\") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShimDataPath,$AnalysisDate,$Machine
+                    $Command = ("& '{0}\{1}' x '{2}\{4}_RegistryHives.zip' -o{2}\") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShimDataPath,$AnalysisDate,$Machine
 
                     Invoke-Expression -Command $Command | Out-Null 
                 }
                 
                 #Process and store in analysis directory
-                $Command = ("& '{0}\AppCompatCacheParser.exe' -f {1}\{2}\c\windows\System32\config\SYSTEM --csv {3}") -f (Get-PRPath -Bin),$ShimDataPath,$Machine,$ShimCacheProcessed
+                $Command = ("& '{0}\AppCompatCacheParser.exe' -f '{1}\{2}\c\windows\System32\config\SYSTEM' --csv {3}") -f (Get-PRPath -Bin),$ShimDataPath,$Machine,$ShimCacheProcessed
 
-                Invoke-Expression -Command $Command  | Out-Null
+                Invoke-Expression -Command $Command  | Out-File -FilePath ("{0}\AppCompatParser_Log.txt" -f $ShimCacheProcessed)
 
             } else {
 

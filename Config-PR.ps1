@@ -67,10 +67,13 @@ process{
 
     #Verify that 7zip is installed and ready for use (needed for 7za standalone application)
     $7zip_Test = Test-Path "C:\Program Files\7-Zip"
+    $7zaFlag = $false
 
     if (!$7zip_Test) {
 
-        Write-Warning "7zip not detected, 7za will need to be manually unpacked." -ErrorAction SilentlyContinue
+        Write-Warning "7zip not detected locally, 7za will need to be manually unpacked." -ErrorAction SilentlyContinue
+        #Set flag to true so that 7zip file is still moved to BIN for manual extraction
+        $7zaFlag = $true
     }
 
     #Update dependencies if needed 
@@ -182,6 +185,9 @@ process{
                 }
         )
 
+        #Introduction Message 
+
+        Write-Host "Collecting Dependencies..."
         #Accept all TLS versions
         [System.Net.ServicePointManager]::SecurityProtocol = "Tls12","Tls11","Tls" 
 
@@ -244,22 +250,31 @@ process{
                     try {
 
                         #Create the staging location
-                        $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
+                        $Stage_Location = ("{0}\{1}.7z" -f $Stage_Path, $Binary_Dep.Name)
                         
                         #Download the zip
                         $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
 
-                        #Extract the files
-                        $7zip_Path = 'C:\Program Files\7-zip\7z.exe'
-                        $Command = (("& '{0}' x {1} -o{2}") -f ($7zip_Path, $Stage_Location,$Stage_Path))
-                        Invoke-Expression -Command $Command | Out-Null
+                        if ($7zaFlag) {
 
-                        #Copy files to Bin
-                        $7za64_Path = ("{0}\x64\7za.exe" -f $Stage_Path)
-                        $7za32_Path = ("{0}\7za.exe" -f $Stage_Path)
-                        
-                        Copy-Item -Path $7za64_Path -Destination "$PSScriptRoot\Bin\7za_x64.exe" -Force
-                        Copy-Item -Path $7za32_Path -Destination "$PSScriptRoot\Bin\7za_x86.exe" -Force
+                            #Copy the .7z file to BIN for manual extraction later
+                            Copy-Item -Path $Stage_Location -Destination "$PSScriptRoot\Bin\"
+
+                        } else {
+
+                            #Extract the files
+                            $7zip_Path = 'C:\Program Files\7-zip\7z.exe'
+                            $Command = (("& '{0}' x {1} -o{2}") -f ($7zip_Path, $Stage_Location,$Stage_Path))
+                            Invoke-Expression -Command $Command | Out-Null
+
+                            #Copy files to Bin
+                            $7za64_Path = ("{0}\x64\7za.exe" -f $Stage_Path)
+                            $7za32_Path = ("{0}\7za.exe" -f $Stage_Path)
+                            
+                            Copy-Item -Path $7za64_Path -Destination "$PSScriptRoot\Bin\7za_x64.exe" -Force
+                            Copy-Item -Path $7za32_Path -Destination "$PSScriptRoot\Bin\7za_x86.exe" -Force
+
+                        }
 
                     } catch {
 
@@ -347,6 +362,5 @@ process{
     }
 
     #Say Goodbye
-
     Write-Host "Configuration Complete! Go forth and forensicate!"
 }

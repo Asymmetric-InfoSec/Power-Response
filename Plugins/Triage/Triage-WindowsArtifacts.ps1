@@ -1,32 +1,47 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Retrieve-RecycleBins.ps1
+    Plugin-Name: Triage-WindowsArtifacts.ps1
     
 .Description
-    This plugin collects the $Recycle.Bin contents (recursively) from a remote system. 
-    The file is copied by pushing the Velociraptor binary to the the remote system, 
-    where it copies the files to C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied
-    to the system, to then zip the directory containing the MFT before moving them back 
-    to your local system for further analysis and processing. This plugin will remove
-    the Velociraptor, 7zip PE, and all locally created files after successfully pulling
-    the artifacts back to the output destination in Power-Response.
+
+    Grabs relevant Windows Artifacts and performs analysis to 
+    speed up the investigation process. This plugin runs the following
+    plugins to gather information:
+
+    Invoke-PRPlugin -Name Retrive-NTFSArtifacts.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-RegistryHives.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-EventLogFiles.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-Amcache.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-Prefetch.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-ShimCache.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-ScheduledTasks.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-Startup.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-RecentItems.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-JumpLists.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-RecycleBin.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-Shellbags.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-BrowsingHistory.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-HostsFile.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-WindowsSearchData.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-SRUMDB.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrive-PSReadLine.ps1 -Session $Session
 
 .EXAMPLE
 
     Power-Response Execution
 
-    Set ComputerName Test-PC
-    Run
+    set computername test-pc
+    run
 
 .NOTES
     Author: Drew Schmitt
-    Date Created: 4/10/2019
+    Date Created: 5/10/2019
     Twitter: @5ynax
     
-    Last Modified By: 
-    Last Modified Date: 
-    Twitter: 
+    Last Modified By:
+    Last Modified Date:
+    Twitter:
   
 #>
 
@@ -89,16 +104,7 @@ process{
         }
     }
 
-    # Set $Output for where to store recovered artifacts
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RecycleBin_{0:yyyyMMdd}' -f (Get-Date)))
-
-    # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
-    If (!(Test-Path $Output)){
-
-        New-Item -Type Directory -Path $Output | Out-Null
-    }
-
-    #Determine system architecture and select proper 7za.exe and Velociraptor executables
+     #Determine system architecture and select proper 7za.exe and Velociraptor executables
     try {
      
         $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
@@ -126,7 +132,7 @@ process{
     }
 
     # Copy 7zip and Velociraptor to remote machine
-
+    
     if (!$7zFlag){
 
         try {
@@ -136,10 +142,8 @@ process{
         } catch {
 
             Throw "Could not copy 7zip to remote machine. Quitting..."
-        }
-
+        }  
     }
-
     
     if (!$VeloFlag){
 
@@ -150,41 +154,30 @@ process{
         } catch {
 
             Throw "Could not copy Velociraptor to remote machine. Quitting..."
-        }
-
+        } 
     }
 
-    #Create Output directory structure on remote host
-    $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0])) -ErrorAction SilentlyContinue} -ArgumentList $Session.ComputerName
+    #Plugin Execution
 
-    If (!$TestRemoteDumpPath){
-
-        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ("C:\ProgramData\{0}" -f $($args[0])) | Out-Null} -ArgumentList $Session.ComputerName
+    Invoke-PRPlugin -Name Retrieve-NTFSArtifacts.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-RegistryHives.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-EventLogFiles.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-Amcache.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-Prefetch.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-ShimCache.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-ScheduledTasks.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-Startup.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-RecentItems.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-JumpLists.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-RecycleBin.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-Shellbags.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-BrowsingHistory.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-HostsFile.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-WindowsSearchData.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-SRUMDB.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-PSReadLine.ps1 -Session $Session
+    Invoke-PRPlugin -Name Collect-SystemInfo.ps1 -Session $Session
     
-    }
-
-    #Collect System Artifacts    
-    $SIDS = Get-ChildItem -Path 'C:\$Recycle.Bin' -Force | Select -ExpandProperty Name
-           
-    foreach ($SID in $SIDS){
-
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\C:\```$Recycle.Bin\{1}\* C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $SID, $Session.ComputerName))
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
-    }
-        
-    # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_RecycleBin.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
-    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
-
-    # Copy artifacts back to $Output (Uses $Session)
-    try {
-
-        Copy-Item -Path (("C:\ProgramData\{0}_RecycleBin.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
-
-    } catch {
-
-        throw "There was an error copying zipped archive back to data collection machine. Retrieve data manually through PS Session."
-    }
     
     #Delete 7zip if deployed by plugin
     if (!$7zFlag){
@@ -199,8 +192,4 @@ process{
         $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Velo_exe -Leaf))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
     }
-    
-    # Delete reamining artifacts from remote machine
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}_RecycleBin.zip, C:\ProgramData\{0}") -f ($Session.ComputerName))
-    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 }

@@ -65,13 +65,13 @@ process{
     foreach ($Machine in $Machines){
         
         #Path to verify for existence before processing prefetch
-        $PrefetchPath = ("{0}\{1}\Execution\Prefetch_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate 
+        $PrefetchPath = ("{0}\{1}\Execution\Prefetch_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate 
         
         #Determine if prefetch output directory exists
         if (Test-Path $PrefetchPath){
 
             #Verify that prefetch has not already been analyzed
-            $PrefetchProcessed = "$PrefetchPath\Analysis\"
+            $PrefetchProcessed = "$PrefetchPath\Analysis"
 
             if (!(Test-Path $PrefetchProcessed)) {
 
@@ -81,7 +81,7 @@ process{
                 #Process Prefetch and store in analysis directory
                 $Command = ("& '{0}\PECmd.exe' -d {1} --csv {2}") -f (Get-PRPath -Bin),$PrefetchPath,$PrefetchProcessed
 
-                Invoke-Expression -Command $Command | Out-Null
+                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\PECmd_Log.txt" -f $PrefetchProcessed)
 
             } else {
 

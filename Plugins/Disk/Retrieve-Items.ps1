@@ -56,42 +56,58 @@ param (
 
 process{
 
-    # Verify that 7za executables are located in (Get-PRPath -Bin)
+    #7zip checks
+    $7zTestPath = "C:\ProgramData\7za*.exe"
+    $7zFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $7zTestPath
 
+    #7zip BIN locations
     $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
     $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
 
-    $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
-    $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
+    #Velociraptor checks
+    $VeloTestPath = "C:\ProgramData\Velociraptor*.exe"
+    $VeloFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $VeloTestPath
 
-    if (!$7z64bitTestPath) {
-
-        Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-    } elseif (!$7z32bitTestPath) {
-
-        Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-    }
-
-    #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
-
+    #Velociraptor BIN locations
     $Velo_64 = ("{0}\Velociraptor_x64.exe" -f (Get-PRPath -Bin))
     $Velo_32 = ("{0}\Velociraptor_x86.exe" -f (Get-PRPath -Bin))
 
-    $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
-    $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
 
-    if (!$Velo_64TestPath) {
+    if (!$7zFlag){
 
-        Throw "64 bit version of Velociraptor not detected in Bin. Place 64bit executable in Bin directory and try again."
+        # Verify that 7za executables are located in (Get-PRPath -Bin)
+        $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
+        $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
 
-    } elseif (!$Velo_32TestPath) {
+        if (!$7z64bitTestPath) {
 
-        Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
+            Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
+
+        } elseif (!$7z32bitTestPath) {
+
+            Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
+        }
+
+    }
+
+    if (!$VeloFlag){
+
+        #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
+        $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
+        $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
+
+        if (!$Velo_64TestPath) {
+
+            Throw "64 bit version of Velociraptor not detected in Bin. Place 64bit executable in Bin directory and try again."
+
+        } elseif (!$Velo_32TestPath) {
+
+            Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
+        }
     }
 
     # Set $Output for where to store recovered files
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('CollectedItems_{0:yyyyMMdd}' -f $(Get-Date))
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RetrievedItems_{0:yyyyMMdd}' -f $(Get-Date)))
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing items
     If (!(Test-Path $Output)) {
@@ -139,15 +155,18 @@ process{
 
     #Copy 7zip executable to the remote machine for user
 
-    try {
+    if (!$7zFlag){
 
-        Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
+        try {
 
-    } catch {
+            Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
 
-        Throw "Could not copy 7zip to remote machine. Quitting."
+        } catch {
+
+            Throw "Could not copy 7zip to remote machine. Quitting."
+        }
     }
-
+    
     #Collect items
     foreach ($Item in $Items){
 
@@ -291,11 +310,7 @@ process{
 
         if ($Locked){
 
-            #Deploy Velociraptor
-
-            $Test_Velo = Invoke-Command -Session $Session -ScriptBlock {Get-Item ("C:\ProgramData\{0}" -f $($args[0])) -ErrorAction SilentlyContinue} -ArgumentList (Split-Path $Velo_exe -Leaf)
-
-            if (!$Test_Velo){
+            if (!$VeloFlag){
 
                 try{
 
@@ -351,18 +366,20 @@ process{
                 Remove-Item -Recurse -Path ("{0}" -f $($args[0])) -Force
 
             } -ArgumentList $FinalPath
-
-        }
-         
+        }    
     }
 
-    #Remove 7zip, Velociraptor
+    #Remove 7zip if deployed by plugin
+    if (!$7zFlag){
 
-    Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path ("C:\ProgramData\{0}" -f ($($args[0]))) -Force} -Argumentlist (Split-Path $Installexe -Leaf)
+        Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path ("C:\ProgramData\{0}" -f ($($args[0]))) -Force} -Argumentlist (Split-Path $Installexe -Leaf)
 
-    if ($Locked){
+    }
+
+    #Remove Velociraptor if deployed by plugin
+
+    if (!$VeloFlag){
 
         Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path ("C:\ProgramData\{0}" -f ($($args[0]))) -Force} -Argumentlist (Split-Path $Velo_exe -Leaf)
     }
-
 }

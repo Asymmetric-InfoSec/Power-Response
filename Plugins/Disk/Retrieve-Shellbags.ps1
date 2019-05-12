@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Retrieve-ShimCache.ps1
+    Plugin-Name: Retrieve-Shellbags.ps1
     
 .Description
     This plugin retrives system and user registry hives from a remote machine and 
@@ -33,10 +33,6 @@
     %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1
     %UserProfile%\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2
 
-    Shimcache Plugin Specific Notes:  
-    1) The system registry hive is retrieved for further analysis (Eric Zimmerman's AppCompatParser)
-    2) The Shimcache is exported to a .reg file for further analysis (Mandiant's shimcacheparser.py)
-
 .EXAMPLE
 
     Power-Response Execution
@@ -50,7 +46,7 @@
     Twitter: @5ynax
     
     Last Modified By: 
-    Last Modified Date:
+    Last Modified Date: 
     Twitter: 
   
 #>
@@ -64,7 +60,7 @@ param (
 
 process{
 
-     #7zip checks
+    #7zip checks
     $7zTestPath = "C:\ProgramData\7za*.exe"
     $7zFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $7zTestPath
 
@@ -116,17 +112,17 @@ process{
 
     #Determine if registry hives were already collected, if not, collect all of them
 
-    $FinalOutputPath = (Get-PRPath -ComputerName $Session.ComputerName -Plugin 'Retrieve-RegistryHives.ps1' -Directory ('RegistryHives_{0:yyyyMMdd}' -f (Get-Date)))
+    $FinalOutputPath = (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RegistryHives_{0:yyyyMMdd}' -f (Get-Date)))
 
     if (!(Test-Path $FinalOutputPath)) {
 
         # Set $Output for where to store recovered artifacts
-        $Output= (Get-PRPath -ComputerName $Session.ComputerName -Plugin 'Retrieve-RegistryHives.ps1' -Directory ('RegistryHives_{0:yyyyMMdd}' -f (Get-Date)))
+        $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RegistryHives_{0:yyyyMMdd}' -f (Get-Date)))
 
         # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
         If (!(Test-Path $Output)){
 
-            New-Item -Type Directory -Path $Output -Force | Out-Null
+            New-Item -Type Directory -Path $Output | Out-Null
         }
 
         #Determine system architecture and select proper 7za.exe and Velociraptor executables
@@ -181,8 +177,9 @@ process{
 
                 Throw "Could not copy Velociraptor to remote machine. Quitting..."
             }
-        }
 
+        }
+           
         #Create Output directory structure on remote host
         $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0])) -ErrorAction SilentlyContinue} -ArgumentList $Session.ComputerName
 
@@ -251,13 +248,13 @@ process{
         # Copy artifacts back to $Output (Uses $Session)
         try {
 
-            Copy-Item -Path (("C:\ProgramData\{0}_RegistryHives.zip") -f ($Session.ComputerName)) -Destination "$Output" -FromSession $Session -Force -ErrorAction Stop
+            Copy-Item -Path (("C:\ProgramData\{0}_RegistryHives.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
 
         } catch {
 
             throw "There was an error copying zipped archive back to data collection machine. Retrieve data manually through PS Session."
         }
-
+        
         #Delete 7zip if deployed by plugin
         if (!$7zFlag){
 
@@ -271,48 +268,10 @@ process{
             $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Velo_exe -Leaf))
             Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
         }
-        
+    
         # Delete remaining artifacts from remote machine
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{2}_RegistryHives.zip, C:\ProgramData\{2}") -f ($Session.ComputerName))
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}_RegistryHives.zip, C:\ProgramData\{0}") -f ($Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
-    }
-
-    # Set $Output for where to store recovered artifacts
-    $ShimOutput= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('ShimCache_{0:yyyyMMdd}' -f (Get-Date)))
-
-    if (!(Test-Path $ShimOutput)){
-
-        New-Item -Type Directory -Path $ShimOutput -Force | Out-Null
-    }
-
-    # Export shimcache into .reg file
-    try{
-
-        Invoke-Command -Session $Session -ScriptBlock {reg export 'HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Session Manager\AppCompatCache' 'C:\ProgramData\Shimcache.reg'} | Out-Null
-
-    } catch {
-
-        Write-Warning "There was a problem exporting stand alone Shimcache reg key or value on {0)" -f $Session.ComputerName
-    }
-
-    #Copy .reg file back to output directory on local machine
-    try {
-
-        Copy-Item -Path 'C:\ProgramData\Shimcache.reg' -Destination $ShimOutput -FromSession $Session -Force
-
-    } catch {
-
-        Write-Warning "There was a problem copying Shimcache reg export on {0}" -f $Session.ComputerName
-    }
-
-    #Remove .reg from remote machine
-    try {
-
-        Invoke-Command -Session $Session -ScriptBlock {Remove-Item 'C:\ProgramData\ShimCache.reg' -Force}
-
-    } catch {
-
-        Write-Warning ("Could not delete .reg file on {0}, manual removal is needed." -f $Session.ComputerName)
     }
 }

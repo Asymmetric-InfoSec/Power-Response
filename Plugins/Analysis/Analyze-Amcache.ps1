@@ -107,13 +107,13 @@ process{
     foreach ($Machine in $Machines){
 
         #Path to verify for existence before processing amcache
-        $AmcachePath = ("{0}\{1}\Execution\Amcache_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
+        $AmcachePath = ("{0}\{1}\Execution\Amcache_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
         #Determine if amcache output directory exists
         if (Test-Path $AmcachePath){
 
             #Verify that amcache has not already been analyzed
-            $AmcacheProcessed = "$AmcachePath\Analysis\"
+            $AmcacheProcessed = "$AmcachePath\Analysis"
 
             if (!(Test-Path $AmcacheProcessed)) {
 
@@ -128,7 +128,7 @@ process{
                 #Process and store in analysis directory
                 $Command = ("& '{0}\AmcacheParser.exe' -f {1}\{2}\c\windows\appcompat\Programs\Amcache.hve --csv {3}") -f (Get-PRPath -Bin),$AmcachePath,$Machine,$AmcacheProcessed
 
-                Invoke-Expression -Command $Command | Out-Null
+                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\AmcacheParser_Results.txt" -f $AmcacheProcessed)
 
             } else {
 

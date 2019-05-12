@@ -1,44 +1,41 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Retrieve-RecycleBins.ps1
+    Plugin-Name: Retrieve-Startup.ps1
     
 .Description
-    This plugin collects the $Recycle.Bin contents (recursively) from a remote system. 
-    The file is copied by pushing the Velociraptor binary to the the remote system, 
-    where it copies the files to C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied
-    to the system, to then zip the directory containing the MFT before moving them back 
-    to your local system for further analysis and processing. This plugin will remove
-    the Velociraptor, 7zip PE, and all locally created files after successfully pulling
-    the artifacts back to the output destination in Power-Response.
+
+	Collects the startup directory contents for each user and all users (public)
+	to use as part of an investigation to determine if there are persistence
+    mechanisms established via the startup directory
 
 .EXAMPLE
 
-    Power-Response Execution
+	Power-Response Execution
 
-    Set ComputerName Test-PC
-    Run
+	Set ComputerName Test-PC
+	run
 
 .NOTES
     Author: Drew Schmitt
-    Date Created: 4/10/2019
+    Date Created: 4/3/2019
     Twitter: @5ynax
     
-    Last Modified By: 
-    Last Modified Date: 
-    Twitter: 
+    Last Modified By:
+    Last Modified Date:
+    Twitter:
   
 #>
 
-param (
+param(
 
     [Parameter(Mandatory=$true,Position=0)]
     [System.Management.Automation.Runspaces.PSSession]$Session
 
-    )
+)
 
-process{
-
+process {
+	
     #7zip checks
     $7zTestPath = "C:\ProgramData\7za*.exe"
     $7zFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $7zTestPath
@@ -89,8 +86,8 @@ process{
         }
     }
 
-    # Set $Output for where to store recovered artifacts
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RecycleBin_{0:yyyyMMdd}' -f (Get-Date)))
+    #Set $Output for where to store recovered artifacts
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('Startup_{0:yyyyMMdd}' -f (Get-Date)))
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing artifacts
     If (!(Test-Path $Output)){
@@ -140,7 +137,6 @@ process{
 
     }
 
-    
     if (!$VeloFlag){
 
         try {
@@ -164,28 +160,50 @@ process{
     }
 
     #Collect System Artifacts    
-    $SIDS = Get-ChildItem -Path 'C:\$Recycle.Bin' -Force | Select -ExpandProperty Name
-           
-    foreach ($SID in $SIDS){
+    $SystemArtifacts = @(
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\C:\```$Recycle.Bin\{1}\* C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $SID, $Session.ComputerName))
+        "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Startup\*"
+    )
+           
+    foreach ($Artifact in $SystemArtifacts){
+
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp '\\.\{1}' C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
+    }
+
+    #Collect user artifacts    
+    $UserArtifacts = @(
+
+        "AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\*"
+    )
+
+    # Grab list of user profiles
+    $Users = Invoke-Command -Session $Session -Scriptblock {Get-CimInstance -ClassName Win32_UserProfile | Select-Object -ExpandProperty LocalPath | Select-String Users}
+
+    # Iterate through each user profile grabbing the artifacts
+    foreach ($User in $Users){
+
+        foreach ($Artifact in $UserArtifacts) {
+
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp '\\.\{1}\{2}' C:\ProgramData\{3}") -f ((Split-Path $Velo_exe -Leaf), $User, $Artifact, $Session.ComputerName))
+            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
+        }
     }
         
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_RecycleBin.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a 'C:\ProgramData\{1}_Startup.zip' C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)
     try {
 
-        Copy-Item -Path (("C:\ProgramData\{0}_RecycleBin.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
+        Copy-Item -Path (("C:\ProgramData\{0}_Startup.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
 
     } catch {
 
         throw "There was an error copying zipped archive back to data collection machine. Retrieve data manually through PS Session."
     }
-    
+
     #Delete 7zip if deployed by plugin
     if (!$7zFlag){
 
@@ -200,7 +218,7 @@ process{
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
     }
     
-    # Delete reamining artifacts from remote machine
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}_RecycleBin.zip, C:\ProgramData\{0}") -f ($Session.ComputerName))
+    # Delete initial artifacts, 7za, and velociraptor binaries from remote machine
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}_Startup.zip, C:\ProgramData\{0}") -f ($Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 }

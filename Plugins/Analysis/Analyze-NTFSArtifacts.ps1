@@ -111,13 +111,13 @@ process{
     foreach ($Machine in $Machines){
 
         #Path to verify for existence before processing NTFS
-        $NTFSPath = ("{0}\{1}\Disk\NTFS_{2}\") -f (Get-PRPath -Output), $Machine, $AnalysisDate
+        $NTFSPath = ("{0}\{1}\Disk\NTFS_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
 
         #Determine if NTFS output directory exists
         if (Test-Path $NTFSPath){
 
             #Verify that NTFS has not already been analyzed
-            $NTFSProcessed = "$NTFSPath\Analysis\"
+            $NTFSProcessed = "$NTFSPath\Analysis"
 
             if (!(Test-Path $NTFSProcessed)) {
 
@@ -125,34 +125,29 @@ process{
                 New-Item -Type Directory -Path $NTFSProcessed | Out-Null
 
                 #Decompress zipped archive
-                $Command = ("& '{0}\{1}' x {2}\{3}_NTFS.zip -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$NTFSPath,$Machine
+                $Command = ("& '{0}\{1}' x '{2}\{3}_NTFS.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$NTFSPath,$Machine
 
                 Invoke-Expression -Command $Command | Out-Null 
 
                 #Process and store MFT
-                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$MFT --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+                $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$MFT' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
 
-                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
+                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_MFT_Log.txt" -f $NTFSProcessed)
 
                 #Process and store $Secure:$SDS
-                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$Secure`%3A`$SDS --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+                $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$Secure`%3A`$SDS' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
 
-                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
+                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_SecureSDS_Log.txt" -f $NTFSProcessed) 
 
                 #Process and store $LogFile
-                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$LogFile --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+                $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$LogFile' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
 
-                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
+                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_LogFile_Log.txt" -f $NTFSProcessed)
 
                 #Process and store $UsnJrnl:$J
-                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$Extend\`$UsnJrnl`%3A`$J --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+                $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$Extend\`$UsnJrnl`%3A`$J' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
 
-                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
-
-                #Process and store $Boot
-                $Command = ("& '{0}\MFTECmd.exe' -f {1}\{2}\c\`$Extend\`$Boot --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
-
-                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-Null 
+                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_USN_Log.txt" -f $NTFSProcessed) 
 
             } else {
 

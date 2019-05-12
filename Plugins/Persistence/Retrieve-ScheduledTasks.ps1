@@ -46,7 +46,7 @@ param (
 process{
 
     # Set $Output for where to store recovered scheduled task files
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory 'ScheduledTasks')
+    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('ScheduledTasks_{0:yyyyMMdd}' -f (Get-Date)))
 
     # Create Subdirectory in $global:PowerResponse.OutputPath for storing scheduled tasks
     If (-not (Test-Path $Output)) {
@@ -62,7 +62,9 @@ process{
     } else {
 
         # Recursively copy directory contents into $Output
-        Copy-Item "C:\Windows\System32\Tasks\" -Recurse -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
+        New-Item -Type Directory -Path "$Output\System32" | Out-Null 
+        Copy-Item "C:\Windows\System32\Tasks\" -Recurse -Destination "$Output\System32\Tasks" -FromSession $Session -Force -ErrorAction SilentlyContinue
+        Copy-Item "C:\Windows\Tasks\" -Recurse -Destination "$Output\Tasks" -FromSession $Session -Force -ErrorAction SilentlyContinue
 
     }
 }
