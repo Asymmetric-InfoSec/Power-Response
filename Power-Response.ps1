@@ -902,7 +902,7 @@ function Invoke-PRPlugin {
 
     end {
         # Compute $AnalysisPath
-        $AnalysisPath = '{0}\Analysis\{1}' -f (Get-PRPath -Plugins),($Path -Replace '.+?-','Analyze-')
+        $AnalysisPath = '{0}\Analysis\{1}' -f (Get-PRPath -Plugins),($Path -Replace '.+-','Analyze-')
 
         # If auto execution of analysis plugins is set and we have a valid $AnalysisPath
         if ($global:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $Path -and (Test-Path -Path $AnalysisPath)) {
