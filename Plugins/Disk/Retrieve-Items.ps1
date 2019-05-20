@@ -378,7 +378,7 @@ process{
 
     #Remove Velociraptor if deployed by plugin
 
-    if (!$VeloFlag){
+    if ($Locked -and !$VeloFlag){
 
         Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path ("C:\ProgramData\{0}" -f ($($args[0]))) -Force} -Argumentlist (Split-Path $Velo_exe -Leaf)
     }
