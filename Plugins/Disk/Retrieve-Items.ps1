@@ -171,7 +171,7 @@ process{
     foreach ($Item in $Items){
 
         #Verify that file exists on remote system, if not skip and continue
-        $PathVerify = Invoke-Command -Session $Session -ScriptBlock {Get-Item $($args[0]) -ErrorAction SilentlyContinue} -ArgumentList $Item 
+        $PathVerify = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Force $($args[0]) -ErrorAction SilentlyContinue} -ArgumentList $Item 
 
         if (!$PathVerify) {
            
@@ -196,9 +196,9 @@ process{
                 $MetaData = @{
 
                     Item = $($args[0])
-                    CreationTimeUTC = (Get-Item $($args[0])).CreationTimeUtc
-                    ModifiedTimeUTC = (Get-Item $($args[0])).LastWriteTimeUtc
-                    AccessTimeUTC = (Get-Item $($args[0])).LastAccessTimeUtc
+                    CreationTimeUTC = (Get-Item -Force $($args[0])).CreationTimeUtc
+                    ModifiedTimeUTC = (Get-Item -Force $($args[0])).LastWriteTimeUtc 
+                    AccessTimeUTC = (Get-Item -Force $($args[0])).LastAccessTimeUtc
                     MD5 = $MD5_Hash
                 } 
 
@@ -225,7 +225,7 @@ process{
 
             Invoke-Command -Session $Session -ScriptBlock {
 
-                $DirItems = Get-ChildItem -Path $($args[0]) -File -Recurse | Select -ExpandProperty FullName
+                $DirItems = Get-ChildItem -Path $($args[0]) -File -Recurse -Force | Select -ExpandProperty FullName
 
                 foreach ($DirItem in $DirItems){
 
@@ -241,10 +241,10 @@ process{
                     $MetaData = @{
 
                         Item = $DirItem
-                        Directory = (Get-Item $DirItem).Directory
-                        CreationTimeUTC = (Get-Item $DirItem).CreationTimeUtc
-                        ModifiedTimeUTC = (Get-Item $DirItem).LastWriteTimeUtc
-                        AccessTimeUTC = (Get-Item $DirItem).LastAccessTimeUtc
+                        Directory = (Get-Item -Force $DirItem).Directory
+                        CreationTimeUTC = (Get-Item -Force $DirItem).CreationTimeUtc 
+                        ModifiedTimeUTC = (Get-Item -Force $DirItem).LastWriteTimeUtc
+                        AccessTimeUTC = (Get-Item -Force $DirItem).LastAccessTimeUtc
                         MD5 = $MD5_Hash
                     } 
 
