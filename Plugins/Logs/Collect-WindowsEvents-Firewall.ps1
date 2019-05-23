@@ -42,11 +42,11 @@
 
 param (
 
+    $StartDate=(Get-Date).AddDays(-7)
+
     )
 
 process {
-
-    $StartDate=(Get-Date).AddDays(-90)
 
     #Windows Firewall Event Log IDs to Retrieve (Microsoft-Windows-Windows Firewall With Advanced Security/Firewall.evtx)
     $WinFirewallEvents = @(

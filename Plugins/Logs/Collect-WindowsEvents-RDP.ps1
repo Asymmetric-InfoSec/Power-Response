@@ -42,11 +42,11 @@
 
 param (
 
+    [DateTime]$StartDate=(Get-Date).AddDays(-7)
+
     )
 
 process {
-
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
 
     #RDP Event Log IDs to Retrieve (Microsoft-Windows-TerminalServices-RDPClient/Operational.evtx)
     $RDP_TC_RDPClient_Events = @(

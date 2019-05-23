@@ -43,11 +43,11 @@
 
 param (
 
+    $StartDate=(Get-Date).AddDays(-7)
+
     )
 
 process {
-
-    $StartDate=(Get-Date).AddDays(-90)
 
     #PowerShell Event Log IDs to Retrieve (Microsoft-Windows-PowerShell/Operational.evtx)
     $PowerShellEvents = @(
