@@ -157,14 +157,11 @@ process {
     }
 
     #Collect System Artifacts    
-    $SystemArtifacts = @(
-
-        "C:\ProgramData\\Microsoft\Search\Data\Applications\Windows\*"
-    )
+    $SystemArtifacts = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem 'C:\ProgramData\Microsoft\Search\Data\Applications\Windows\' -Force}
            
     foreach ($Artifact in $SystemArtifacts){
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp '\\.\{1}' C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
+        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp '\\.\{1}' C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact.FullName, $Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
     }
 
