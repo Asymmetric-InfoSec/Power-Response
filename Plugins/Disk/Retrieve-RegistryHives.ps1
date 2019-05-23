@@ -202,14 +202,21 @@ process{
             "$env:SystemRoot\System32\config\SOFTWARE.LOG2",
             "$env:SystemRoot\System32\config\SECURITY",
             "$env:SystemRoot\System32\config\SECURITY.LOG1",
-            "$env:SystemRoot\System32\config\SECURITY.LOG2",
-            "$env:SystemRoot\System32\config\*"
+            "$env:SystemRoot\System32\config\SECURITY.LOG2"
 
         )
                
         foreach ($Artifact in $SystemArtifacts){
 
             $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
+            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
+        }
+
+        $SystemArtifacts2 = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem 'C:\Windows\System32\config\RegBack\' -Force}
+           
+        foreach ($Artifact in $SystemArtifacts2){
+
+            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp '\\.\{1}' C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact.FullName, $Session.ComputerName))
             Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
         }
         
