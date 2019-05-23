@@ -182,6 +182,12 @@ process{
 
                 Name = "RegistryExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/RegistryExplorer_RECmd.zip'; Rename = ''; Type = 'zipped_zimmerman_RegistryExplorer'
 
+                },
+
+            @{
+
+                Name = "EvtxExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/EvtxExplorer.zip'; Rename = ''; Type = 'zipped_zimmerman'
+
                 }
         )
 
