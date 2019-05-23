@@ -42,12 +42,12 @@
 
 param (
 
+    [DateTime]$StartDate=(Get-Date).AddDays(-7)
+
     )
 
 process {
-
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
-
+    
     #System Event Log IDs to Retrieve (System)
     $SystemEvents = @(
 
