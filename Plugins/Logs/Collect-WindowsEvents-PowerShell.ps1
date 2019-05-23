@@ -43,7 +43,7 @@
 
 param (
 
-    $StartDate=(Get-Date).AddDays(-7)
+    [DateTime]$StartDate=(Get-Date).AddDays(-7)
 
     )
 
