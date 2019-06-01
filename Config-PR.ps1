@@ -34,6 +34,7 @@
     Twitter:
   
 #>
+[CmdletBinding()]
 
 param (
 
@@ -189,6 +190,12 @@ process{
                 Name = "EvtxExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/EvtxExplorer.zip'; Rename = ''; Type = 'zipped_zimmerman'
 
                 }
+
+            @{
+
+                Name = "FLS"; URL = 'https://github.com/sleuthkit/sleuthkit/releases/download/sleuthkit-4.6.6/sleuthkit-4.6.6-win32.zip'; Rename = 'fls'; Type = 'fls'
+
+            }
         )
 
         #Introduction Message 
@@ -339,7 +346,7 @@ process{
 
                     try{
 
-                         #Create the staging location
+                        #Create the staging location
                         $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
                         
                         #Download the zip
@@ -359,6 +366,38 @@ process{
                         $Message = ("Configuration of {0} failed. Configure manually." -f $Binary_Dep.Name)
                         Write-Warning $Message -ErrorAction SilentlyContinue
                     }
+                }
+
+                fls{
+
+                    try{
+
+                        #Create the staging location
+                        $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
+                            
+                        #Download the zip
+                        $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
+
+                        #Extract the files
+                        $Expand_Stage = ("{0}\fls" -f $Stage_Path)
+                        Expand-Archive -Path $Stage_Location -Destination $Expand_Stage -Force
+
+                        Write-Debug "fls"
+
+                        #Copy relevant files to final location
+                        $Expand_Path =  ("{0}\Bin\fls" -f $PSScriptRoot)
+                        New-Item -Type Directory -Path $Expand_Path -Force | Out-Null
+                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\fls.exe" -Destination $Expand_Path -Force
+                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libewf.dll" -Destination $Expand_Path -Force
+                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libvhdi.dll" -Destination $Expand_Path -Force
+                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libvmdk.dll" -Destination $Expand_Path -Force
+                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\zlib.dll" -Destination $Expand_Path -Force
+
+                    } catch {
+
+                        $Message = ("Configuration of {0} failed. Configure manually." -f $Binary_Dep.Name)
+                        Write-Warning $Message -ErrorAction SilentlyContinue
+                    }  
                 }
             }
         }
