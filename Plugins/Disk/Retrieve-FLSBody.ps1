@@ -60,7 +60,7 @@ process{
     $Dependencies = $FLSExe,$Libewf,$Libvhdi,$Libvmdk,$Zlib
 
     #Verify binaries exist in Bin
-    foreach ($Dependency in $Dependenices) {
+    foreach ($Dependency in $Dependencies){
 
         try {
 
@@ -91,12 +91,17 @@ process{
     
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
 
+    #Compress output before copying to analysis machine
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Compress-Archive -Path {0}\FLS.body -Destination {0}\FLS.zip -Force") -f ($RemotePath))
+
+    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
+
     #Copy data to analysis system
-    $DataPath = ("{0}\FLS.body" -f $RemotePath)
+    $DataPath = ("{0}\FLS.zip" -f $RemotePath)
     Copy-Item -Path $DataPath -Destination "$Output" -FromSession $Session -Force -ErrorAction SilentlyContinue
 
     #Cleanup artifacts on remote system
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Recurse -Force {0}\fls, {0}\FLS.body") -f $RemotePath)
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Recurse -Force {0}\fls, {0}\FLS.body, {0}\FLS.zip") -f $RemotePath)
 
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 }

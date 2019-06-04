@@ -160,6 +160,7 @@ process{
     #Plugin Execution
 
     Invoke-PRPlugin -Name Retrieve-NTFSArtifacts.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-FLSBody.ps1 -Session $Session
     Invoke-PRPlugin -Name Retrieve-RegistryHives.ps1 -Session $Session
     Invoke-PRPlugin -Name Retrieve-EventLogFiles.ps1 -Session $Session
     Invoke-PRPlugin -Name Retrieve-Amcache.ps1 -Session $Session
