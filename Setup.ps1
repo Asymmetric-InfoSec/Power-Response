@@ -1,10 +1,10 @@
 <#
 
 .SYNOPSIS
-    Config-PR.ps1
+    Setup.ps1
     
 .Description
-	Configures Power-Response for first time use. This script will retrieve
+	Setup Power-Response for first time use. This script will retrieve
 	all Power-Response binary dependencies, rename them to the proper name
 	for use with Power-Response. Additionally, the script will prepare the
 	host for running Power-Response by unblocking all Power-Response related
@@ -18,10 +18,10 @@
 	the	script with the updated parameter.
 
 .EXAMPLE
-	Config-PR.ps1 
-	*This will run in the initial mode and complete all configuration
+	Setup.ps1 
+	*This will run in the initial mode and complete all Setup
 
-	Config-PR.ps1 -Update
+	Setup.ps1 -Update
 	*This will update the binary dependencies for Power-Response
 
 .NOTES
@@ -29,9 +29,9 @@
     Date Created: 4/22/2019
     Twitter: @5ynax
     
-    Last Modified By:
-    Last Modified Date:
-    Twitter:
+    Last Modified By: Gavin Prentice
+    Last Modified Date: 6/5/2019
+    Twitter: @valrkey
   
 #>
 [CmdletBinding()]
@@ -50,21 +50,21 @@ process{
     $ProgressPreference = 'SilentlyContinue'
 
     #Say Hello!
-    Write-Host "Starting Configuration"
+    Write-Host "Starting Setup"
 
     #Ensure that all files with alternate data streams are unblocked (for users that download a zip from the repo) to avoid PowerShell from not running Power-Response
 
     Get-ChildItem -Path $PSScriptRoot -Recurse *.ps1 | Unblock-File
 
-    #Verify that Bin exists and is ready for configuration process
+    #Verify that Bin exists and is ready for Setup process
 
     $Bin_Test = Test-Path "$PSScriptRoot\Bin"
 
-    if (!$Bin_Test) {
-
-        Write-Host "Bin not detected, creating Bin directory"
-        New-Item -Type Directory -Path "$PSScriptRoot\Bin" -Force | Out-Null
+    if ($Bin_Test) {
+        Remove-Item -Force -Recurse -Path "$PSScriptRoot\Bin"
     }
+    
+    New-Item -Type Directory -Path "$PSScriptRoot\Bin" -Force | Out-Null
 
     #Verify that 7zip is installed and ready for use (needed for 7za standalone application)
     $7zip_Test = Test-Path "C:\Program Files\7-Zip"
@@ -86,7 +86,7 @@ process{
 
     else {
 
-        # Configure Power-Response binary dependencies
+        # Download Power-Response binary dependencies
         $Binary_Deps = @(
 
             @{
@@ -237,7 +237,7 @@ process{
 
                     } catch {
 
-                        $Message = ("Configuration of {0} failed. Configure manually." -f $Binary_Dep.Name)
+                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
                         Write-Warning $Message -ErrorAction SilentlyContinue
                     }    
                 }
@@ -253,7 +253,7 @@ process{
 
                     } catch {
 
-                        $Message = ("Configuration of {0} failed. Configure manually." -f $Binary_Dep.Name)
+                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
                         Write-Warning $Message -ErrorAction SilentlyContinue
                     }
                 }
@@ -291,7 +291,7 @@ process{
 
                     } catch {
 
-                        $Message = ("Configuration of {0} failed. Configure manually." -f $Binary_Dep.Name)
+                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
                         Write-Warning $Message -ErrorAction SilentlyContinue
                     }
                 }
@@ -312,7 +312,7 @@ process{
 
                     } catch {
 
-                        $Message = ("Configuration of {0} failed. Configure manually." -f $Binary_Dep.Name)
+                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
                         Write-Warning $Message -ErrorAction SilentlyContinue
                     } 
                 }
@@ -337,7 +337,7 @@ process{
 
                         } catch {
 
-                            $Message = ("Configuration of {0} failed. Configure manually." -f $Binary_Dep.Name)
+                            $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
                             Write-Warning $Message -ErrorAction SilentlyContinue
                         }
                 }
@@ -363,7 +363,7 @@ process{
 
                     } catch {
 
-                        $Message = ("Configuration of {0} failed. Configure manually." -f $Binary_Dep.Name)
+                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
                         Write-Warning $Message -ErrorAction SilentlyContinue
                     }
                 }
@@ -395,7 +395,7 @@ process{
 
                     } catch {
 
-                        $Message = ("Configuration of {0} failed. Configure manually." -f $Binary_Dep.Name)
+                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
                         Write-Warning $Message -ErrorAction SilentlyContinue
                     }  
                 }
@@ -407,5 +407,5 @@ process{
     }
 
     #Say Goodbye
-    Write-Host "Configuration Complete! Go forth and forensicate!"
+    Write-Host "Setup Complete! Go forth and forensicate!"
 }
