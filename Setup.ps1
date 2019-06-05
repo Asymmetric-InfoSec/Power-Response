@@ -21,9 +21,6 @@
 	Setup.ps1 
 	*This will run in the initial mode and complete all Setup
 
-	Setup.ps1 -Update
-	*This will update the binary dependencies for Power-Response
-
 .NOTES
     Author: Drew Schmitt
     Date Created: 4/22/2019
@@ -37,9 +34,6 @@
 [CmdletBinding()]
 
 param (
-
-	[Parameter(Mandatory=$false)]
-	[Switch]$Update
 
 	)
 
@@ -61,6 +55,7 @@ process{
     $Bin_Test = Test-Path "$PSScriptRoot\Bin"
 
     if ($Bin_Test) {
+
         Remove-Item -Force -Recurse -Path "$PSScriptRoot\Bin"
     }
     
@@ -77,334 +72,325 @@ process{
         $7zaFlag = $true
     }
 
-    #Update dependencies if needed 
-    if ($Update){
+    # Download Power-Response binary dependencies
+    $Binary_Deps = @(
 
-        Write-Host "Functionality Coming Soon."
+        @{
 
-        } 
+            Name = "Autorunsc" ; URL = 'https://download.sysinternals.com/files/Autoruns.zip'; Rename = ''; Type = 'zipped_sysinternals'
 
-    else {
+            },
 
-        # Download Power-Response binary dependencies
-        $Binary_Deps = @(
+         @{
 
-            @{
+            Name = "Sigcheck"; URL = 'https://download.sysinternals.com/files/Sigcheck.zip'; Rename = ''; Type = 'zipped_sysinternals' 
 
-                Name = "Autorunsc" ; URL = 'https://download.sysinternals.com/files/Autoruns.zip'; Rename = ''; Type = 'zipped_sysinternals'
+            },
 
-                },
+        @{
 
-             @{
+            Name = "Handle"; URL = 'https://download.sysinternals.com/files/Handle.zip'; Rename = ''; Type = 'zipped_sysinternals'
 
-                Name = "Sigcheck"; URL = 'https://download.sysinternals.com/files/Sigcheck.zip'; Rename = ''; Type = 'zipped_sysinternals' 
+            },
 
-                },
+        @{
 
-            @{
+            Name = "Winpmem"; URL = 'https://github.com/Velocidex/c-aff4/releases/download/3.2/winpmem_3.2.exe'; Rename = 'winpmem.exe'; Type = 'binary'
 
-                Name = "Handle"; URL = 'https://download.sysinternals.com/files/Handle.zip'; Rename = ''; Type = 'zipped_sysinternals'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "7za"; URL = 'https://www.7-zip.org/a/7z1900-extra.7z'; Rename = ''; Type = '7za'
 
-                Name = "Winpmem"; URL = 'https://github.com/Velocidex/c-aff4/releases/download/3.2/winpmem_3.2.exe'; Rename = 'winpmem.exe'; Type = 'binary'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "Velociraptor_x86"; URL = 'https://github.com/Velocidex/velociraptor/releases/download/0.2.9/velociraptor-v0.2.9-windows-4.0-386.exe'; Rename = 'velociraptor_x86.exe'; Type = 'binary'
 
-                Name = "7za"; URL = 'https://www.7-zip.org/a/7z1900-extra.7z'; Rename = ''; Type = '7za'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "Velociraptor_x64"; URL = 'https://github.com/Velocidex/velociraptor/releases/download/0.2.9/velociraptor-v0.2.9-windows-4.0-amd64.exe'; Rename = 'velociraptor_x64.exe'; Type = 'binary'
 
-                Name = "Velociraptor_x86"; URL = 'https://github.com/Velocidex/velociraptor/releases/download/0.2.9/velociraptor-v0.2.9-windows-4.0-386.exe'; Rename = 'velociraptor_x86.exe'; Type = 'binary'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "PECmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/PECmd.zip' ;Rename = ''; Type = 'zipped_zimmerman'
 
-                Name = "Velociraptor_x64"; URL = 'https://github.com/Velocidex/velociraptor/releases/download/0.2.9/velociraptor-v0.2.9-windows-4.0-amd64.exe'; Rename = 'velociraptor_x64.exe'; Type = 'binary'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "JLECmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/JLECmd.zip'; Rename = ''; Type = 'zipped_zimmerman'
 
-                Name = "PECmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/PECmd.zip' ;Rename = ''; Type = 'zipped_zimmerman'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "LECmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/LECmd.zip'; Rename = ''; Type = 'zipped_zimmerman'
 
-                Name = "JLECmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/JLECmd.zip'; Rename = ''; Type = 'zipped_zimmerman'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "MFTECmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/MFTECmd.zip'; Rename = ''; Type = 'zipped_zimmerman'
 
-                Name = "LECmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/LECmd.zip'; Rename = ''; Type = 'zipped_zimmerman'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "AppCompatParser"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/AppCompatCacheParser.zip'; Rename = ''; Type = 'zipped_zimmerman'
 
-                Name = "MFTECmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/MFTECmd.zip'; Rename = ''; Type = 'zipped_zimmerman'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "AmcacheParser"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/AmcacheParser.zip'; Rename = ''; Type = 'zipped_zimmerman'
 
-                Name = "AppCompatParser"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/AppCompatCacheParser.zip'; Rename = ''; Type = 'zipped_zimmerman'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "ShellBagsExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/ShellBagsExplorer.zip'; Rename = ''; Type = 'zipped_zimmerman_ShellBagsExplorer'
 
-                Name = "AmcacheParser"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/AmcacheParser.zip'; Rename = ''; Type = 'zipped_zimmerman'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "RBCmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/RBCmd.zip'; Rename = ''; Type = 'zipped_zimmerman'
 
-                Name = "ShellBagsExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/ShellBagsExplorer.zip'; Rename = ''; Type = 'zipped_zimmerman_ShellBagsExplorer'
+            },
 
-                },
+        @{
 
-            @{
+            Name = "RegistryExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/RegistryExplorer_RECmd.zip'; Rename = ''; Type = 'zipped_zimmerman_RegistryExplorer'
 
-                Name = "RBCmd"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/RBCmd.zip'; Rename = ''; Type = 'zipped_zimmerman'
+            },
 
-                },
+        @{
 
-            @{
-
-                Name = "RegistryExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/RegistryExplorer_RECmd.zip'; Rename = ''; Type = 'zipped_zimmerman_RegistryExplorer'
-
-                },
-
-            @{
-
-                Name = "EvtxExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/EvtxExplorer.zip'; Rename = ''; Type = 'zipped_zimmerman'
-
-                }
-
-            @{
-
-                Name = "FLS"; URL = 'https://github.com/sleuthkit/sleuthkit/releases/download/sleuthkit-4.6.6/sleuthkit-4.6.6-win32.zip'; Rename = 'fls'; Type = 'fls'
+            Name = "EvtxExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/EvtxExplorer.zip'; Rename = ''; Type = 'zipped_zimmerman'
 
             }
-        )
 
-        #Introduction Message 
+        @{
 
-        Write-Host "Collecting Dependencies..."
-        #Accept all TLS versions
-        [System.Net.ServicePointManager]::SecurityProtocol = "Tls12","Tls11","Tls" 
+            Name = "FLS"; URL = 'https://github.com/sleuthkit/sleuthkit/releases/download/sleuthkit-4.6.6/sleuthkit-4.6.6-win32.zip'; Rename = 'fls'; Type = 'fls'
 
-        #Create netclient for use in config
-        $Client = New-Object System.Net.WebClient 
+        }
+    )
 
-        #Create staging location
-        $Stage_Path = "$PSScriptRoot\Stage"
-        New-Item -Type Directory -Path $Stage_Path | Out-Null
+    #Introduction Message 
 
-        #Loop through each hash table and process accordingly
-        foreach ($Binary_Dep in $Binary_Deps) {
+    Write-Host "Collecting Dependencies..."
 
-            #Process each type according to how they need to be handled
-            switch ($Binary_Dep.Type) {
+    #Accept all TLS versions
+    [System.Net.ServicePointManager]::SecurityProtocol = "Tls12","Tls11","Tls" 
 
-                zipped_sysinternals {
+    #Create netclient for use in config
+    $Client = New-Object System.Net.WebClient 
 
-                    try {
+    #Create staging location
+    $Stage_Path = "$PSScriptRoot\Stage"
+    New-Item -Type Directory -Path $Stage_Path | Out-Null
 
-                        #Create the staging location
-                        $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
-                        
-                        #Download the zip
-                        $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
+    #Loop through each hash table and process accordingly
+    foreach ($Binary_Dep in $Binary_Deps) {
+
+        #Process each type according to how they need to be handled
+        switch ($Binary_Dep.Type) {
+
+            zipped_sysinternals {
+
+                try {
+
+                    #Create the staging location
+                    $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
+                    
+                    #Download the zip
+                    $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
+
+                    #Extract the files
+                    Expand-Archive -Path $Stage_Location -Destination $Stage_Path -Force
+
+                    #Copy the files to the BIN folder
+                    $Copy_Path = ("{0}/{1}*.exe" -f $Stage_Path, $Binary_Dep.Name)
+                    $Final_Destination = "$PSScriptRoot\Bin"
+                    Copy-Item -Path $Copy_Path -Destination $Final_Destination -Force
+
+                } catch {
+
+                    $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
+                    Write-Warning $Message -ErrorAction SilentlyContinue
+                }    
+            }
+
+            binary {
+
+                try {
+
+                    #Dowload binary to the proper location
+                    $Binary_Path = "$PSScriptRoot\Bin"
+                    $Binary_Dest = "{0}\{1}.exe" -f $Binary_Path,$Binary_Dep.Name
+                    $Client.DownloadFile($Binary_Dep.URL,$Binary_Dest)
+
+                } catch {
+
+                    $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
+                    Write-Warning $Message -ErrorAction SilentlyContinue
+                }
+            }
+
+            7za{
+
+                try {
+
+                    #Create the staging location
+                    $Stage_Location = ("{0}\{1}.7z" -f $Stage_Path, $Binary_Dep.Name)
+                    
+                    #Download the zip
+                    $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
+
+                    if ($7zaFlag) {
+
+                        #Copy the .7z file to BIN for manual extraction later
+                        Copy-Item -Path $Stage_Location -Destination "$PSScriptRoot\Bin\"
+
+                    } else {
 
                         #Extract the files
-                        Expand-Archive -Path $Stage_Location -Destination $Stage_Path -Force
+                        $7zip_Path = 'C:\Program Files\7-zip\7z.exe'
+                        $Command = (("& '{0}' x {1} -o{2}") -f ($7zip_Path, $Stage_Location,$Stage_Path))
+                        Invoke-Expression -Command $Command | Out-Null
 
-                        #Copy the files to the BIN folder
-                        $Copy_Path = ("{0}/{1}*.exe" -f $Stage_Path, $Binary_Dep.Name)
-                        $Final_Destination = "$PSScriptRoot\Bin"
-                        Copy-Item -Path $Copy_Path -Destination $Final_Destination -Force
+                        #Copy files to Bin
+                        $7za64_Path = ("{0}\x64\7za.exe" -f $Stage_Path)
+                        $7za32_Path = ("{0}\7za.exe" -f $Stage_Path)
+                        
+                        Copy-Item -Path $7za64_Path -Destination "$PSScriptRoot\Bin\7za_x64.exe" -Force
+                        Copy-Item -Path $7za32_Path -Destination "$PSScriptRoot\Bin\7za_x86.exe" -Force
 
-                    } catch {
+                    }
 
-                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
-                        Write-Warning $Message -ErrorAction SilentlyContinue
-                    }    
+                } catch {
+
+                    $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
+                    Write-Warning $Message -ErrorAction SilentlyContinue
                 }
+            }
 
-                binary {
+            zipped_zimmerman{
 
-                    try {
+                try{
 
-                        #Dowload binary to the proper location
-                        $Binary_Path = "$PSScriptRoot\Bin"
-                        $Binary_Dest = "{0}\{1}.exe" -f $Binary_Path,$Binary_Dep.Name
-                        $Client.DownloadFile($Binary_Dep.URL,$Binary_Dest)
+                    #Create the staging location
+                    $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
+                    
+                    #Download the zip
+                    $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
+
+                    #Extract the files into their final resting place
+                    $Expand_Path = ("{0}\Bin" -f $PSScriptRoot)
+                    Expand-Archive -Path $Stage_Location -Destination $Expand_Path -Force
+
+                } catch {
+
+                    $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
+                    Write-Warning $Message -ErrorAction SilentlyContinue
+                } 
+            }
+
+            zipped_zimmerman_ShellBagsExplorer{
+
+                try{ 
+
+                    #Create the staging location
+                    $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
+                    
+                    #Download the zip
+                    $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
+
+                    #Extract the files
+                    Expand-Archive -Path $Stage_Location -Destination $Stage_Path -Force
+
+                    #Copy files to their final resting place
+                    $Shell_Path = ("{0}\{1}\SBECmd.exe" -f $Stage_Path, $Binary_Dep.Name)
+                    $Final_Shell_Path = ("{0}\Bin" -f $PSScriptRoot)
+                    Copy-Item -Path $Shell_Path -Destination $Final_Shell_Path -Force
 
                     } catch {
 
                         $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
                         Write-Warning $Message -ErrorAction SilentlyContinue
                     }
+            }
+
+            zipped_zimmerman_RegistryExplorer{
+
+                try{
+
+                    #Create the staging location
+                    $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
+                    
+                    #Download the zip
+                    $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
+
+                    #Extract the files
+                    $Expand_Path = ("{0}\Bin" -f $PSScriptRoot)
+                    Expand-Archive -Path $Stage_Location -Destination $Expand_Path -Force
+
+                    #Copy the files to their final resting place
+                    $Batch_Path = "$PSScriptRoot\Bin\RegistryExplorer\BatchExamples\RECmd_Batch_MC.reb"
+                    $Final_Batch_Path = "$PSScriptRoot\Bin\RegistryExplorer\RECmd_Batch_MC.reb"
+                    Copy-Item -Path $Batch_Path -Destination $Final_Batch_Path -Force
+
+                } catch {
+
+                    $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
+                    Write-Warning $Message -ErrorAction SilentlyContinue
                 }
+            }
 
-                7za{
+            fls{
 
-                    try {
+                try{
 
-                        #Create the staging location
-                        $Stage_Location = ("{0}\{1}.7z" -f $Stage_Path, $Binary_Dep.Name)
+                    #Create the staging location
+                    $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
                         
-                        #Download the zip
-                        $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
+                    #Download the zip
+                    $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
 
-                        if ($7zaFlag) {
+                    #Extract the files
+                    $Expand_Stage = ("{0}\fls" -f $Stage_Path)
+                    Expand-Archive -Path $Stage_Location -Destination $Expand_Stage -Force
 
-                            #Copy the .7z file to BIN for manual extraction later
-                            Copy-Item -Path $Stage_Location -Destination "$PSScriptRoot\Bin\"
+                    Write-Debug "fls"
 
-                        } else {
+                    #Copy relevant files to final location
+                    $Expand_Path =  ("{0}\Bin\fls" -f $PSScriptRoot)
+                    New-Item -Type Directory -Path $Expand_Path -Force | Out-Null
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\fls.exe" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libewf.dll" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libvhdi.dll" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libvmdk.dll" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\zlib.dll" -Destination $Expand_Path -Force
 
-                            #Extract the files
-                            $7zip_Path = 'C:\Program Files\7-zip\7z.exe'
-                            $Command = (("& '{0}' x {1} -o{2}") -f ($7zip_Path, $Stage_Location,$Stage_Path))
-                            Invoke-Expression -Command $Command | Out-Null
+                } catch {
 
-                            #Copy files to Bin
-                            $7za64_Path = ("{0}\x64\7za.exe" -f $Stage_Path)
-                            $7za32_Path = ("{0}\7za.exe" -f $Stage_Path)
-                            
-                            Copy-Item -Path $7za64_Path -Destination "$PSScriptRoot\Bin\7za_x64.exe" -Force
-                            Copy-Item -Path $7za32_Path -Destination "$PSScriptRoot\Bin\7za_x86.exe" -Force
-
-                        }
-
-                    } catch {
-
-                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
-                        Write-Warning $Message -ErrorAction SilentlyContinue
-                    }
-                }
-
-                zipped_zimmerman{
-
-                    try{
-
-                        #Create the staging location
-                        $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
-                        
-                        #Download the zip
-                        $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
-
-                        #Extract the files into their final resting place
-                        $Expand_Path = ("{0}\Bin" -f $PSScriptRoot)
-                        Expand-Archive -Path $Stage_Location -Destination $Expand_Path -Force
-
-                    } catch {
-
-                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
-                        Write-Warning $Message -ErrorAction SilentlyContinue
-                    } 
-                }
-
-                zipped_zimmerman_ShellBagsExplorer{
-
-                    try{ 
-
-                        #Create the staging location
-                        $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
-                        
-                        #Download the zip
-                        $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
-
-                        #Extract the files
-                        Expand-Archive -Path $Stage_Location -Destination $Stage_Path -Force
-
-                        #Copy files to their final resting place
-                        $Shell_Path = ("{0}\{1}\SBECmd.exe" -f $Stage_Path, $Binary_Dep.Name)
-                        $Final_Shell_Path = ("{0}\Bin" -f $PSScriptRoot)
-                        Copy-Item -Path $Shell_Path -Destination $Final_Shell_Path -Force
-
-                        } catch {
-
-                            $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
-                            Write-Warning $Message -ErrorAction SilentlyContinue
-                        }
-                }
-
-                zipped_zimmerman_RegistryExplorer{
-
-                    try{
-
-                        #Create the staging location
-                        $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
-                        
-                        #Download the zip
-                        $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
-
-                        #Extract the files
-                        $Expand_Path = ("{0}\Bin" -f $PSScriptRoot)
-                        Expand-Archive -Path $Stage_Location -Destination $Expand_Path -Force
-
-                        #Copy the files to their final resting place
-                        $Batch_Path = "$PSScriptRoot\Bin\RegistryExplorer\BatchExamples\RECmd_Batch_MC.reb"
-                        $Final_Batch_Path = "$PSScriptRoot\Bin\RegistryExplorer\RECmd_Batch_MC.reb"
-                        Copy-Item -Path $Batch_Path -Destination $Final_Batch_Path -Force
-
-                    } catch {
-
-                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
-                        Write-Warning $Message -ErrorAction SilentlyContinue
-                    }
-                }
-
-                fls{
-
-                    try{
-
-                        #Create the staging location
-                        $Stage_Location = ("{0}\{1}.zip" -f $Stage_Path, $Binary_Dep.Name)
-                            
-                        #Download the zip
-                        $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
-
-                        #Extract the files
-                        $Expand_Stage = ("{0}\fls" -f $Stage_Path)
-                        Expand-Archive -Path $Stage_Location -Destination $Expand_Stage -Force
-
-                        Write-Debug "fls"
-
-                        #Copy relevant files to final location
-                        $Expand_Path =  ("{0}\Bin\fls" -f $PSScriptRoot)
-                        New-Item -Type Directory -Path $Expand_Path -Force | Out-Null
-                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\fls.exe" -Destination $Expand_Path -Force
-                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libewf.dll" -Destination $Expand_Path -Force
-                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libvhdi.dll" -Destination $Expand_Path -Force
-                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libvmdk.dll" -Destination $Expand_Path -Force
-                        Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\zlib.dll" -Destination $Expand_Path -Force
-
-                    } catch {
-
-                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
-                        Write-Warning $Message -ErrorAction SilentlyContinue
-                    }  
-                }
+                    $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
+                    Write-Warning $Message -ErrorAction SilentlyContinue
+                }  
             }
         }
-        
-        #Remove staging location
-        Remove-Item -Recurse -Path $Stage_Path -Force
     }
+    
+    #Remove staging location
+    Remove-Item -Recurse -Path $Stage_Path -Force
 
     #Say Goodbye
     Write-Host "Setup Complete! Go forth and forensicate!"
