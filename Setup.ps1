@@ -50,6 +50,24 @@ process{
 
     Get-ChildItem -Path $PSScriptRoot -Recurse *.ps1 | Unblock-File
 
+    #Install the ImportExcel module from PSGallery
+    $Excel_Test = Get-Module -ListAvailable -Name 'ImportExcel'
+    if (!$Excel_Test) {
+
+        Write-Host -Object "Installing 'ImportExcel' module"
+
+        try {
+
+            Install-Module -Force -Name "ImportExcel"
+
+        } catch {
+
+            Write-Warning -Message "Installing module in current user ($ENV:UserName) context. To install the module system-wide, run the 'Setup.ps1' script as admin"
+            Install-Module -Force -Name "ImportExcel" -Scope "CurrentUser"
+
+        }
+    }
+
     #Verify that Bin exists and is ready for Setup process
 
     $Bin_Test = Test-Path "$PSScriptRoot\Bin"

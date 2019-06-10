@@ -170,6 +170,7 @@ function Get-Config {
             AdminUserName = $ENV:UserName
             AutoAnalyze = $true
             AutoClear = $true
+            AutoConsolidate = $true
             HashAlgorithm = 'SHA256'
             OutputType = @('XML','CSV')
             PromptText = 'power-response'
@@ -977,9 +978,40 @@ function Out-PRFile {
 
             # Export the $Objects into specified format
             switch($OutputType) {
-                'CSV' { $Objects | Export-Csv -Path ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()) }
-                'XML' { $Objects | Export-CliXml -Path ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()) }
-                default { Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType); exit }
+                'CSV' {
+                    # Construct $FilePath
+                    $FilePath = '{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()
+
+                    # Export objects as CSV data
+                    $Objects | Export-Csv -Path $FilePath
+
+                    # Track $FilePath for protecting later
+                    $Path += $FilePath
+
+                    # If $global:PowerResponse.Config.AutoConsolidate is set
+                    if ($global:PowerResponse.Config.AutoConsolidate) {
+                        # Warn if the ImportExcel module doesn't exist
+                        if (!(Get-Module -ListAvailable -Name 'ImportExcel')) {
+                            Write-Warning -Message 'No ''ImportExcel'' module detected, will not consolidate output'
+                        } else {
+                            Write-Host -ForegroundColor 'Yellow' -Object 'Consolidate functionality coming soon!'
+                        }
+                    }
+                }
+                'XML' {
+                    # Construct $FilePath
+                    $FilePath = '{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()
+
+                    # Export objects as XML data
+                    $Objects | Export-CliXml -Path $FilePath
+
+                    # Track $FilePath for protecting later
+                    $Path += $FilePath
+                }
+                default {
+                    Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType)
+                    exit
+                }
             }
         } catch {
             # Caught error exporting $Objects
@@ -992,7 +1024,7 @@ function Out-PRFile {
             Write-Log -Message $Message
 
             # Remove the created $Path file
-            Remove-Item -Force -Path $Path
+            Remove-Item -Force -Path $FilePath
         }
 
         # Protect the newly created output files
@@ -1097,7 +1129,7 @@ Write-Host $Banner
 $global:PowerResponse = @{}
 
 # Import $global:PowerResponse.Config from data file
-Import-Config -Path $ConfigPath -RootKeys @('AdminUserName','AutoAnalyze','AutoClear','HashAlgorithm','OutputType','PromptText','ThrottleLimit','Path','PSSession')
+Import-Config -Path $ConfigPath -RootKeys @('AdminUserName','AutoAnalyze','AutoClear','AutoConsolidate','HashAlgorithm','OutputType','PromptText','ThrottleLimit','Path','PSSession')
 
 # Write a log to indicate framework startup
 Write-Log -Message 'Began the Power-Response framework'
