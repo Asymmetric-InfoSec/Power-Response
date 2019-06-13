@@ -314,7 +314,7 @@ process{
 
                 try{
 
-                    Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -ErrorAction Stop 
+                    Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop 
 
                 }catch {
 
@@ -347,7 +347,7 @@ process{
             
             #Copy $Item
             
-            Copy-Item -Path ("C:\ProgramData\{0}.zip" -f (Split-Path $FinalPath -Leaf)) -Destination $Output -FromSession $Session
+            Copy-Item -Path ("C:\ProgramData\{0}.zip" -f (Split-Path $FinalPath -Leaf)) -Destination $Output -FromSession $Session -Force
             
             #Remove created files on remote machine as cleanup
             
