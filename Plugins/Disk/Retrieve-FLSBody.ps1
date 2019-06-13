@@ -87,21 +87,27 @@ process{
     }
 
     #Run on the remote host and collect data
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}\fls\fls.exe' -r -m '{1}' '\\.\{1}' | Out-File '{0}\FLS.body'") -f ($RemotePath,$SystemDrive))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}\fls\fls.exe' -r -m '{1}' '\\.\{1}' | Out-File '{0}\FLSi.body'") -f ($RemotePath,$SystemDrive))
+    
+    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
+
+    #Format the FLS body file so that it works with all operating systems and not just Windows because CRLF 
+
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Get-Content '{0}\FLSi.body' -raw | ForEach-Object {{`$_ -replace `"``r`", `"`"}} | Set-Content -NoNewLine '{0}\FLS.body'") -f ($RemotePath))
     
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
 
     #Compress output before copying to analysis machine
     $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Compress-Archive -Path {0}\FLS.body -Destination {0}\FLS.zip -Force") -f ($RemotePath))
 
-    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
+    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
     #Copy data to analysis system
     $DataPath = ("{0}\FLS.zip" -f $RemotePath)
     Copy-Item -Path $DataPath -Destination "$Output" -FromSession $Session -Force -ErrorAction SilentlyContinue
 
     #Cleanup artifacts on remote system
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Recurse -Force {0}\fls, {0}\FLS.body, {0}\FLS.zip") -f $RemotePath)
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Recurse -Force {0}\fls, {0}\FLSi.body, {0}\FLS.body, {0}\FLS.zip") -f $RemotePath)
 
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 }

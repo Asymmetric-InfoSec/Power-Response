@@ -309,7 +309,7 @@ process{
 
         #Remove the archive
         Remove-Item -Path $ArchivePath -Force 
-            
+        
         #Remove the Metadata file
         Remove-Item -Path $ExportPath -Force  
 
