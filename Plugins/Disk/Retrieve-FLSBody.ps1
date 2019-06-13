@@ -94,8 +94,6 @@ process{
     #Format the FLS body file so that it works with all operating systems and not just Windows because CRLF 
 
     $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Get-Content '{0}\FLSi.body' -raw | ForEach-Object {{`$_ -replace `"``r`", `"`"}} | Set-Content -NoNewLine '{0}\FLS.body'") -f ($RemotePath))
-
-    Write-Debug "Scriptblock"
     
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
 
