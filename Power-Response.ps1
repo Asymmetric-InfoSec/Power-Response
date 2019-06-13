@@ -170,9 +170,9 @@ function Get-Config {
             AdminUserName = $ENV:UserName
             AutoAnalyze = $true
             AutoClear = $true
-            AutoConsolidate = $true
+            ExcelName = 'power-response.xlsx'
             HashAlgorithm = 'SHA256'
-            OutputType = @('XML','CSV')
+            OutputType = @('CSV','XLSX','XML')
             PromptText = 'power-response'
             ThrottleLimit = 32
 
@@ -362,7 +362,7 @@ function Import-Config {
         $Config = Get-Config @PSBoundParameters
 
         # Check for required $Config value existence (sanity check - should never fail with default values)
-        if (!$Config.AdminUserName -or !$Config.HashAlgorithm -or !$Config.Path -or !$Config.PSSession -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.PSSession.NoMachineProfile) {
+        if (!$Config.AdminUserName -or !$Config.AutoAnalyze -or !$Config.AutoClear -or !$Config.ExcelName -or !$Config.HashAlgorithm -or !$Config.Path -or !$Config.PSSession -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.PSSession.NoMachineProfile) {
             throw 'Missing required configuration value'
         }
 
@@ -925,7 +925,7 @@ function Out-PRFile {
 
         [String]$Plugin = $global:PowerResponse.Location.FullName,
 
-        [ValidateSet('CSV','XML')]
+        [ValidateSet('CSV','XLSX','XML')]
         [String[]]$OutputType = $global:PowerResponse.Parameters.OutputType,
 
         [String]$Directory,
@@ -942,13 +942,24 @@ function Out-PRFile {
             $Plugin = Get-PRPlugin -Name $Plugin
         }
 
+        # If no ImportExcel module is found
+        if ($OutputType -Contains 'XLSX' -and !(Get-Module -ListAvailable -Name 'ImportExcel')) {
+            Write-Warning -Message 'No ''ImportExcel'' module detected, will not write output to XLSX format (run ''Setup.ps1'' as admin)'
+
+            # Sanitize $OutputType
+            $OutputType = $OutputType -ne 'XLSX'
+
+            # Prevent reoccuring warnings
+            $global:PowerResponse.Parameters.OutputType = $global:PowerResponse.Parameters.OutputType -ne 'XLSX'
+        }
+
         # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}_{APPEND}
-        $Name = ('{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}_{2}' -f $Date, (Get-Item -Path $Plugin).BaseName.ToLower(),$Append) -Replace '_$'
+        $Name = ('{1}_{2}' -f $Date, (Get-Item -Path $Plugin).BaseName.ToLower(),$Append) -Replace '_$'
 
         # Remove irrelevent keys from $PSBoundParameters
+        $null = $PSBoundParameters.Remove('Append')
         $null = $PSBoundParameters.Remove('InputObject')
         $null = $PSBoundParameters.Remove('OutputType')
-        $null = $PSBoundParameters.Remove('Append')
 
         # Get $OutputPath with remaining $PSBoundParameters
         $OutputPath = Get-PRPath @PSBoundParameters
@@ -979,28 +990,43 @@ function Out-PRFile {
             # Export the $Objects into specified format
             switch($OutputType) {
                 'CSV' {
-                    # Construct $FilePath
-                    $FilePath = '{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()
+                    # Write verbose message
+                    Write-Verbose -Message ('Exporting objects to {0} format' -f $PSItem)
 
-                    # Export objects as CSV data
+                    # Format the destination $FilePath
+                    $FilePath = '{0}\{1:yyyy-MM-dd_HH-mm-ss-fff}_{2}.{3}' -f $OutputPath,$Date,$Name,$PSItem.ToLower()
+
+                    # Export $Objects as CSV data
                     $Objects | Export-Csv -Path $FilePath
 
                     # Track $FilePath for protecting later
                     $Path += $FilePath
+                }
+                'XLSX' {
+                    # Write verbose message
+                    Write-Verbose -Message ('Exporting objects to {0} format' -f $PSItem)
 
-                    # If $global:PowerResponse.Config.AutoConsolidate is set
-                    if ($global:PowerResponse.Config.AutoConsolidate) {
-                        # Warn if the ImportExcel module doesn't exist
-                        if (!(Get-Module -ListAvailable -Name 'ImportExcel')) {
-                            Write-Warning -Message 'No ''ImportExcel'' module detected, will not consolidate output'
-                        } else {
-                            Write-Host -ForegroundColor 'Yellow' -Object 'Consolidate functionality coming soon!'
-                        }
-                    }
+                    # Format the $ExcelPath
+                    $FilePath = '{0}\{1}\{2}.xlsx' -f (Get-PRPath -Output),$ComputerName.ToUpper(),$global:PowerResponse.Config.ExcelName -Replace '(\.xlsx){2}','.xlsx'
+
+                    # Construct $WorksheetName
+                    $WorksheetName = '{0}_{1:MM-dd_HH-mm-ss}' -f ($Name -Replace '^.+?-'),$Date
+
+                    # Allow writing to Excel file
+                    Set-ItemProperty -Path $FilePath -Name 'IsReadOnly' -Value $false -ErrorAction 'SilentlyContinue'
+
+                    # Export $Objects as XLSX data
+                    $Objects | Export-Excel -Path $FilePath -WorksheetName $WorksheetName
+
+                    # Track $FilePath for protecting later
+                    $Path += $FilePath
                 }
                 'XML' {
-                    # Construct $FilePath
-                    $FilePath = '{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()
+                    # Write verbose message
+                    Write-Verbose -Message ('Exporting objects to {0} format' -f $PSItem)
+
+                    # Format the destination $FilePath
+                    $FilePath = '{0}\{1:yyyy-MM-dd_HH-mm-ss-fff}_{2}.{3}' -f $OutputPath,$Date,$Name,$PSItem.ToLower()
 
                     # Export objects as XML data
                     $Objects | Export-CliXml -Path $FilePath
@@ -1129,7 +1155,7 @@ Write-Host $Banner
 $global:PowerResponse = @{}
 
 # Import $global:PowerResponse.Config from data file
-Import-Config -Path $ConfigPath -RootKeys @('AdminUserName','AutoAnalyze','AutoClear','AutoConsolidate','HashAlgorithm','OutputType','PromptText','ThrottleLimit','Path','PSSession')
+Import-Config -Path $ConfigPath -RootKeys @('AdminUserName','AutoAnalyze','AutoClear','ExcelName','HashAlgorithm','OutputType','PromptText','ThrottleLimit','Path','PSSession')
 
 # Write a log to indicate framework startup
 Write-Log -Message 'Began the Power-Response framework'

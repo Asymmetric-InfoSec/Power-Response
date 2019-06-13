@@ -3,17 +3,17 @@
     ####   AdminUserName - Administrative user name (defaults to $ENV:UserName)
     ####   AutoAnalyze - Automatically analyze data collections (defaults to $true)
     ####   AutoClear - Automatically clear the screen following plugin execution (defaults to $true)
-    ####   AutoConsolidate - Automatically consolidate output gathered from CSVs (defaults to $true)
+    ####   ExcelName - Name for the consolidated Excel file (defaults to power-response.xlsx)
     ####   HashAlgorithm - Hash algorithm to use for file integrity log (defaults to SHA256)
-    ####   OutputType - Default output type for plugins (defaults to XML,CSV)
+    ####   OutputType - Default output type for plugins (defaults to CSV,XLSX,XML)
     ####   PromptText - Text to show with your prompt (defaults to power-response)
     ####   ThrottleLimit - Maximum number of concurrent connections (defaults to 32)
     # AdminUserName = $ENV:UserName
     # AutoAnalyze = $true
     # AutoClear = $true
-    # AutoConsolidate = $true
+    # ExcelName = 'power-response.xlsx'
     # HashAlgorithm = 'SHA256'
-    # OutputType = 'XML','CSV'
+    # OutputType = 'XML','XLSX','CSV'
     # PromptText = 'power-response'
     # ThrottleLimit = 32
     # --------- End General Section ----------
