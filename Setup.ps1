@@ -9,13 +9,7 @@
 	for use with Power-Response. Additionally, the script will prepare the
 	host for running Power-Response by unblocking all Power-Response related
 	.ps1 files since they are not digitally signed. Power-Response shoud 
-	be ready for use immediately after running this script. 
-
-	This script also has a switch paramter for updating binary dependencies
-	for use in Power-Response. Simply execute the script with the update 
-	parameter and the script will update the binary dependencies accordingly.
-	It is recommended that you complete a repository update prior to executing 
-	the	script with the updated parameter.
+	be ready for use immediately after running this script.
 
 .EXAMPLE
 	Setup.ps1 

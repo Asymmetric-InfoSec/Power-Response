@@ -170,7 +170,6 @@ function Get-Config {
             AdminUserName = $ENV:UserName
             AutoAnalyze = $true
             AutoClear = $true
-            ExcelName = 'power-response.xlsx'
             HashAlgorithm = 'SHA256'
             OutputType = @('CSV','XLSX','XML')
             PromptText = 'power-response'
@@ -357,13 +356,24 @@ function Import-Config {
         [String[]]$RootKeys
     )
 
+    begin {
+        # List out required values to check for
+        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','HashAlgorithm','OutputType','Path','PromptText','PSSession','ThrottleLimit')
+        $PathRequiredValues = @('Bin','Logs','Output','Plugins')
+        $PSSessionRequiredValues = @('NoMachineProfile')
+    }
+
     process {
         # Pull the config information from the provided $Path
         $Config = Get-Config @PSBoundParameters
 
         # Check for required $Config value existence (sanity check - should never fail with default values)
-        if (!$Config.AdminUserName -or !$Config.AutoAnalyze -or !$Config.AutoClear -or !$Config.ExcelName -or !$Config.HashAlgorithm -or !$Config.Path -or !$Config.PSSession -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.PSSession.NoMachineProfile) {
-            throw 'Missing required configuration value'
+        [String[]]$TopMising = $TopRequiredValues | Where-Object { $Config.Keys -NotContains $PSItem -or !$Config.$PSItem }
+        [String[]]$PathMising = $PathRequiredValues | Where-Object { $Config.Path.Keys -NotContains $PSItem -or !$Config.Path.$PSItem }
+        [String[]]$PSSessionMising = $PSSessionRequiredValues | Where-Object { $Config.PSSession.Keys -NotContains $PSItem -or !$Config.PSSession.$PSItem }
+
+        if ($TopMissing + $PathMissing + $PSSessionMissing) {
+            throw ('Missing required configuration value: {0}' -f ($TopMissing + ($PathMissing | Foreach-Object { 'Path.{0}' -f $PSItem }) + ($PSSessionMissing | Foreach-Object { 'PSSession.{0}' -f $PSItem })))
         }
 
         $global:PowerResponse.Config = $Config
@@ -1007,19 +1017,52 @@ function Out-PRFile {
                     Write-Verbose -Message ('Exporting objects to {0} format' -f $PSItem)
 
                     # Format the $ExcelPath
-                    $FilePath = '{0}\{1}\{2}.xlsx' -f (Get-PRPath -Output),$ComputerName.ToUpper(),$global:PowerResponse.Config.ExcelName -Replace '(\.xlsx){2}','.xlsx'
+                    $FilePath = '{0}\{1}\{2}_power-response_output.xlsx' -f (Get-PRPath -Output),$ComputerName.ToUpper(),$ComputerName.ToLower()
 
-                    # Construct $WorksheetName
-                    $WorksheetName = '{0}_{1:MM-dd_HH-mm-ss}' -f ($Name -Replace '^.+?-'),$Date
+                    # Track $OpenExcelParameters
+                    $ExcelParameters = @{
+                        Path = $FilePath
+                        Create = !(Test-Path -Path $FilePath)
+                    }
 
-                    # Allow writing to Excel file
-                    Set-ItemProperty -Path $FilePath -Name 'IsReadOnly' -Value $false -ErrorAction 'SilentlyContinue'
+                    try {
+                        # Open the $ExcelPackage
+                        $ExcelPackage = Open-ExcelPackage @ExcelParameters
+                    } catch {
+                        # Write file open warnning message
+                        Write-Warning -Message ('Detected that Excel has the file {0} open. Please save and close the file so writing can occur. Press Enter to continue' -f $FilePath)
+
+                        # Wait for user input
+                        $null = Read-Host
+
+                        # Open the $ExcelPackage again and this time fail past the remaining logic
+                        $ExcelPackage = Open-ExcelPackage @ExcelParameters
+                    }
+
+                    # Remove the Create parameter
+                    $null = $ExcelParameters.Remove('Create')
+                    $ExcelParameters.WorksheetName = '{0}_{1:MM-dd_HH-mm-ss}' -f ($Name -Replace '^.+?-'),$Date
+
+                    # Get the $Worksheets in $ExcelPackage
+                    [String[]]$Worksheets = @($ExcelPackage.Workbook.Worksheets.Name) + $ExcelParameters.WorksheetName | Sort-Object
+
+                    if ($Worksheets.Count -gt 1 -and $Worksheets.IndexOf($ExcelParameters.WorkSheetName) -eq 0) {
+                        $ExcelParameters.MoveToStart = $true
+                    } elseif ($Worksheets.Count -gt 1) {
+                        $ExcelParameters.MoveAfter = $Worksheets[$Worksheets.IndexOf($ExcelParameters.WorkSheetName)-1]
+                    }
+
+                    # Add a worksheet in alphabetical order
+                    Add-Worksheet @ExcelParameters
+
+                    # Remove irrelevent parameters
+                    $null = $ExcelParameters.Remove('MoveToStart')
+                    $null = $ExcelParameters.Remove('MoveAfter')
 
                     # Export $Objects as XLSX data
-                    $Objects | Export-Excel -Path $FilePath -WorksheetName $WorksheetName
+                    $Objects | Export-Excel @ExcelParameters
 
-                    # Track $FilePath for protecting later
-                    $Path += $FilePath
+                    # Specifically don't track $FilePath for protecting later since we want to write more things to it later
                 }
                 'XML' {
                     # Write verbose message
@@ -1041,7 +1084,7 @@ function Out-PRFile {
             }
         } catch {
             # Caught error exporting $Objects
-            $Message = '{0} output export error: {1}' -f ($OutputType -Join ','), $PSItem
+            $Message = '{0} output export error: {1}' -f $FilePath,$PSItem
 
             # Write output object export warning
             Write-Warning -Message $Message
@@ -1061,7 +1104,7 @@ function Out-PRFile {
 function Protect-PRFile {
     param (
         [Parameter(Position=0)]
-        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Path (Get-PRPath -Output) -ErrorAction 'SilentlyContinue' | Select-Object -ExpandProperty 'FullName'),
+        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Exclude '*.xlsx' -Path (Get-PRPath -Output) -ErrorAction 'SilentlyContinue' | Select-Object -ExpandProperty 'FullName'),
 
         [ValidateSet('SHA1','SHA256','SHA384','SHA512','MACTripleDES','MD5','RIPEMD160')]
         [String]$HashAlgorithm = $global:PowerResponse.Config.HashAlgorithm

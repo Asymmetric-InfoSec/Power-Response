@@ -3,7 +3,6 @@
     ####   AdminUserName - Administrative user name (defaults to $ENV:UserName)
     ####   AutoAnalyze - Automatically analyze data collections (defaults to $true)
     ####   AutoClear - Automatically clear the screen following plugin execution (defaults to $true)
-    ####   ExcelName - Name for the consolidated Excel file (defaults to power-response.xlsx)
     ####   HashAlgorithm - Hash algorithm to use for file integrity log (defaults to SHA256)
     ####   OutputType - Default output type for plugins (defaults to CSV,XLSX,XML)
     ####   PromptText - Text to show with your prompt (defaults to power-response)
@@ -11,7 +10,6 @@
     # AdminUserName = $ENV:UserName
     # AutoAnalyze = $true
     # AutoClear = $true
-    # ExcelName = 'power-response.xlsx'
     # HashAlgorithm = 'SHA256'
     # OutputType = 'XML','XLSX','CSV'
     # PromptText = 'power-response'
