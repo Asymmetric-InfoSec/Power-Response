@@ -100,7 +100,7 @@ process{
     #Compress output before copying to analysis machine
     $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Compress-Archive -Path {0}\FLS.body -Destination {0}\FLS.zip -Force") -f ($RemotePath))
 
-    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock
+    Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
     #Copy data to analysis system
     $DataPath = ("{0}\FLS.zip" -f $RemotePath)
