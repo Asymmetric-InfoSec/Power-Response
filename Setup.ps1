@@ -9,13 +9,7 @@
 	for use with Power-Response. Additionally, the script will prepare the
 	host for running Power-Response by unblocking all Power-Response related
 	.ps1 files since they are not digitally signed. Power-Response shoud 
-	be ready for use immediately after running this script. 
-
-	This script also has a switch paramter for updating binary dependencies
-	for use in Power-Response. Simply execute the script with the update 
-	parameter and the script will update the binary dependencies accordingly.
-	It is recommended that you complete a repository update prior to executing 
-	the	script with the updated parameter.
+	be ready for use immediately after running this script.
 
 .EXAMPLE
 	Setup.ps1 
@@ -49,6 +43,24 @@ process{
     #Ensure that all files with alternate data streams are unblocked (for users that download a zip from the repo) to avoid PowerShell from not running Power-Response
 
     Get-ChildItem -Path $PSScriptRoot -Recurse *.ps1 | Unblock-File
+
+    #Install the ImportExcel module from PSGallery
+    $Excel_Test = Get-Module -ListAvailable -Name 'ImportExcel'
+    if (!$Excel_Test) {
+
+        Write-Host -Object "Installing 'ImportExcel' module"
+
+        try {
+
+            Install-Module -Force -Name "ImportExcel"
+
+        } catch {
+
+            Write-Warning -Message "Installing module in current user ($ENV:UserName) context. To install the module system-wide, run the 'Setup.ps1' script as admin"
+            Install-Module -Force -Name "ImportExcel" -Scope "CurrentUser"
+
+        }
+    }
 
     #Verify that Bin exists and is ready for Setup process
 
