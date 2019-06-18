@@ -4,14 +4,14 @@
     ####   AutoAnalyze - Automatically analyze data collections (defaults to $true)
     ####   AutoClear - Automatically clear the screen following plugin execution (defaults to $true)
     ####   HashAlgorithm - Hash algorithm to use for file integrity log (defaults to SHA256)
-    ####   OutputType - Default output type for plugins (defaults to CSV,XLSX,XML)
+    ####   OutputType - Default output type for plugins (defaults to CSV,XLSX)
     ####   PromptText - Text to show with your prompt (defaults to power-response)
     ####   ThrottleLimit - Maximum number of concurrent connections (defaults to 32)
     # AdminUserName = $ENV:UserName
     # AutoAnalyze = $true
     # AutoClear = $true
     # HashAlgorithm = 'SHA256'
-    # OutputType = 'XML','XLSX','CSV'
+    # OutputType = 'CSV','XLSX'
     # PromptText = 'power-response'
     # ThrottleLimit = 32
     # --------- End General Section ----------

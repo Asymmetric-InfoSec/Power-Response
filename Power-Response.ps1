@@ -171,7 +171,7 @@ function Get-Config {
             AutoAnalyze = $true
             AutoClear = $true
             HashAlgorithm = 'SHA256'
-            OutputType = @('CSV','XLSX','XML')
+            OutputType = @('CSV','XLSX')
             PromptText = 'power-response'
             ThrottleLimit = 32
 
@@ -1021,13 +1021,12 @@ function Out-PRFile {
 
                     # Track $OpenExcelParameters
                     $ExcelParameters = @{
-                        Path = $FilePath
                         Create = !(Test-Path -Path $FilePath)
                     }
 
                     try {
                         # Open the $ExcelPackage
-                        $ExcelPackage = Open-ExcelPackage @ExcelParameters
+                        $ExcelParameters.ExcelPackage = Open-ExcelPackage @ExcelParameters -Path $FilePath
                     } catch {
                         # Write file open warnning message
                         Write-Warning -Message ('Detected that Excel has the file {0} open. Please save and close the file so writing can occur. Press Enter to continue' -f $FilePath)
@@ -1036,31 +1035,18 @@ function Out-PRFile {
                         $null = Read-Host
 
                         # Open the $ExcelPackage again and this time fail past the remaining logic
-                        $ExcelPackage = Open-ExcelPackage @ExcelParameters
+                        $ExcelParameters.ExcelPackage = Open-ExcelPackage @ExcelParameters -Path $FilePath
                     }
 
                     # Remove the Create parameter
                     $null = $ExcelParameters.Remove('Create')
                     $ExcelParameters.WorksheetName = '{0}_{1:MM-dd_HH-mm-ss}' -f ($Name -Replace '^.+?-'),$Date
 
-                    # Get the $Worksheets in $ExcelPackage
-                    [String[]]$Worksheets = @($ExcelPackage.Workbook.Worksheets.Name) + $ExcelParameters.WorksheetName | Sort-Object
-
-                    if ($Worksheets.Count -gt 1 -and $Worksheets.IndexOf($ExcelParameters.WorkSheetName) -eq 0) {
-                        $ExcelParameters.MoveToStart = $true
-                    } elseif ($Worksheets.Count -gt 1) {
-                        $ExcelParameters.MoveAfter = $Worksheets[$Worksheets.IndexOf($ExcelParameters.WorkSheetName)-1]
-                    }
-
                     # Add a worksheet in alphabetical order
-                    Add-Worksheet @ExcelParameters
-
-                    # Remove irrelevent parameters
-                    $null = $ExcelParameters.Remove('MoveToStart')
-                    $null = $ExcelParameters.Remove('MoveAfter')
+                    $ExcelParameters.WorksheetName = Add-Worksheet @ExcelParameters -MoveAfter * | Select-Object -ExpandProperty 'Name'
 
                     # Export $Objects as XLSX data
-                    $Objects | Export-Excel @ExcelParameters
+                    $Objects | Export-Excel @ExcelParameters -AutoSize
 
                     # Specifically don't track $FilePath for protecting later since we want to write more things to it later
                 }
