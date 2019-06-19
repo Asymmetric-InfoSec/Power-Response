@@ -183,7 +183,7 @@ process{
     #Create retrieved items staging folder on the remote machine
     $ItemStage = ("C:\ProgramData\{0}") -f ($Session.ComputerName)
 
-    Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path $($args[0])} -Argumentlist $ItemStage | Out-Null
+    Invoke-Command -Session $Session -ScriptBlock {if (!(Test-Path $($args[0]))) {New-Item -Type Directory -Path $($args[0])}} -Argumentlist $ItemStage | Out-Null
     
     #Collect items
     foreach ($Item in $Items){
@@ -193,7 +193,7 @@ process{
 
         if (!$PathVerify) {
            
-            Write-Error "No item found at $Item. Skipping." -ErrorAction Continue
+            Write-Warning "No item found at $Item. Skipping." -ErrorAction Continue
             Continue
         }
 
@@ -267,7 +267,7 @@ process{
         #Collect $Item
         $FinalPath = ("{0}\{1}_{2}") -f ($ItemStage,(Split-Path $Item -Leaf),$Session.ComputerName)
 
-        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path $($args[0])} -Argumentlist $FinalPath | Out-Null
+        Invoke-Command -Session $Session -ScriptBlock {if (!(Test-Path $($args[0]))) {New-Item -Type Directory -Path $($args[0])}} -Argumentlist $FinalPath | Out-Null
 
         if (!$PathVerify.PSIsContainer){
 
@@ -289,20 +289,24 @@ process{
         }
     }
 
+    #Used for unique naming of zip archive
+    $Seconds = ((Get-Date -UFormat %s).Split('.')[0])
+
     #Compress    
     Invoke-Command -Session $Session -ScriptBlock {
 
         #Create archive of Item and MetaData (separately)
-        $ArchivePath = ("{0}\{1}_RetrievedItems.zip" -f ($($args[0]), $($args[1])))
+        $ArchivePath = ("{0}\{1}_RetrievedItems_{2}.zip" -f ($($args[0]),$($args[1]),$($args[3])))
         
-        $Command_Compress = ("& 'C:\ProgramData\{0}' a -pinfected -tzip {1} {2} {3}" -f ($($args[2]), $ArchivePath, $ExportPath, ($($args[0]))))
+        $Command_Compress = ("& 'C:\ProgramData\{0}' a -pinfected -tzip {1} {2} {3}" -f ($($args[2]),$ArchivePath,$ExportPath,($($args[0]))))
         
         Invoke-Expression -Command $Command_Compress | Out-Null
 
-    } -ArgumentList $ItemStage,($Session.ComputerName),(Split-Path $Installexe -Leaf)
+    } -ArgumentList $ItemStage,($Session.ComputerName),(Split-Path $Installexe -Leaf), $Seconds
         
     #Copy $Item
-    Copy-Item -Path ("{0}\{1}_RetrievedItems.zip" -f ($ItemStage,($Session.ComputerName))) -Destination $Output -FromSession $Session
+
+    Copy-Item -Path ("{0}\{1}_RetrievedItems_{2}.zip" -f ($ItemStage,($Session.ComputerName),$Seconds)) -Destination $Output -FromSession $Session
     
     #Remove created files on remote machine as cleanup
     Invoke-Command -Session $Session -ScriptBlock {
