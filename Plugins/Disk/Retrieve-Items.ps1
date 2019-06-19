@@ -213,8 +213,8 @@ process{
 
                 $MetaData = @{
 
-                    Item = $($args[0])
-                    Directory = ""
+                    Item = (Split-Path $($args[0]) -leaf)
+                    Directory = (Get-Item -Force $($args[0])).Directory
                     CreationTimeUTC = (Get-Item -Force $($args[0])).CreationTimeUtc
                     ModifiedTimeUTC = (Get-Item -Force $($args[0])).LastWriteTimeUtc 
                     AccessTimeUTC = (Get-Item -Force $($args[0])).LastAccessTimeUtc
@@ -247,7 +247,7 @@ process{
 
                     $MetaData = @{
 
-                        Item = $DirItem
+                        Item = (Split-Path $DirItem -Leaf)
                         Directory = (Get-Item -Force $DirItem).Directory
                         CreationTimeUTC = (Get-Item -Force $DirItem).CreationTimeUtc 
                         ModifiedTimeUTC = (Get-Item -Force $DirItem).LastWriteTimeUtc
