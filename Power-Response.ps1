@@ -42,9 +42,9 @@ function Format-Parameter {
             $CommandParameters.Add('ComputerName',(New-Object -TypeName 'System.Management.Automation.ParameterMetadata' -ArgumentList 'ComputerName',([String[]])))
         }
 
-        # If $CommandParameters does not contain a 'ComputerName' entry
+        # If $CommandParameters does not contain a 'OutputType' entry
         if ($CommandParameters.Keys -NotContains 'OutputType') {
-            # Add a fake 'ComputerName' parameter to $CommandParameters
+            # Add a fake 'OutputType' parameter to $CommandParameters
             $CommandParameters.Add('OutputType',(New-Object -TypeName 'System.Management.Automation.ParameterMetadata' -ArgumentList 'OutputType',([String[]])))
         }
 
@@ -765,8 +765,22 @@ function Invoke-PRCommand {
     }
 }
 
+function Invoke-PRSplat {
+    param (
+        [Parameter(Mandatory=$true,Position=0)]
+        [String]$Path,
+        [Parameter(Mandatory=$true,Position=1)]
+        [HashTable]$Parameters
+    )
+
+    process {
+        # Execute $Path file with $Parameters preserving PSComputerName as RemoteComputerName
+        & $Path @Parameters | Foreach-Object { Add-Member -InputObject $PSItem -NotePropertyName 'RemoteComputerName' -NotePropertyValue $PSItem.PSComputerName -PassThru }
+    }
+}
+
 function Invoke-PRPlugin {
-    [CmdletBinding(DefaultParameterSetName='Path')]
+    [CmdletBinding(DefaultParameterSetName='Name')]
     param (
         [Parameter(Mandatory=$true,ParameterSetName='Path')]
         [String]$Path,
@@ -775,7 +789,9 @@ function Invoke-PRPlugin {
         [String]$Name,
 
         [Parameter(Mandatory=$true)]
-        [System.Management.Automation.Runspaces.PSSession[]]$Session
+        [System.Management.Automation.Runspaces.PSSession[]]$Session,
+
+        [String]$HuntName
     )
 
     begin {
@@ -804,6 +820,18 @@ function Invoke-PRPlugin {
 
         # Gather to $Path's $CommandParameters
         $CommandParameters = Get-CommandParameter -Path $Path
+
+        # Initialize $OutPRFileParameters
+        $OutPRFileParameters = @{
+            Plugin = $Path
+        }
+
+        # Add Hunt specific parameters if $HuntName is present
+        if ($HuntName) {
+            $OutPRFileParameters.ComputerName = $HuntName
+            $OutPRFileParameters.Directory = $Item.BaseName -Replace '^.+-'
+            $OutPRFileParameters.OutputType = 'CSV'
+        }
     }
 
     process {
@@ -817,7 +845,7 @@ function Invoke-PRPlugin {
                 ArgumentList = $CommandParameters.Keys | Foreach-Object { $global:PowerResponse.Parameters.$PSItem }
                 AsJob = $true
                 FilePath = $Path
-                JobName = Get-Item -Path $Path | Select-Object -ExpandProperty 'BaseName'
+                JobName = $Item.BaseName
                 Session = $Session
                 ThrottleLimit = $global:PowerResponse.Config.ThrottleLimit
             }
@@ -827,7 +855,7 @@ function Invoke-PRPlugin {
                 $Job = Invoke-Command @InvokeCommandParameters
             } catch {
                 # Format remoting warning $Message
-                $Message = 'Plugin Job Creation Error: {0}' -f $PSItem
+                $Message = 'Plugin {0} Job Creation Error: {1}' -f $Item.BaseName.ToUpper(),$PSItem
 
                 # Write warning $Message
                 Write-Warning -Message $Message
@@ -846,11 +874,20 @@ function Invoke-PRPlugin {
 
                 # Loop through $Result groups
                 foreach ($Result in $Results) {
+                    # Handle Hunt/Non-Hunt output
+                    if ($HuntName) {
+                        # Append the ComputerName to the filename
+                        $OutPRFileParameters.Append = $Result.Name.ToLower()
+                    } else {
+                        # Send output to ComputerName folder
+                        $OutPRFileParameters.ComputerName = $Result.Name
+                    }
+
                     # Send each $Result to it's specific PR output file based on ComputerName
-                    $Result.Group | Out-PRFile -ComputerName $Result.Name -Plugin $Path
+                    $Result.Group | Out-PRFile @OutPRFileParameters
 
                     # Format the remote execution success $Message
-                    $Message = 'Plugin {0} Execution Succeeded for {1}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$Result.Name
+                    $Message = 'Plugin {0} Execution Succeeded for {1} at {2}' -f $Item.BaseName.ToUpper(),$Result.Name,(Get-Date)
 
                     # Write host $Message
                     Write-Host -Object $Message
@@ -864,7 +901,7 @@ function Invoke-PRPlugin {
 
                 foreach ($RemoteError in $RemoteErrors) {
                     # Format the remote error $Message
-                    $Message = 'Plugin {0} Execution Error for {1}: {2}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
+                    $Message = 'Plugin {0} Execution Error for {1}: {2}' -f $Item.BaseName.ToUpper(),$RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
 
                     # Write warning $Message
                     Write-Warning -Message $Message
@@ -883,30 +920,86 @@ function Invoke-PRPlugin {
             # Parse the $ReleventParameters from $global:PowerResponse.Parameters
             $global:PowerResponse.Parameters.GetEnumerator() | Where-Object { $CommandParameters.Keys -Contains $PSItem.Key } | Foreach-Object { $ReleventParameters.($PSItem.Key) = $PSItem.Value }
 
-            # Loop through $Session
-            foreach ($SessionInstance in $Session) {
-                # Set $ReleventParameters.Session to the current $SessionInstance
-                $ReleventParameters.Session = $SessionInstance
+            # If the plugin is expecting a $Session of type PSSession[]
+            if ($CommandParameters.Session.ParameterType.BaseType.FullName -eq 'System.Array') {
+                Write-Verbose -Message 'Detected Plugin requesting all the Sessions'
+                # Set $ReleventParameters.Session to the generated $Session
+                $ReleventParameters.Session = $Session
 
                 try {
                     # Execute the $Path with the $ReleventParameters
-                    & $Path @ReleventParameters | Out-PRFile -ComputerName $SessionInstance.ComputerName -Plugin $Path
+                    $Result = & $Path @ReleventParameters | Group-Object -Property 'PSComputerName'
 
-                    # Format host success $Message
-                    $Message = 'Plugin {0} Execution Succeeded for {1} at {2}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$SessionInstance.ComputerName, (Get-Date)
+                    # Loop through $Result groups
+                    foreach ($Result in $Results) {
+                        # Handle Hunt/Non-Hunt output
+                        if ($HuntName) {
+                            # Append the ComputerName to the filename
+                            $OutPRFileParameters.Append = $Result.Name.ToLower()
+                        } else {
+                            # Send output to ComputerName folder
+                            $OutPRFileParameters.ComputerName = $Result.Name
+                        }
 
-                    # Write execution success message
-                    Write-Host -Object $Message
+                        # Send each $Result to it's specific PR output file based on ComputerName
+                        $Result.Group | Out-PRFile @OutPRFileParameters
+
+                        # Format the remote execution success $Message
+                        $Message = 'Plugin {0} Execution Succeeded for {1}' -f $Item.BaseName.ToUpper(),$Result.Name
+
+                        # Write host $Message
+                        Write-Host -Object $Message
+
+                        # Write log $Message
+                        Write-Log -Message $Message
+                    }
                 } catch {
                     # Format warning $Message
-                    $Message = 'Plugin {0} Execution Error for {1}: {2}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$SessionInstance.ComputerName,$PSItem
+                    $Message = 'Plugin {0} Execution Error: {1}' -f $Item.BaseName.ToUpper(),$PSItem
 
                     # Write warning $Message to screen along with some admin advice
                     Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
+
+                    # Write execution $Message to log
+                    Write-Log -Message $Message
                 }
 
-                # Write execution $Message to log
-                Write-Log -Message $Message
+            } else {
+                Write-Verbose -Message 'Detected Plugin requesting single Session'
+                # Loop through each $SessionInstance
+                foreach ($SessionInstance in $Session) {
+                    # Set $ReleventParameters.Session to the current $SessionInstance
+                    $ReleventParameters.Session = $SessionInstance
+
+                    # Handle Hunt/Non-Hunt output
+                    if ($HuntName) {
+                        # Append the ComputerName to the filename
+                        $OutPRFileParameters.Append = $Result.Name.ToLower()
+                    } else {
+                        # Send output to ComputerName folder
+                        $OutPRFileParameters.ComputerName = $Result.Name
+                    }
+
+                    try {
+                        # Execute the $Path with the $ReleventParameters
+                        & $Path @ReleventParameters | Out-PRFile @OutPRFileParameters
+
+                        # Format host success $Message
+                        $Message = 'Plugin {0} Execution Succeeded for {1} at {2}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$SessionInstance.ComputerName, (Get-Date)
+
+                        # Write execution success message
+                        Write-Host -Object $Message
+                    } catch {
+                        # Format warning $Message
+                        $Message = 'Plugin {0} Execution Error for {1}: {2}' -f $Item.BaseName.ToUpper(),$SessionInstance.ComputerName,$PSItem
+
+                        # Write warning $Message to screen along with some admin advice
+                        Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
+                    }
+
+                    # Write execution $Message to log
+                    Write-Log -Message $Message
+                }
             }
         }
     }
@@ -931,6 +1024,7 @@ function Out-PRFile {
         [PSObject]$InputObject,
 
         [Parameter(Mandatory=$true)]
+        [Alias('Hunt')]
         [String]$ComputerName,
 
         [String]$Plugin = $global:PowerResponse.Location.FullName,
