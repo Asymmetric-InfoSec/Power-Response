@@ -42,11 +42,11 @@
 
 param (
 
+    [DateTime]$StartDate=(Get-Date).AddDays(-7)
+
     )
 
 process {
-
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
 
     #WMI Event Log IDs to Retrieve (Microsoft-Windows-WMI-Activity/Operational.evtx)
     $WMI_Events = @(

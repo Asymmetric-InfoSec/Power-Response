@@ -171,7 +171,7 @@ function Get-Config {
             AutoAnalyze = $true
             AutoClear = $true
             HashAlgorithm = 'SHA256'
-            OutputType = @('XML','CSV')
+            OutputType = @('CSV','XLSX')
             PromptText = 'power-response'
             ThrottleLimit = 32
 
@@ -356,13 +356,24 @@ function Import-Config {
         [String[]]$RootKeys
     )
 
+    begin {
+        # List out required values to check for
+        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','HashAlgorithm','OutputType','Path','PromptText','PSSession','ThrottleLimit')
+        $PathRequiredValues = @('Bin','Logs','Output','Plugins')
+        $PSSessionRequiredValues = @('NoMachineProfile')
+    }
+
     process {
         # Pull the config information from the provided $Path
         $Config = Get-Config @PSBoundParameters
 
         # Check for required $Config value existence (sanity check - should never fail with default values)
-        if (!$Config.AdminUserName -or !$Config.HashAlgorithm -or !$Config.Path -or !$Config.PSSession -or !$Config.Path.Bin -or !$Config.Path.Logs -or !$Config.Path.Output -or !$Config.Path.Plugins -or !$Config.PSSession.NoMachineProfile) {
-            throw 'Missing required configuration value'
+        [String[]]$TopMising = $TopRequiredValues | Where-Object { $Config.Keys -NotContains $PSItem -or !$Config.$PSItem }
+        [String[]]$PathMising = $PathRequiredValues | Where-Object { $Config.Path.Keys -NotContains $PSItem -or !$Config.Path.$PSItem }
+        [String[]]$PSSessionMising = $PSSessionRequiredValues | Where-Object { $Config.PSSession.Keys -NotContains $PSItem -or !$Config.PSSession.$PSItem }
+
+        if ($TopMissing + $PathMissing + $PSSessionMissing) {
+            throw ('Missing required configuration value: {0}' -f ($TopMissing + ($PathMissing | Foreach-Object { 'Path.{0}' -f $PSItem }) + ($PSSessionMissing | Foreach-Object { 'PSSession.{0}' -f $PSItem })))
         }
 
         $global:PowerResponse.Config = $Config
@@ -924,7 +935,7 @@ function Out-PRFile {
 
         [String]$Plugin = $global:PowerResponse.Location.FullName,
 
-        [ValidateSet('CSV','XML')]
+        [ValidateSet('CSV','XLSX','XML')]
         [String[]]$OutputType = $global:PowerResponse.Parameters.OutputType,
 
         [String]$Directory,
@@ -941,13 +952,24 @@ function Out-PRFile {
             $Plugin = Get-PRPlugin -Name $Plugin
         }
 
+        # If no ImportExcel module is found
+        if ($OutputType -Contains 'XLSX' -and !(Get-Module -ListAvailable -Name 'ImportExcel')) {
+            Write-Warning -Message 'No ''ImportExcel'' module detected, will not write output to XLSX format (run ''Setup.ps1'' as admin)'
+
+            # Sanitize $OutputType
+            $OutputType = $OutputType -ne 'XLSX'
+
+            # Prevent reoccuring warnings
+            $global:PowerResponse.Parameters.OutputType = $global:PowerResponse.Parameters.OutputType -ne 'XLSX'
+        }
+
         # Create the destination file $Name: {UTC TIMESTAMP}_{PLUGIN}_{APPEND}
-        $Name = ('{0:yyyy-MM-dd_HH-mm-ss-fff}_{1}_{2}' -f $Date, (Get-Item -Path $Plugin).BaseName.ToLower(),$Append) -Replace '_$'
+        $Name = ('{1}_{2}' -f $Date, (Get-Item -Path $Plugin).BaseName.ToLower(),$Append) -Replace '_$'
 
         # Remove irrelevent keys from $PSBoundParameters
+        $null = $PSBoundParameters.Remove('Append')
         $null = $PSBoundParameters.Remove('InputObject')
         $null = $PSBoundParameters.Remove('OutputType')
-        $null = $PSBoundParameters.Remove('Append')
 
         # Get $OutputPath with remaining $PSBoundParameters
         $OutputPath = Get-PRPath @PSBoundParameters
@@ -977,13 +999,78 @@ function Out-PRFile {
 
             # Export the $Objects into specified format
             switch($OutputType) {
-                'CSV' { $Objects | Export-Csv -Path ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()) }
-                'XML' { $Objects | Export-CliXml -Path ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()); $Path += ('{0}\{1}.{2}' -f $OutputPath,$Name,$PSItem.ToLower()) }
-                default { Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType); exit }
+                'CSV' {
+                    # Write verbose message
+                    Write-Verbose -Message ('Exporting objects to {0} format' -f $PSItem)
+
+                    # Format the destination $FilePath
+                    $FilePath = '{0}\{1:yyyy-MM-dd_HH-mm-ss-fff}_{2}.{3}' -f $OutputPath,$Date,$Name,$PSItem.ToLower()
+
+                    # Export $Objects as CSV data
+                    $Objects | Export-Csv -Path $FilePath
+
+                    # Track $FilePath for protecting later
+                    $Path += $FilePath
+                }
+                'XLSX' {
+                    # Write verbose message
+                    Write-Verbose -Message ('Exporting objects to {0} format' -f $PSItem)
+
+                    # Format the $ExcelPath
+                    $FilePath = '{0}\{1}\{2}_power-response_output.xlsx' -f (Get-PRPath -Output),$ComputerName.ToUpper(),$ComputerName.ToLower()
+
+                    # Track $OpenExcelParameters
+                    $ExcelParameters = @{
+                        Create = !(Test-Path -Path $FilePath)
+                    }
+
+                    try {
+                        # Open the $ExcelPackage
+                        $ExcelParameters.ExcelPackage = Open-ExcelPackage @ExcelParameters -Path $FilePath
+                    } catch {
+                        # Write file open warnning message
+                        Write-Warning -Message ('Detected that Excel has the file {0} open. Please save and close the file so writing can occur. Press Enter to continue' -f $FilePath)
+
+                        # Wait for user input
+                        $null = Read-Host
+
+                        # Open the $ExcelPackage again and this time fail past the remaining logic
+                        $ExcelParameters.ExcelPackage = Open-ExcelPackage @ExcelParameters -Path $FilePath
+                    }
+
+                    # Remove the Create parameter
+                    $null = $ExcelParameters.Remove('Create')
+                    $ExcelParameters.WorksheetName = '{0}_{1:MM-dd_HH-mm-ss}' -f ($Name -Replace '^.+?-'),$Date
+
+                    # Add a worksheet in alphabetical order
+                    $ExcelParameters.WorksheetName = Add-Worksheet @ExcelParameters -MoveAfter * | Select-Object -ExpandProperty 'Name'
+
+                    # Export $Objects as XLSX data
+                    $Objects | Export-Excel @ExcelParameters -AutoSize
+
+                    # Specifically don't track $FilePath for protecting later since we want to write more things to it later
+                }
+                'XML' {
+                    # Write verbose message
+                    Write-Verbose -Message ('Exporting objects to {0} format' -f $PSItem)
+
+                    # Format the destination $FilePath
+                    $FilePath = '{0}\{1:yyyy-MM-dd_HH-mm-ss-fff}_{2}.{3}' -f $OutputPath,$Date,$Name,$PSItem.ToLower()
+
+                    # Export objects as XML data
+                    $Objects | Export-CliXml -Path $FilePath
+
+                    # Track $FilePath for protecting later
+                    $Path += $FilePath
+                }
+                default {
+                    Write-Warning ('Unexpected Out-PRFile OutputType: {0}' -f $OutputType)
+                    exit
+                }
             }
         } catch {
             # Caught error exporting $Objects
-            $Message = '{0} output export error: {1}' -f ($OutputType -Join ','), $PSItem
+            $Message = '{0} output export error: {1}' -f $FilePath,$PSItem
 
             # Write output object export warning
             Write-Warning -Message $Message
@@ -992,7 +1079,7 @@ function Out-PRFile {
             Write-Log -Message $Message
 
             # Remove the created $Path file
-            Remove-Item -Force -Path $Path
+            Remove-Item -Force -Path $FilePath
         }
 
         # Protect the newly created output files
@@ -1003,7 +1090,7 @@ function Out-PRFile {
 function Protect-PRFile {
     param (
         [Parameter(Position=0)]
-        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Path (Get-PRPath -Output) -ErrorAction 'SilentlyContinue' | Select-Object -ExpandProperty 'FullName'),
+        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Exclude '*.xlsx' -Path (Get-PRPath -Output) -ErrorAction 'SilentlyContinue' | Select-Object -ExpandProperty 'FullName'),
 
         [ValidateSet('SHA1','SHA256','SHA384','SHA512','MACTripleDES','MD5','RIPEMD160')]
         [String]$HashAlgorithm = $global:PowerResponse.Config.HashAlgorithm
@@ -1097,7 +1184,7 @@ Write-Host $Banner
 $global:PowerResponse = @{}
 
 # Import $global:PowerResponse.Config from data file
-Import-Config -Path $ConfigPath -RootKeys @('AdminUserName','AutoAnalyze','AutoClear','HashAlgorithm','OutputType','PromptText','ThrottleLimit','Path','PSSession')
+Import-Config -Path $ConfigPath -RootKeys @('AdminUserName','AutoAnalyze','AutoClear','ExcelName','HashAlgorithm','OutputType','PromptText','ThrottleLimit','Path','PSSession')
 
 # Write a log to indicate framework startup
 Write-Log -Message 'Began the Power-Response framework'

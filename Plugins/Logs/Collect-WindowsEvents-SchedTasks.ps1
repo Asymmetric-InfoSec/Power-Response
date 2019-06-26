@@ -42,11 +42,11 @@
 
 param (
 
+    [DateTime]$StartDate=(Get-Date).AddDays(-7)
+
     )
 
 process {
-
-    [DateTime]$StartDate=(Get-Date).AddDays(-90)
 
     #Scheduled Tasks Event Log IDs to Retireve (Microsoft-Windows-Task Scheduler/Operational.evtx)
     $Sched_Tasks_Events = @(

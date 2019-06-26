@@ -31,11 +31,11 @@ PowerShell Remoting
 
 Power-Response depends on PowerShell remoting. All remote hosts will need to have PowerShell remoting enabled for data collection to be successful.
 
-### Run the Config Script
+### Run the Setup Script
 
-If you downloaded the zip from GitHub, Unblock `Config-PR.ps1` by executing `Unblock-File .\Config-PR.ps1`
+If you downloaded the zip from GitHub, Unblock `Setup.ps1` (previously `Config-PR.ps1`) by executing `Unblock-File .\Setup.ps1`
 
-Execute `Config-PR.ps1` located in the Power-Response root directory to satisfy all dependencies
+Execute `Setup.ps1` located in the Power-Response root directory to satisfy all dependencies
 
 Big shout outs to Eric Zimmerman, Michael Cohen, and the Sysinternals crew for making amazing tools we can incorporate into our framework!
 

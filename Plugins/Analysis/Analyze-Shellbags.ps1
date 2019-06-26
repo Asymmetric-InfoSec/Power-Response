@@ -133,7 +133,7 @@ process{
                 #Process and store in analysis directory
                 $Command = ("& '{0}\SBECmd.exe' -d {2}\{3} --csv {4}") -f (Get-PRPath -Bin),$BatchFile,$ShellbagsPath,$Machine,$ShellbagsProcessed
 
-                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\Shellbags_Log.txt" -f $ShimCacheProcessed)
+                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\Shellbags_Log.txt" -f $ShellbagsProcessed)
 
             } else {
 

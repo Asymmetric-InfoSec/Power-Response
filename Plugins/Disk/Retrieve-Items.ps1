@@ -75,7 +75,7 @@ process{
 
     if (!$7zFlag){
 
-        # Verify that 7za executables are located in (Get-PRPath -Bin)
+        #Verify that 7za executables are located in (Get-PRPath -Bin)
         $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
         $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
 
@@ -106,10 +106,10 @@ process{
         }
     }
 
-    # Set $Output for where to store recovered files
+    #Set $Output for where to store recovered files
     $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RetrievedItems_{0:yyyyMMdd}' -f $(Get-Date)))
 
-    # Create Subdirectory in $global:PowerResponse.OutputPath for storing items
+    #Create Subdirectory in $global:PowerResponse.OutputPath for storing items
     If (!(Test-Path $Output)) {
 
         New-Item -Type Directory -Path $Output | Out-Null
@@ -153,8 +153,7 @@ process{
         Continue
     }
 
-    #Copy 7zip executable to the remote machine for user
-
+    #Copy 7zip executable to the remote machine
     if (!$7zFlag){
 
         try {
@@ -166,6 +165,25 @@ process{
             Throw "Could not copy 7zip to remote machine. Quitting."
         }
     }
+
+    #Copy Velociraptor to remote machine
+    if (!$VeloFlag){
+
+        try{
+
+            Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -ErrorAction Stop 
+
+        }catch {
+
+            Throw ("Could not deploy Velociraptor for retrieval. Quitting..." -f $Item)
+            
+        }
+    }
+
+    #Create retrieved items staging folder on the remote machine
+    $ItemStage = ("C:\ProgramData\{0}") -f ($Session.ComputerName)
+
+    Invoke-Command -Session $Session -ScriptBlock {if (!(Test-Path $($args[0]))) {New-Item -Type Directory -Path $($args[0])}} -Argumentlist $ItemStage | Out-Null
     
     #Collect items
     foreach ($Item in $Items){
@@ -175,7 +193,7 @@ process{
 
         if (!$PathVerify) {
            
-            Write-Error "No item found at $Item. Skipping." -ErrorAction Continue
+            Write-Warning "No item found at $Item. Skipping." -ErrorAction Continue
             Continue
         }
 
@@ -190,35 +208,24 @@ process{
 
                 } catch {
                                         
-                    $MD5_Hash = "Could not obtain MD5 hash. File was likely locked."
+                    $MD5_Hash = "Could not obtain MD5 hash."
                 }
 
                 $MetaData = @{
 
-                    Item = $($args[0])
+                    Item = (Split-Path $($args[0]) -leaf)
+                    Directory = (Get-Item -Force $($args[0])).Directory
                     CreationTimeUTC = (Get-Item -Force $($args[0])).CreationTimeUtc
                     ModifiedTimeUTC = (Get-Item -Force $($args[0])).LastWriteTimeUtc 
                     AccessTimeUTC = (Get-Item -Force $($args[0])).LastAccessTimeUtc
                     MD5 = $MD5_Hash
                 } 
 
-                $ExportPath = "C:\ProgramData\{0}_Metadata.csv" -f (Split-Path $($args[0]) -Leaf)
+                $ExportPath = "{0}\RetrievedItems_Metadata.csv" -f ($($args[1]))
 
-                [PSCustomObject]$MetaData | Select Item, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath
-
-                try {
-                    
-                    $FileStream = [System.IO.File]::Open($Item,'Open','Write')
-                    $FileStream.Close()
-                    $FileStream.Dispose()
-                    $IsLocked = $false
-
-                } catch {
-                    
-                    $IsLocked = $true
-                }
+                [PSCustomObject]$MetaData | Select Item, Directory, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath -Append
             
-            } -ArgumentList $Item
+            } -ArgumentList $Item,$ItemStage
         }
 
         if ($PathVerify.PSIsContainer){
@@ -235,12 +242,12 @@ process{
 
                     } catch {
 
-                        $MD5_Hash = "Could not obtain MD5 hash. File was likely locked."
+                        $MD5_Hash = "Could not obtain MD5 hash."
                     }
 
                     $MetaData = @{
 
-                        Item = $DirItem
+                        Item = (Split-Path $DirItem -Leaf)
                         Directory = (Get-Item -Force $DirItem).Directory
                         CreationTimeUTC = (Get-Item -Force $DirItem).CreationTimeUtc 
                         ModifiedTimeUTC = (Get-Item -Force $DirItem).LastWriteTimeUtc
@@ -248,126 +255,72 @@ process{
                         MD5 = $MD5_Hash
                     } 
 
-                    $ExportPath = "C:\ProgramData\{0}_Metadata.csv" -f (Split-Path $($args[0]) -Leaf)
+                    $ExportPath = "{0}\RetrievedItems_Metadata.csv" -f ($($args[1]))
 
                     [PSCustomObject]$MetaData | Select Item, Directory, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath -Append
 
                 }
 
-                foreach ($DirItem in $DirItems){
-
-                    try {
-
-                        $FileStream = [System.IO.File]::Open($DirItem,'Open','Write')
-                        $FileStream.Close()
-                        $FileStream.Dispose()
-                        $IsLocked = $false
-
-                    } catch {
-
-                        $IsLocked = $true
-                        Break
-                    }
-                }
-
-            } -ArgumentList $Item
+            } -ArgumentList $Item,$ItemStage
         } 
 
-        $Locked = Invoke-Command -Session $Session -ScriptBlock {$IsLocked}
-        #Process the $item based on IsLocked value
+        #Collect $Item
+        $FinalPath = ("{0}\{1}_{2}") -f ($ItemStage,(Split-Path $Item -Leaf),$Session.ComputerName)
 
-        if (!$Locked){
+        Invoke-Command -Session $Session -ScriptBlock {if (!(Test-Path $($args[0]))) {New-Item -Type Directory -Path $($args[0])}} -Argumentlist $FinalPath | Out-Null
 
-            Invoke-Command -Session $Session -ScriptBlock {
-
-            #Create archive of Item and MetaData (separately)
-            $ArchivePath = "C:\ProgramData\{0}.zip" -f (Split-Path $($args[1]) -Leaf)
-            $Command_Compress = "C:\ProgramData\{0} a -pinfected -tzip {1} {2} {3}" -f ($($args[0]), $ArchivePath, $ExportPath, ($($args[1])))
-
-            Invoke-Expression -Command $Command_Compress | Out-Null
-
-            } -ArgumentList (Split-Path $Installexe -Leaf), $Item
-
-            #Copy specified archive to $Output
-            $ItemPath = "C:\ProgramData\{0}.zip" -f (Split-Path $Item -Leaf)
-
-            Copy-Item -Path $ItemPath -Destination "$Output\" -FromSession $Session -Force -ErrorAction SilentlyContinue
-
-            #Remove created files on remote machine as cleanup
-
-            Invoke-Command -Session $Session -ScriptBlock {
-
-                #Remove the archive
-
-                Remove-Item -Path $ArchivePath -Force 
-                    
-                #Remove the Metadata file
-
-                Remove-Item -Path $ExportPath -Force  
-
-            }
-        }
-
-        if ($Locked){
-
-            if (!$VeloFlag){
-
-                try{
-
-                    Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -ErrorAction Stop 
-
-                }catch {
-
-                    Throw ("Locked file detected at {0}, but could not deploy Velociraptor for retrieval. Quitting..." -f $Item)
-                }
-
-            }
-
-            #Copy $Item with Velociraptor, compress, and copy back to origin machine
-
-            #Collect $Item
-            $FinalPath = "C:\ProgramData\{1}_{0}" -f $Session.ComputerName, (Split-Path $Item -Leaf)
-
-            Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path $($args[0])} -Argumentlist $FinalPath | Out-Null
+        if (!$PathVerify.PSIsContainer){
 
             $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}\{1}' fs --accessor ntfs cp \\.\{2} {3}") -f ($env:ProgramData, (Split-Path -Path $Velo_exe -Leaf), $Item, $FinalPath))
+        
             Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
-           
-            #Compress    
-            Invoke-Command -Session $Session -ScriptBlock {
+        }
 
-                #Create archive of Item and MetaData (separately)
-                $ArchivePath = ("C:\ProgramData\{0}.zip" -f (Split-Path $($args[1]) -Leaf))
-                
-                $Command_Compress = ("& 'C:\ProgramData\{0}' a -pinfected -tzip {1} {2} {3}" -f ($($args[0]), $ArchivePath, $ExportPath, ($($args[1]))))
-                
-                Invoke-Expression -Command $Command_Compress | Out-Null
+        if ($PathVerify.PSIsContainer){
 
-            } -ArgumentList (Split-Path $Installexe -Leaf), $FinalPath
-            
-            #Copy $Item
-            
-            Copy-Item -Path ("C:\ProgramData\{0}.zip" -f (Split-Path $FinalPath -Leaf)) -Destination $Output -FromSession $Session
-            
-            #Remove created files on remote machine as cleanup
-            
-            Invoke-Command -Session $Session -ScriptBlock {
+            $DirObjects = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem -Path $($args[0]) -File -Recurse -Force | Select -ExpandProperty FullName} -Argumentlist $Item
 
-                #Remove the archive
+            foreach ($DirObject in $DirObjects){
 
-                Remove-Item -Path $ArchivePath -Force 
-                    
-                #Remove the Metadata file
-
-                Remove-Item -Path $ExportPath -Force  
-
-                #Remove the Velociraptor archive 
-
-                Remove-Item -Recurse -Path ("{0}" -f $($args[0])) -Force
-
-            } -ArgumentList $FinalPath
-        }    
+                $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}\{1}' fs --accessor ntfs cp \\.\{2} {3}") -f ($env:ProgramData, (Split-Path -Path $Velo_exe -Leaf), $DirObject, $FinalPath))
+        
+                Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
+            }
+        }
     }
+
+    #Used for unique naming of zip archive
+    $Seconds = ((Get-Date -UFormat %s).Split('.')[0])
+
+    #Compress    
+    Invoke-Command -Session $Session -ScriptBlock {
+
+        #Create archive of Item and MetaData (separately)
+        $ArchivePath = ("{0}\{1}_RetrievedItems_{2}.zip" -f ($($args[0]),$($args[1]),$($args[3])))
+        
+        $Command_Compress = ("& 'C:\ProgramData\{0}' a -pinfected -tzip {1} {2} {3}" -f ($($args[2]),$ArchivePath,$ExportPath,($($args[0]))))
+        
+        Invoke-Expression -Command $Command_Compress | Out-Null
+
+    } -ArgumentList $ItemStage,($Session.ComputerName),(Split-Path $Installexe -Leaf), $Seconds
+        
+    #Copy $Item
+
+    Copy-Item -Path ("{0}\{1}_RetrievedItems_{2}.zip" -f ($ItemStage,($Session.ComputerName),$Seconds)) -Destination $Output -FromSession $Session
+    
+    #Remove created files on remote machine as cleanup
+    Invoke-Command -Session $Session -ScriptBlock {
+
+        #Remove the archive
+        Remove-Item -Path $ArchivePath -Force 
+        
+        #Remove the Metadata file
+        Remove-Item -Path $ExportPath -Force  
+
+        #Remove the Velociraptor archive 
+        Remove-Item -Recurse -Path ("{0}" -f $($args[0])) -Force
+
+    } -ArgumentList $ItemStage    
 
     #Remove 7zip if deployed by plugin
     if (!$7zFlag){
@@ -377,8 +330,7 @@ process{
     }
 
     #Remove Velociraptor if deployed by plugin
-
-    if ($Locked -and !$VeloFlag){
+    if (!$VeloFlag){
 
         Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path ("C:\ProgramData\{0}" -f ($($args[0]))) -Force} -Argumentlist (Split-Path $Velo_exe -Leaf)
     }
