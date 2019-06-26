@@ -974,10 +974,10 @@ function Invoke-PRPlugin {
                     # Handle Hunt/Non-Hunt output
                     if ($HuntName) {
                         # Append the ComputerName to the filename
-                        $OutPRFileParameters.Append = $Result.Name.ToLower()
+                        $OutPRFileParameters.Append = $SessionInstance.ComputerName.ToLower()
                     } else {
                         # Send output to ComputerName folder
-                        $OutPRFileParameters.ComputerName = $Result.Name
+                        $OutPRFileParameters.ComputerName = $SessionInstance.ComputerName
                     }
 
                     try {
