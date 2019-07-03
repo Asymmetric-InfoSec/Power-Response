@@ -10,7 +10,7 @@
 .EXAMPLE
 
     Set ComputerName <list of computers>
-    Set HuntName UserAccountsHunt
+    Set HuntName ScheduledTaskHunt
     Run
 
 .NOTES
