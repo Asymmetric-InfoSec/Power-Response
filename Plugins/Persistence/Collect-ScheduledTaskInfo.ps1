@@ -22,9 +22,9 @@
     Date Created: 2/8/2019
     Twitter: @5ynax
     
-    Last Modified By:
-    Last Modified Date:
-    Twitter:
+    Last Modified By: Drew Schmitt
+    Last Modified Date: 7/3/2019
+    Twitter: @5ynax
   
 #>
 
@@ -38,12 +38,42 @@ process{
 
     try {
 
-        Get-ScheduledTask | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns
+        $Tasks = Get-ScheduledTask
+
+        foreach ($Task in $Tasks) {
+
+            $TaskInfo = @{
+
+                Date = $Task.Date
+                Enabled = $Task.Settings.Enabled
+                HiddenTask = $Task.Settings.Hidden
+                TaskName = $Task.TaskName
+                Author = $Task.Author
+                Description = $Task.Description
+                TaskPath = $Task.TaskPath
+                URI = $Task.URI
+                Execute = $Task.Actions.Execute
+                Arguments = $Task.Actions.Arguments
+                Principal = $Task.Principal.DisplayName
+                PrincipalId = $Task.Principal.Id
+                LogonType = $Task.Principal.LogonType
+                UserId = $Task.Principal.UserId
+                SidType = $Task.Principal.ProcessTokenSidType
+                RequiredPrivilege = $Task.Principal.RequiredPrivilege
+                AllowDemandStart = $Task.Settings.AllowDemandStart
+                RunOnlyIfIdle = $Task.Settings.RunOnlyIfIdle
+                RunOnlyIfNetworkAvailable = $Task.Settings.RunOnlyIfNetworkAvailable
+                WakeToRun = $Task.Settings.WakeToRun
+                Version = $Task.Version
+
+            }
+
+            [PSCustomObject]$TaskInfo | Select Date,Enabled,HiddenTask,TaskName,Version,Author,Description,TaskPAth,URI,Execute,Arguments,Principal,PrincipalId,LogonType,UserId,SidType,RequiredPrivilege,AllowDemandStart,RunOnlyIfIdle,RunOnlyIfNetworkAvailable,WakeToRun
+
+        }
     
     } catch {
 
         Write-Warning "Could not collect scheduled task info."
     }
-    
-    
 }
