@@ -187,12 +187,17 @@ process{
 
             Name = "EvtxExplorer"; URL = 'https://f001.backblazeb2.com/file/EricZimmermanTools/EvtxExplorer.zip'; Rename = ''; Type = 'zipped_zimmerman'
 
-            }
+            },
 
         @{
 
             Name = "FLS"; URL = 'https://github.com/sleuthkit/sleuthkit/releases/download/sleuthkit-4.6.6/sleuthkit-4.6.6-win32.zip'; Rename = 'fls'; Type = 'fls'
 
+        },
+
+        @{
+
+            Name = "LogParser"; URL = 'https://download.microsoft.com/download/f/f/1/ff1819f9-f702-48a5-bbc7-c9656bc74de8/LogParser.msi'; Rename = ''; Type = 'logparser'
         }
     )
 
@@ -381,8 +386,6 @@ process{
                     $Expand_Stage = ("{0}\fls" -f $Stage_Path)
                     Expand-Archive -Path $Stage_Location -Destination $Expand_Stage -Force
 
-                    Write-Debug "fls"
-
                     #Copy relevant files to final location
                     $Expand_Path =  ("{0}\Bin\fls" -f $PSScriptRoot)
                     New-Item -Type Directory -Path $Expand_Path -Force | Out-Null
@@ -397,6 +400,44 @@ process{
                     $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
                     Write-Warning $Message -ErrorAction SilentlyContinue
                 }  
+            }
+
+            logparser {
+
+                #Verify if log parser is already installed
+                $LogInstalled = Test-Path "C:\Program Files (x86)\Log Parser*"
+
+                if (!$LogInstalled) {
+
+                    try{
+
+                        #Set the download location
+                        $Stage_Location = ("{0}\LogParser.msi" -f $Stage_Path)
+                        
+                        #Download the msi
+                        $Client.DownloadFile($Binary_Dep.URL,$Stage_Location)
+
+                        #Install LogParser
+                        $MsiPath = ("{0}" -f $Stage_Location)
+                        $arguments = "/i `"$MsiPath`" /quiet"
+                        Start-Process msiexec.exe -ArgumentList $arguments -Wait
+
+                    }catch {
+
+                        $Message = ("Setup of {0} failed. Download manually." -f $Binary_Dep.Name)
+                        Write-Warning $Message -ErrorAction SilentlyContinue
+
+                    }    
+                }
+
+                #Create LogParser directory in BIN
+                $Expand_Path = ("{0}\Bin\LogParser" -f $PSScriptRoot)
+                New-Item -Type Directory -Path $Expand_Path | Out-Null
+
+                #Copy LogParser files to BIN for use in Power-Response
+                Copy-Item -Path "C:\Program files (x86)\Log Parser*\LogParser.exe" -Destination $Expand_Path -Force
+                Copy-Item -Path "C:\Program files (x86)\Log Parser*\LogParser.dll" -Destination $Expand_Path -Force
+                Copy-Item -Path "C:\Program files (x86)\Log Parser*\COM\" -Destination $Expand_Path -Recurse -Force
             }
         }
     }

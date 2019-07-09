@@ -1101,7 +1101,7 @@ function Out-PRFile {
                     $FilePath = '{0}\{1:yyyy-MM-dd_HH-mm-ss-fff}_{2}.{3}' -f $OutputPath,$Date,$Name,$PSItem.ToLower()
 
                     # Export $Objects as CSV data
-                    $Objects | Export-Csv -Path $FilePath
+                    $Objects | Export-Csv -Path $FilePath -NoTypeInformation
 
                     # Track $FilePath for protecting later
                     $Path += $FilePath
