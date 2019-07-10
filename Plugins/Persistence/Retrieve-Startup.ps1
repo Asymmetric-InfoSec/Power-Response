@@ -191,7 +191,7 @@ process {
     }
         
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a 'C:\ProgramData\{1}_Startup.zip' C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a -pinfected -tzip 'C:\ProgramData\{1}_Startup.zip' C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)
