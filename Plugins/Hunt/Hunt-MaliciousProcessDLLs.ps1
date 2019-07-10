@@ -1,7 +1,7 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Hunt-MaliciousDLLs.ps1
+    Plugin-Name: Hunt-MaliciousProcessDLLs.ps1
     
 .Description
 
