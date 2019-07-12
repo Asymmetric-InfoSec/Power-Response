@@ -39,8 +39,6 @@ process{
     try {
 
         Get-ScheduledTask | Get-ScheduledTaskInfo | Select LastRuntime, NextRunTime, TaskName, TaskPath, LastTaskResult, NumberOfMissedRuns
-
-        }
     
     } catch {
 
