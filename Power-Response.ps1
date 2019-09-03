@@ -368,9 +368,9 @@ function Import-Config {
         $Config = Get-Config @PSBoundParameters
 
         # Check for required $Config value existence (sanity check - should never fail with default values)
-        [String[]]$TopMising = $TopRequiredValues | Where-Object { $Config.Keys -NotContains $PSItem -or !$Config.$PSItem }
-        [String[]]$PathMising = $PathRequiredValues | Where-Object { $Config.Path.Keys -NotContains $PSItem -or !$Config.Path.$PSItem }
-        [String[]]$PSSessionMising = $PSSessionRequiredValues | Where-Object { $Config.PSSession.Keys -NotContains $PSItem -or !$Config.PSSession.$PSItem }
+        [String[]]$TopMissing = $TopRequiredValues | Where-Object { $Config.Keys -NotContains $PSItem -or !$Config.$PSItem }
+        [String[]]$PathMissing = $PathRequiredValues | Where-Object { $Config.Path.Keys -NotContains $PSItem -or !$Config.Path.$PSItem }
+        [String[]]$PSSessionMissing = $PSSessionRequiredValues | Where-Object { $Config.PSSession.Keys -NotContains $PSItem -or !$Config.PSSession.$PSItem }
 
         if ($TopMissing + $PathMissing + $PSSessionMissing) {
             throw ('Missing required configuration value: {0}' -f ($TopMissing + ($PathMissing | Foreach-Object { 'Path.{0}' -f $PSItem }) + ($PSSessionMissing | Foreach-Object { 'PSSession.{0}' -f $PSItem })))
