@@ -6,7 +6,7 @@
 .Description
     Collects BITS jobs details for all users on the machine to
     determine if BITS jobs are being used for persistence or as
-    part of additional compromise
+    part of additional compromise.
 
 .EXAMPLE
 
