@@ -55,7 +55,7 @@ param (
     [String]$EncryptPassword = 'infected',
 
     [Parameter(Position=3)]
-    [Switch]$NoEncrypt,
+    [Switch]$NoEncrypt
 )
 
 process {
@@ -72,7 +72,7 @@ process {
     }
 
     # Define stage directory
-    $RemoteStageDirectory = 'C:\ProgramData\Power-Response'
+    $RemoteStageDirectory = 'C:\ProgramData\Power-Response\'
 
     # Define $7za tracking structure
     $7za = @{
@@ -91,38 +91,43 @@ process {
     foreach ($Instance in $7za.Deploy) {
         try {
             # Determine system $Architecture and select proper 7za.exe
-            $Architecture = Invoke-Command -Session $Instance -ScriptBlock { Get-WmiObject -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' -ErrorAction 'Stop' | Select-Object -ExpandProperty 'OSArchitecture' }
+            $Architecture = Invoke-Command -Session $Instance -ScriptBlock { if (!(Test-Path -Path $using:RemoteStageDirectory -PathType 'Container')) { $null = New-Item -Path $using:RemoteStageDirectory -ItemType 'Directory' }; Get-WmiObject -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' -ErrorAction 'Stop' | Select-Object -ExpandProperty 'OSArchitecture' }
         } catch {
             # Unable to get $Architecture information
-            Write-Error ('Unable to determine system architecture for {0}. Data was not gathered.' -f $Instance.ComputerName)
+            Write-Warning ('Unable to determine system architecture for {0}. Data was not gathered.' -f $Instance.ComputerName)
             continue
         }
 
         # Ensure we are tracking a sensible $Architecture
-        if ($7za.Path.Keys -Contains $Architecture) {
+        if ($7za.Path.Keys -NotContains $Architecture) {
             Write-Error ('Unknown system architecture ({0}) detected for {1}. Data was not gathered.)' -f $Architecture, $Instance.ComputerName)
             continue
         }
 
-        # Keep track of the relevent $InstallExe
-        $InstallExe = $7za.Path.$Architecture
-
         # Verify the each $7za $Exe exists
-        if (Test-Path -Path $InstallExe -PathType 'Leaf') {
+        if (!(Test-Path -Path $7za.Path.$Architecture -PathType 'Leaf')) {
             throw ('{0} version of 7za.exe not detected in Bin. Place {0} executable in Bin directory and try again.' -f $Architecture)
         }
 
+        # Compute the $Remote7za path
+        $Remote7za = Join-Path -Path $RemoteStageDirectory -ChildPath (Split-Path -Leaf -Path $7za.Path.$Architecture)
+
         try {
             # Copy 7zip executable to the remote machine
-            Copy-Item -Path $InstallExe -Destination $RemoteStageDirectory -ToSession $Instance -Force -ErrorAction 'Stop'
+            Copy-Item -Path $7za.Path.$Architecture -Destination $Remote7za -ToSession $Instance -Force -ErrorAction 'Stop'
         } catch {
             # Failed to copy 7zip
             throw 'Could not copy 7zip to remote machine. Quitting.'
         }
     }
 
-    # Copy the files
-    Copy-PRFile -Path $Items -Destination $RemoteStageDirectory -Session $Session
+    try {
+        # Copy the files
+        Copy-PRItem -Path $Items -Destination $RemoteStageDirectory -Session $Session
+    } catch {
+        # Caught an error
+        Write-Error -Message "Copy-PRItem error: $PSItem" -ErrorAction 'Continue'
+    }
 
     # Used for unique naming of zip archive
     $Seconds = (Get-Date -UFormat %s).Split('.')[0]
@@ -132,25 +137,18 @@ process {
 
     # Compress the non-exe files in the remote stage directory
     Invoke-Command -Session $Session -ScriptBlock {
-        param (
-            [Parameter(Position=0)][String]$7zTestPath,
-            [Parameter(Position=1)][String]$RemoteStageDirectory
-            [Parameter(Position=2)][String]$EncryptPassword,
-            [Parameter(Position=3)][String]$Archive,
-        )
-
         # Get actual 7zip path
-        $7zipPath = Get-Item -Path $7zTestPath | Select-Object -First 1 -ExpandProperty 'FullName'
+        $7zipPath = Get-Item -Path $using:7zTestPath | Select-Object -First 1 -ExpandProperty 'FullName'
 
         # Get all non-exe paths in the remote stage directory
-        $Path = Get-ChildItem -Force -Path $RemoteStageDirectory -Exclude '*.exe' | Select-Object -ExpandProperty 'FullName'
+        $Path = Get-ChildItem -Force -Path $using:RemoteStageDirectory -Exclude '*.exe' | Select-Object -ExpandProperty 'FullName'
 
         # Create compression command
-        $Command = "& '{0}' a -p{1} -tzip {2} {3}" -f $7zipPath,$EncryptPassword,$Archive,($Path -Join ' ')
+        $Command = "$7zipPath a -p$using:EncryptPassword -tzip $using:Archive {0}" -f ($Path -Join ' ')
 
         # Execute compression command
         $null = Invoke-Expression -Command $Command
-    } -ArgumentList $7zTestPath,$RemoteStageDirectory,$EncryptPassword,$Archive
+    }
 
     foreach ($Instance in $Session) {
         # Set output for each specific instance of session
@@ -168,7 +166,7 @@ process {
     # Remove created files on remote machine as cleanup
     Invoke-Command -Session $Session -ScriptBlock {
         # Get all non-exe items in remote stage directory
-        $Path = Get-ChildItem -Force -Path $RemoteStageDirectory -Exclude '*.exe' | Select-Object -ExpandProperty 'FullName'
+        $Path = Get-ChildItem -Force -Path $using:RemoteStageDirectory -Exclude '*.exe' | Select-Object -ExpandProperty 'FullName'
 
         # Remove the archive
         Remove-Item -Force -Recurse -Path $Path 

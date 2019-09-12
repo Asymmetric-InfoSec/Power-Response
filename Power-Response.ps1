@@ -9,25 +9,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-# UserInput class is designed to separate user input strings to successfully casted string type parameters
-# Essentially acts like a string for our purposes
-if ('UserInput' -as [Type] -ne $null) {
-    Write-Log -Message 'Creating UserInput class'
-    class UserInput {
-        [String]$Value
-
-        UserInput([String]$Value) {
-            $this.Value = $Value
-        }
-
-        [String] ToString() {
-            return $this.Value
-        }
-    }
-}
-
 # Function to copy remote file (locked or not) to a remote destination
-function Copy-PRFile {
+function Copy-PRItem {
     param (
         [Parameter(Position=0,Mandatory=$true)]
         [System.Management.Automation.Runspaces.PSSession[]]$Session,
@@ -40,13 +23,13 @@ function Copy-PRFile {
     )
 
     begin {
-        function CopyFile {
+        function CopyItem {
             [CmdletBinding()]
             param (
-                [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
+                [Parameter(Position=0,Mandatory=$true,ValueFromPipeline=$true)]
                 [String[]]$Path,
 
-                [Parameter(Position=0,Mandatory=$true)]
+                [Parameter(Position=1,Mandatory=$true)]
                 [String]$Destination
             )
 
@@ -212,8 +195,13 @@ function Copy-PRFile {
     }
 
     process {
-        # Invoke CopyFile on sessions
-        Invoke-Command -ScriptBlock $function:CopyFile -Session $Session -ArgumentList $Path,$Destination
+        try {
+            # Invoke CopyFile on sessions
+            Invoke-Command -ScriptBlock $function:CopyItem -Session $Session -ArgumentList @($Path),$Destination
+        } catch {
+            # Caught error
+            Write-Error -Message "Invoke command error: $PSItem" -ErrorAction 'Continue'
+        }
     }
 }
 
@@ -558,9 +546,9 @@ function Import-Config {
         $Config = Get-Config @PSBoundParameters
 
         # Check for required $Config value existence (sanity check - should never fail with default values)
-        [String[]]$TopMissing = $TopRequiredValues | Where-Object { $Config.Keys -NotContains $PSItem -or !$Config.$PSItem }
-        [String[]]$PathMissing = $PathRequiredValues | Where-Object { $Config.Path.Keys -NotContains $PSItem -or !$Config.Path.$PSItem }
-        [String[]]$PSSessionMissing = $PSSessionRequiredValues | Where-Object { $Config.PSSession.Keys -NotContains $PSItem -or !$Config.PSSession.$PSItem }
+        [String[]]$TopMissing = $TopRequiredValues | Where-Object { $Config.Keys -NotContains $PSItem -or !$Config.$PSItem -eq $null }
+        [String[]]$PathMissing = $PathRequiredValues | Where-Object { $Config.Path.Keys -NotContains $PSItem -or !$Config.Path.$PSItem -eq $null }
+        [String[]]$PSSessionMissing = $PSSessionRequiredValues | Where-Object { $Config.PSSession.Keys -NotContains $PSItem -or !$Config.PSSession.$PSItem -eq $null }
 
         if ($TopMissing + $PathMissing + $PSSessionMissing) {
             throw ('Missing required configuration value: {0}' -f ($TopMissing + ($PathMissing | Foreach-Object { 'Path.{0}' -f $PSItem }) + ($PSSessionMissing | Foreach-Object { 'PSSession.{0}' -f $PSItem })))
@@ -1473,6 +1461,23 @@ Import-Config -Path $ConfigPath -RootKeys @('AdminUserName','AutoAnalyze','AutoC
 # Write a log to indicate framework startup
 Write-Log -Message 'Began the Power-Response framework'
 
+# UserInput class is designed to separate user input strings to successfully casted string type parameters
+# Essentially acts like a string for our purposes
+if ('UserInput' -as [Type] -ne $null) {
+    Write-Log -Message 'Creating UserInput class'
+    class UserInput {
+        [String]$Value
+
+        UserInput([String]$Value) {
+            $this.Value = $Value
+        }
+
+        [String] ToString() {
+            return $this.Value
+        }
+    }
+}
+
 # Save the execution location
 $SavedLocation = Get-Location
 
@@ -1490,13 +1495,6 @@ if (!(Get-ChildItem $global:PowerResponse.Location)) {
     Write-Error 'No Power-Response plugins detected'
     Read-Host 'Press Enter to Exit'
     exit
-}
-
-Write-Debug 'Before Lib loading'
-
-# Load the Lib functions
-foreach ($File in (Get-ChildItem -File -Path "$PSScriptRoot\Lib")) {
-    . $File
 }
 
 # Initialize tracked $global:PowerResponse.Parameters to $global:PowerResponse.Config data
