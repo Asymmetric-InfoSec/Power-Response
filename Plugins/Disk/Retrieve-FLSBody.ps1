@@ -64,7 +64,7 @@ process{
 
         try {
 
-            Get-Item -Path $Dependency -ErrorAction Stop
+            Get-Item -Path $Dependency -ErrorAction Stop | Out-Null
 
         } catch {
 

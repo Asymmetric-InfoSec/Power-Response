@@ -11,6 +11,7 @@
 
     Invoke-PRPlugin -Name Collect-RunKeys.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-ScheduledTaskInfo.ps1 -Session $Session
+    Invoke-PRPlugin -Name Collect-ScheduledTaskDetails.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-Services.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-StartupDirList.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-StartupList.ps1 -Session $Session
@@ -30,9 +31,9 @@
     Date Created: 5/10/2019
     Twitter: @5ynax
     
-    Last Modified By:
-    Last Modified Date:
-    Twitter:
+    Last Modified By: Drew Schmitt
+    Last Modified Date: 7/3/2019
+    Twitter: @5ynax
   
 #>
 
@@ -152,6 +153,7 @@ process{
 
     Invoke-PRPlugin -Name Collect-RunKeys.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-ScheduledTaskInfo.ps1 -Session $Session
+    Invoke-PRPlugin -Name Collect-ScheduledTaskDetails.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-Services.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-StartupDirList.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-StartupList.ps1 -Session $Session
