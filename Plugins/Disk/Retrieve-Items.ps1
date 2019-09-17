@@ -74,19 +74,17 @@ process {
     # Define stage directory
     $RemoteStageDirectory = 'C:\ProgramData\Power-Response\'
 
+    # Test path for existing 7zip deploys
+    $7zTestPath = Join-Path -Path $RemoteStageDirectory -ChildPath '7za*.exe'
+
     # Define $7za tracking structure
     $7za = @{
+        Deploy = Invoke-Command -Session $Session -ScriptBlock { Test-Path -Path $using:7zTestPath -PathType 'Leaf' } | Where-Object { !$PSItem } | Foreach-Object { Get-PSSession -InstanceId $PSItem.RunspaceId }
         Path = @{
             '32-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x86.exe'
             '64-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x64.exe'
         }
     }
-
-    # Test path for existing 7zip deploys
-    $7zTestPath = Join-Path -Path $RemoteStageDirectory -ChildPath '7za*.exe'
-
-    # Track Sessions where 7zip is already on remote machine
-    $7za.Deploy = Invoke-Command -Session $Session -ScriptBlock { Test-Path -Path $($args[0]) } -ArgumentList $7zTestPath | Where-Object { !$PSItem } | Foreach-Object { Get-PSSession -InstanceId $PSItem.RunspaceId }
 
     foreach ($Instance in $7za.Deploy) {
         try {
@@ -94,13 +92,24 @@ process {
             $Architecture = Invoke-Command -Session $Instance -ScriptBlock { if (!(Test-Path -Path $using:RemoteStageDirectory -PathType 'Container')) { $null = New-Item -Path $using:RemoteStageDirectory -ItemType 'Directory' }; Get-WmiObject -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' -ErrorAction 'Stop' | Select-Object -ExpandProperty 'OSArchitecture' }
         } catch {
             # Unable to get $Architecture information
-            Write-Warning ('Unable to determine system architecture for {0}. Data was not gathered.' -f $Instance.ComputerName)
-            continue
+            $Warning = 'Unable to determine system architecture for {0}. Data was not gathered.' -f $Instance.ComputerName
         }
 
         # Ensure we are tracking a sensible $Architecture
-        if ($7za.Path.Keys -NotContains $Architecture) {
-            Write-Error ('Unknown system architecture ({0}) detected for {1}. Data was not gathered.)' -f $Architecture, $Instance.ComputerName)
+        if ($Architecture -and $7za.Path.Keys -NotContains $Architecture) {
+            $Warning = 'Unknown system architecture ({0}) detected for {1}. Data was not gathered.)' -f $Architecture, $Instance.ComputerName
+        }
+
+        # If we ran into problems with the above checks
+        if ($Warning) {
+            # Write the warning
+            Write-Warning -Message $Warning
+
+            # Remove the failed $Session for master and deploy list
+            $Session = $Session | Where-Object { $PSItem.ComputerName -ne $Instance.ComputerName }
+            $7za.Deploy = $7za.Deploy | Where-Object { $PSItem.ComputerName -ne $Instance.ComputerName }
+
+            # Continue to next item
             continue
         }
 
@@ -126,14 +135,14 @@ process {
         Copy-PRItem -Path $Items -Destination $RemoteStageDirectory -Session $Session
     } catch {
         # Caught an error
-        Write-Error -Message "Copy-PRItem error: $PSItem" -ErrorAction 'Continue'
+        Write-Warning -Message "Copy-PRItem error: $PSItem" -ErrorAction 'Continue'
     }
 
     # Used for unique naming of zip archive
     $Seconds = (Get-Date -UFormat %s).Split('.')[0]
 
     # Remote archive path
-    $Archive = '{0}\RetrievedItems_{1}.zip' -f $RemoteStageDirectory,$Seconds
+    $Archive = "$RemoteStageDirectory\RetrievedItems_$Seconds.zip"
 
     # Compress the non-exe files in the remote stage directory
     Invoke-Command -Session $Session -ScriptBlock {
@@ -159,9 +168,10 @@ process {
             $null = New-Item -ItemType 'Directory' -Path $Output
         }
 
-        # Copy each item to 
+        # Copy each item to output
         Copy-Item -Path $Archive -Destination $Output -FromSession $Instance
     }
+
 
     # Remove created files on remote machine as cleanup
     Invoke-Command -Session $Session -ScriptBlock {
@@ -173,8 +183,7 @@ process {
     }
 
     # Remove 7zip if deployed by plugin
-    if (!$7za.Deploy) {
-
+    if ($7za.Deploy) {
         Invoke-Command -Session $7za.Deploy -ScriptBlock {
             # Get all elements in the Power-Response deploy directory
             $Path = Get-ChildItem -Force -Path (Split-Path -Parent -Path $7zipPath)
@@ -186,6 +195,6 @@ process {
             } else {
                 Remove-Item -Recurse -Force -Path $7zipPath
             }
-        } -Argumentlist $7zTestPath
+        }
     }
 }

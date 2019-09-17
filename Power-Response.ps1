@@ -45,11 +45,14 @@ function Copy-PRItem {
 
                     process {
                         # Get the item at path
-                        $Item = Get-Item -Force -Path $Path
+                        $Item = Get-Item -Force -Path $Path -ErrorAction 'SilentlyContinue'
 
                         # Select the relevent metadata
-                        $MetaData = $Item | Select-Object @{Name='Item'; Expression={$PSItem.Name}},'Directory','CreationTimeUtc',@{Name='ModifiedTimeUtc'; Expression={$PSItem.LastWriteTimeUTC}},@{Name='AccessTimeUtc'; Expression={$PSItem.LastAccessTimeUTC}},@{Name='MD5'; Expression={$Hash}}
-
+                        if ($Item -ne $null) {
+                            $MetaData = $Item | Select-Object @{Name='Item'; Expression={$PSItem.Name}},'Directory','CreationTimeUtc',@{Name='ModifiedTimeUtc'; Expression={$PSItem.LastWriteTimeUTC}},@{Name='AccessTimeUtc'; Expression={$PSItem.LastAccessTimeUTC}},@{Name='MD5'; Expression={$Hash}}
+                        } else {
+                            $MetaData = '' | Select-Object @{Name='Item'; Expression={Split-Path -Leaf -Path $Path}},@{Name='Directory'; Expression={Split-Path -Parent -Path $Path}},'CreationTimeUtc','ModifiedTimeUtc','AccessTimeUtc',@{Name='MD5'; Expression={$Hash}}
+                        }
                         # Build destination csv
                         $DestinationCsv = Join-Path -Path $Destination -ChildPath 'CopyItems_Metadata.csv'
 
@@ -71,14 +74,6 @@ function Copy-PRItem {
 
                         # Compute destination location
                         $Location = Join-Path -Path $Destination -ChildPath $ChildPath
-
-                        # Get the containing directory
-                        $Directory = Split-Path -Parent -Path $Location
-
-                        # Create the destination directory if it doesn't exist
-                        if (!(Test-Path -Path $Directory -PathType 'Container')) {
-                            $null = New-Item -ItemType 'Directory' -Path $Directory
-                        }
 
                         return $Location
                     }
@@ -148,22 +143,22 @@ function Copy-PRItem {
                             $GetContent.Path = $File -Split ':([^\\]+)$' | Select-Object -First 1
                         } else {
                             $null = $GetContent.Remove('Stream')
-                            $GetContent.Path = $Item
+                            $GetContent.Path = $File
                         }
 
                         # Create the end $Location full path
                         $Location = GetLocation -Path $File -Destination $Destination
 
                         # Verbose print results
-                        Write-Verbose -Message "File:     '$File'"
-                        Write-Verbose -Message "Location: '$Location'"
-                        Write-Verbose -Message "Stream:   '$Stream'"
+                        Write-Verbose -Message ("File:     '{0}'" -f $GetContent.Path)
+                        Write-Verbose -Message ("Location: '{0}'" -f $Location)
+                        Write-Verbose -Message ("Stream:   '{0}'" -f $GetContent.Stream)
 
                         # Get the content of the file
                         $Bytes = Get-Content @GetContent -ErrorAction 'SilentlyContinue'
 
                         if ($Bytes -eq $null) {
-                            Write-Verbose -Message "Unable to read file: $File normally, assuming locked"
+                            Write-Verbose -Message ("Unable to read file: {0} normally, assuming locked" -f $GetContent.Path)
 
                             # Ensure PowerForensics is loaded
                             if (('PowerForensics.FileSystem.Ntfs.FileRecord' -as [Type]) -eq $null) {
@@ -172,12 +167,20 @@ function Copy-PRItem {
 
                             try {
                                 # Get the byte content of the file
-                                $Bytes = [PowerForensics.FileSystems.Ntfs.FileRecord]::GetContentBytes($File, $Stream)
+                                $Bytes = [PowerForensics.FileSystems.Ntfs.FileRecord]::GetContentBytes($GetContent.Path, $GetContent.Stream)
                             } catch [System.Management.Automation.MethodInvocationException] {
                                 # Unable to find file
-                                Write-Error -Message "Unable to collect file: $File" -ErrorAction 'Continue'
+                                Write-Warning -Message ("Unable to collect file: {0}" -f $GetContent.Path)
                                 continue
                             }
+                        }
+
+                        # Get the containing directory
+                        $Directory = Split-Path -Parent -Path $Location
+
+                        # Create the destination directory if it doesn't exist
+                        if (!(Test-Path -Path $Directory -PathType 'Container')) {
+                            $null = New-Item -ItemType 'Directory' -Path $Directory
                         }
 
                         # For now, write the file to disk. Eventually GZIP stream the bytes
@@ -187,7 +190,7 @@ function Copy-PRItem {
                         $Hash = ($MD5Generator.ComputeHash($Bytes) | Foreach-Object { $PSItem.ToString('X2') }) -Join ''
 
                         # Add to the meta data file
-                        AddMetaData -Path $Path -Destination $Destination -Hash $Hash
+                        AddMetaData -Path $GetContent.Path -Destination $Destination -Hash $Hash
                     }
                 }
             }
