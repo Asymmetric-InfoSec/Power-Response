@@ -33,305 +33,168 @@
     Date Created: 3/15/2019
     Twitter: @5ynax
     
-    Last Modified By:
-    Last Modified Date:
-    Twitter:
+    Last Modified By: Gavin Prentice
+    Last Modified Date: 9/3/2019
+    Twitter: @valrkey
   
 #>
-[CmdletBinding(DefaultParameterSetName="Items")]
+[CmdletBinding(DefaultParameterSetName='Items')]
 
 param (
 
-    [Parameter(ParameterSetName = "Items", Position = 0, Mandatory = $true)]
-    [Parameter(ParameterSetName = "List", Position = 0, Mandatory = $true)]
-    [System.Management.Automation.Runspaces.PSSession]$Session,
+    [Parameter(Position=0,Mandatory=$true)]
+    [System.Management.Automation.Runspaces.PSSession[]]$Session,
 
-    [Parameter(ParameterSetName = "Items", Position = 1, Mandatory = $false)]
-    [string[]]$ItemPath,
+    [Parameter(Position=1,Mandatory=$true,ParameterSetName='Items')]
+    [String[]]$ItemPath,
 
-    [Parameter(ParameterSetName = "List", Position = 1, Mandatory = $true)]
-    [string]$ListPath
+    [Parameter(Position=1,Mandatory=$true,ParameterSetName='List')]
+    [String]$ListPath,
 
-    )
+    [Parameter(Position=2)]
+    [String]$EncryptPassword = 'infected',
 
-process{
+    [Parameter(Position=3)]
+    [Switch]$NoEncrypt
+)
 
-    #7zip checks
-    $7zTestPath = "C:\ProgramData\7za*.exe"
-    $7zFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $7zTestPath
+process {
 
-    #7zip BIN locations
-    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
-    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
-
-    #Velociraptor checks
-    $VeloTestPath = "C:\ProgramData\Velociraptor*.exe"
-    $VeloFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $VeloTestPath
-
-    #Velociraptor BIN locations
-    $Velo_64 = ("{0}\Velociraptor_x64.exe" -f (Get-PRPath -Bin))
-    $Velo_32 = ("{0}\Velociraptor_x86.exe" -f (Get-PRPath -Bin))
-
-
-    if (!$7zFlag){
-
-        #Verify that 7za executables are located in (Get-PRPath -Bin)
-        $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
-        $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
-
-        if (!$7z64bitTestPath) {
-
-            Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-        } elseif (!$7z32bitTestPath) {
-
-            Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-        }
-
-    }
-
-    if (!$VeloFlag){
-
-        #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
-        $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
-        $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
-
-        if (!$Velo_64TestPath) {
-
-            Throw "64 bit version of Velociraptor not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-        } elseif (!$Velo_32TestPath) {
-
-            Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
-        }
-    }
-
-    #Set $Output for where to store recovered files
-    $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('RetrievedItems_{0:yyyyMMdd}' -f $(Get-Date)))
-
-    #Create Subdirectory in $global:PowerResponse.OutputPath for storing items
-    If (!(Test-Path $Output)) {
-
-        New-Item -Type Directory -Path $Output | Out-Null
-    }
-
+    # Resolve parameter set differences
     switch ($PSCmdlet.ParameterSetName) {
-
-        "Items" {[string[]]$Items = $ItemPath}
-        "List" {[string[]]$Items = (Import-CSV $ListPath | Select -ExpandProperty "Path")}
+        'Items' { [String[]]$Items = $ItemPath }
+        'List' { [String[]]$Items = (Import-Csv -Path $ListPath | Select-Object -ExpandProperty 'Path') }
     }
 
+    # Ensure we have something to grab
     if (!$Items) {
-
-        Throw ("Value for ItemPath not detected for {0}. Add item path and try again" -f $Session.ComputerName)
+        throw ('Value for ItemPath not detected for {0}. Add item path and try again' -f $Session.ComputerName)
     }
 
-    #Determine system architecture and select proper 7za.exe and Velociraptor executables
-    try {
-     
-        $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
-    
-        if ($Architecture -eq "64-bit") {
+    # Define stage directory
+    $RemoteStageDirectory = 'C:\ProgramData\Power-Response\'
 
-            $Installexe = $7za64
-            $Velo_exe = $Velo_64
+    # Test path for existing 7zip deploys
+    $7zTestPath = Join-Path -Path $RemoteStageDirectory -ChildPath '7za*.exe'
 
-        } elseif ($Architecture -eq "32-bit") {
+    # Define $7za tracking structure
+    $7za = @{
+        Deploy = Invoke-Command -Session $Session -ScriptBlock { Test-Path -Path $using:7zTestPath -PathType 'Leaf' } | Where-Object { !$PSItem } | Foreach-Object { Get-PSSession -InstanceId $PSItem.RunspaceId }
+        Path = @{
+            '32-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x86.exe'
+            '64-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x64.exe'
+        }
+    }
 
-            $Installexe = $7za32
-            $Velo_exe = $Velo_32
-
-        } else {
-        
-            Write-Error ("Unknown system architecture ({0}) detected for {1}. Data was not gathered.)" -f $Architecture, $Session.ComputerName)
-            Continue
+    foreach ($Instance in $7za.Deploy) {
+        try {
+            # Determine system $Architecture and select proper 7za.exe
+            $Architecture = Invoke-Command -Session $Instance -ScriptBlock { if (!(Test-Path -Path $using:RemoteStageDirectory -PathType 'Container')) { $null = New-Item -Path $using:RemoteStageDirectory -ItemType 'Directory' }; Get-WmiObject -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' -ErrorAction 'Stop' | Select-Object -ExpandProperty 'OSArchitecture' }
+        } catch {
+            # Unable to get $Architecture information
+            $Warning = 'Unable to determine system architecture for {0}. Data was not gathered.' -f $Instance.ComputerName
         }
 
-    } catch {
-    
-     Write-Error ("Unable to determine system architecture for {0}. Data was not gathered." -f $Session.ComputerName)
-        Continue
-    }
+        # Ensure we are tracking a sensible $Architecture
+        if ($Architecture -and $7za.Path.Keys -NotContains $Architecture) {
+            $Warning = 'Unknown system architecture ({0}) detected for {1}. Data was not gathered.)' -f $Architecture, $Instance.ComputerName
+        }
 
-    #Copy 7zip executable to the remote machine
-    if (!$7zFlag){
+        # If we ran into problems with the above checks
+        if ($Warning) {
+            # Write the warning
+            Write-Warning -Message $Warning
+
+            # Remove the failed $Session for master and deploy list
+            $Session = $Session | Where-Object { $PSItem.ComputerName -ne $Instance.ComputerName }
+            $7za.Deploy = $7za.Deploy | Where-Object { $PSItem.ComputerName -ne $Instance.ComputerName }
+
+            # Continue to next item
+            continue
+        }
+
+        # Verify the each $7za $Exe exists
+        if (!(Test-Path -Path $7za.Path.$Architecture -PathType 'Leaf')) {
+            throw ('{0} version of 7za.exe not detected in Bin. Place {0} executable in Bin directory and try again.' -f $Architecture)
+        }
+
+        # Compute the $Remote7za path
+        $Remote7za = Join-Path -Path $RemoteStageDirectory -ChildPath (Split-Path -Leaf -Path $7za.Path.$Architecture)
 
         try {
-
-            Copy-Item -Path $Installexe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
-
+            # Copy 7zip executable to the remote machine
+            Copy-Item -Path $7za.Path.$Architecture -Destination $Remote7za -ToSession $Instance -Force -ErrorAction 'Stop'
         } catch {
-
-            Throw "Could not copy 7zip to remote machine. Quitting."
+            # Failed to copy 7zip
+            throw 'Could not copy 7zip to remote machine. Quitting.'
         }
     }
 
-    #Copy Velociraptor to remote machine
-    if (!$VeloFlag){
-
-        try{
-
-            Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -ErrorAction Stop 
-
-        }catch {
-
-            Throw ("Could not deploy Velociraptor for retrieval. Quitting..." -f $Item)
-            
-        }
+    try {
+        # Copy the files
+        Copy-PRItem -Path $Items -Destination $RemoteStageDirectory -Session $Session
+    } catch {
+        # Caught an error
+        Write-Warning -Message "Copy-PRItem error: $PSItem" -ErrorAction 'Continue'
     }
 
-    #Create retrieved items staging folder on the remote machine
-    $ItemStage = ("C:\ProgramData\{0}") -f ($Session.ComputerName)
+    # Used for unique naming of zip archive
+    $Seconds = (Get-Date -UFormat %s).Split('.')[0]
 
-    Invoke-Command -Session $Session -ScriptBlock {if (!(Test-Path $($args[0]))) {New-Item -Type Directory -Path $($args[0])}} -Argumentlist $ItemStage | Out-Null
-    
-    #Collect items
-    foreach ($Item in $Items){
+    # Remote archive path
+    $Archive = "$RemoteStageDirectory\RetrievedItems_$Seconds.zip"
 
-        #Verify that file exists on remote system, if not skip and continue
-        $PathVerify = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Force $($args[0]) -ErrorAction SilentlyContinue} -ArgumentList $Item 
+    # Compress the non-exe files in the remote stage directory
+    Invoke-Command -Session $Session -ScriptBlock {
+        # Get actual 7zip path
+        $7zipPath = Get-Item -Path $using:7zTestPath | Select-Object -First 1 -ExpandProperty 'FullName'
 
-        if (!$PathVerify) {
-           
-            Write-Warning "No item found at $Item. Skipping." -ErrorAction Continue
-            Continue
+        # Get all non-exe paths in the remote stage directory
+        $Path = Get-ChildItem -Force -Path $using:RemoteStageDirectory -Exclude '*.exe' | Select-Object -ExpandProperty 'FullName'
+
+        # Create compression command
+        $Command = "$7zipPath a -p$using:EncryptPassword -tzip $using:Archive {0}" -f ($Path -Join ' ')
+
+        # Execute compression command
+        $null = Invoke-Expression -Command $Command
+    }
+
+    foreach ($Instance in $Session) {
+        # Set output for each specific instance of session
+        $Output = Get-PRPath -ComputerName $Instance.ComputerName -Directory ('RetrievedItems_{0:yyyyMMdd}' -f (Get-Date))
+
+        # Create directory if it doesn't exist
+        if (!(Test-Path -Path $Output -PathType 'Container')) {
+            $null = New-Item -ItemType 'Directory' -Path $Output
         }
 
-        if (!$PathVerify.PSIsContainer){
+        # Copy each item to output
+        Copy-Item -Path $Archive -Destination $Output -FromSession $Instance
+    }
 
-            #Get Item Attributes, create metadata file, and compress files
-            Invoke-Command -Session $Session -ScriptBlock {
 
-                try {
-                    
-                    $MD5_Hash = (Get-FileHash -Path $($args[0]) -Algorithm MD5 -ErrorAction Stop).Hash
+    # Remove created files on remote machine as cleanup
+    Invoke-Command -Session $Session -ScriptBlock {
+        # Get all non-exe items in remote stage directory
+        $Path = Get-ChildItem -Force -Path $using:RemoteStageDirectory -Exclude '*.exe' | Select-Object -ExpandProperty 'FullName'
 
-                } catch {
-                                        
-                    $MD5_Hash = "Could not obtain MD5 hash."
-                }
+        # Remove the archive
+        Remove-Item -Force -Recurse -Path $Path 
+    }
 
-                $MetaData = @{
+    # Remove 7zip if deployed by plugin
+    if ($7za.Deploy) {
+        Invoke-Command -Session $7za.Deploy -ScriptBlock {
+            # Get all elements in the Power-Response deploy directory
+            $Path = Get-ChildItem -Force -Path (Split-Path -Parent -Path $7zipPath)
 
-                    Item = (Split-Path $($args[0]) -leaf)
-                    Directory = (Get-Item -Force $($args[0])).Directory
-                    CreationTimeUTC = (Get-Item -Force $($args[0])).CreationTimeUtc
-                    ModifiedTimeUTC = (Get-Item -Force $($args[0])).LastWriteTimeUtc 
-                    AccessTimeUTC = (Get-Item -Force $($args[0])).LastAccessTimeUtc
-                    MD5 = $MD5_Hash
-                } 
 
-                $ExportPath = "{0}\RetrievedItems_Metadata.csv" -f ($($args[1]))
-
-                [PSCustomObject]$MetaData | Select Item, Directory, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath -Append
-            
-            } -ArgumentList $Item,$ItemStage
-        }
-
-        if ($PathVerify.PSIsContainer){
-
-            Invoke-Command -Session $Session -ScriptBlock {
-
-                $DirItems = Get-ChildItem -Path $($args[0]) -File -Recurse -Force | Select -ExpandProperty FullName
-
-                foreach ($DirItem in $DirItems){
-
-                    try{
-
-                        $MD5_Hash = (Get-FileHash -Path $DirItem -Algorithm MD5 -ErrorAction Stop).Hash
-
-                    } catch {
-
-                        $MD5_Hash = "Could not obtain MD5 hash."
-                    }
-
-                    $MetaData = @{
-
-                        Item = (Split-Path $DirItem -Leaf)
-                        Directory = (Get-Item -Force $DirItem).Directory
-                        CreationTimeUTC = (Get-Item -Force $DirItem).CreationTimeUtc 
-                        ModifiedTimeUTC = (Get-Item -Force $DirItem).LastWriteTimeUtc
-                        AccessTimeUTC = (Get-Item -Force $DirItem).LastAccessTimeUtc
-                        MD5 = $MD5_Hash
-                    } 
-
-                    $ExportPath = "{0}\RetrievedItems_Metadata.csv" -f ($($args[1]))
-
-                    [PSCustomObject]$MetaData | Select Item, Directory, CreationTimeUTC, ModifiedTimeUTC, AccessTimeUTC, MD5 | Export-CSV $ExportPath -Append
-
-                }
-
-            } -ArgumentList $Item,$ItemStage
-        } 
-
-        #Collect $Item
-        $FinalPath = ("{0}\{1}_{2}") -f ($ItemStage,(Split-Path $Item -Leaf),$Session.ComputerName)
-
-        Invoke-Command -Session $Session -ScriptBlock {if (!(Test-Path $($args[0]))) {New-Item -Type Directory -Path $($args[0])}} -Argumentlist $FinalPath | Out-Null
-
-        if (!$PathVerify.PSIsContainer){
-
-            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}\{1}' fs --accessor ntfs cp \\.\{2} {3}") -f ($env:ProgramData, (Split-Path -Path $Velo_exe -Leaf), $Item, $FinalPath))
-        
-            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
-        }
-
-        if ($PathVerify.PSIsContainer){
-
-            $DirObjects = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem -Path $($args[0]) -File -Recurse -Force | Select -ExpandProperty FullName} -Argumentlist $Item
-
-            foreach ($DirObject in $DirObjects){
-
-                $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& '{0}\{1}' fs --accessor ntfs cp \\.\{2} {3}") -f ($env:ProgramData, (Split-Path -Path $Velo_exe -Leaf), $DirObject, $FinalPath))
-        
-                Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
+            # Remove entire parent directory if 7zip is only child
+            if ($Path.Count -eq 1 -and $Path.FullName -eq $7zipPath) {
+                Remove-Item -Recurse -Force -Path $Path
+            } else {
+                Remove-Item -Recurse -Force -Path $7zipPath
             }
         }
-    }
-
-    #Used for unique naming of zip archive
-    $Seconds = ((Get-Date -UFormat %s).Split('.')[0])
-
-    #Compress    
-    Invoke-Command -Session $Session -ScriptBlock {
-
-        #Create archive of Item and MetaData (separately)
-        $ArchivePath = ("{0}\{1}_RetrievedItems_{2}.zip" -f ($($args[0]),$($args[1]),$($args[3])))
-        
-        $Command_Compress = ("& 'C:\ProgramData\{0}' a -pinfected -tzip {1} {2} {3}" -f ($($args[2]),$ArchivePath,$ExportPath,($($args[0]))))
-        
-        Invoke-Expression -Command $Command_Compress | Out-Null
-
-    } -ArgumentList $ItemStage,($Session.ComputerName),(Split-Path $Installexe -Leaf), $Seconds
-        
-    #Copy $Item
-
-    Copy-Item -Path ("{0}\{1}_RetrievedItems_{2}.zip" -f ($ItemStage,($Session.ComputerName),$Seconds)) -Destination $Output -FromSession $Session
-    
-    #Remove created files on remote machine as cleanup
-    Invoke-Command -Session $Session -ScriptBlock {
-
-        #Remove the archive
-        Remove-Item -Path $ArchivePath -Force 
-        
-        #Remove the Metadata file
-        Remove-Item -Path $ExportPath -Force  
-
-        #Remove the Velociraptor archive 
-        Remove-Item -Recurse -Path ("{0}" -f $($args[0])) -Force
-
-    } -ArgumentList $ItemStage    
-
-    #Remove 7zip if deployed by plugin
-    if (!$7zFlag){
-
-        Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path ("C:\ProgramData\{0}" -f ($($args[0]))) -Force} -Argumentlist (Split-Path $Installexe -Leaf)
-
-    }
-
-    #Remove Velociraptor if deployed by plugin
-    if (!$VeloFlag){
-
-        Invoke-Command -Session $Session -ScriptBlock {Remove-Item -Path ("C:\ProgramData\{0}" -f ($($args[0]))) -Force} -Argumentlist (Split-Path $Velo_exe -Leaf)
     }
 }
