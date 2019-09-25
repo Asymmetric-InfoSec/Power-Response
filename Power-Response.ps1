@@ -972,6 +972,7 @@ function Invoke-PRPlugin {
         [Parameter(Mandatory=$true)]
         [System.Management.Automation.Runspaces.PSSession[]]$Session,
 
+        [Alias('ScopeName')]
         [String]$HuntName
     )
 
