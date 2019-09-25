@@ -1110,7 +1110,7 @@ function Invoke-PRPlugin {
 
                 try {
                     # Execute the $Path with the $ReleventParameters
-                    $Result = & $Path @ReleventParameters | Group-Object -Property 'PSComputerName'
+                    $Results = & $Path @ReleventParameters | Group-Object -Property 'PSComputerName'
 
                     # Loop through $Result groups
                     foreach ($Result in $Results) {
