@@ -256,7 +256,7 @@ function Format-Parameter {
                 $global:PowerResponse.Parameters.$CommandParam = $global:PowerResponse.Parameters.$CommandParam.ToString()
 
                 # If the input value is not a file path, try to execute it as a PowerShell expression
-                if (!(Test-Path $global:PowerResponse.Parameters.$CommandParam)) {
+                if (!(Test-Path -PathType 'Leaf' -Path $global:PowerResponse.Parameters.$CommandParam -ErrorAction 'SilentlyContinue')) {
                     # Build a $Commands string to check for PowerShell expressions '[TYPE]($global:PowerResponse.Parameters.VALUE)'
                     $Commands += '[{0}]({1})' -f $ParameterType.FullName,$global:PowerResponse.Parameters.$CommandParam
                 }
