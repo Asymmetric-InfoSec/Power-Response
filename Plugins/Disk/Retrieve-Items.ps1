@@ -135,7 +135,7 @@ process {
         Copy-PRItem -Path $Items -Destination $RemoteStageDirectory -Session $Session
     } catch {
         # Caught an error
-        Write-Warning -Message "Copy-PRItem error: $PSItem" -ErrorAction 'Continue'
+        Write-Warning -Message "Copy-PRItem error: $PSItem"
     }
 
     # Used for unique naming of zip archive
