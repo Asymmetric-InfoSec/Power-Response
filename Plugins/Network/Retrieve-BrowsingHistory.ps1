@@ -109,11 +109,11 @@ process{
     }
 
     #Create Output directory structure on remote host
-    $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0])) -ErrorAction SilentlyContinue} -ArgumentList $Session.ComputerName
-
+    $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ('C:\ProgramData\Power-Response' ) -ErrorAction SilentlyContinue}
+    
     If (!$TestRemoteDumpPath){
 
-        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ("C:\ProgramData\{0}" -f $($args[0])) | Out-Null} -ArgumentList $Session.ComputerName
+        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ('C:\ProgramData\Power-Response' | Out-Null}
     
     }
 
@@ -138,13 +138,13 @@ process{
             $Artifact = ('{0}\{1}' -f $User,$UserArtifact)
 
             # Stage Artifacts           
-            Copy-PRItem -Session $Session -Path $Artifact -Destination ("C:\ProgramData\{0}" -f $Session.ComputerName)
+            Copy-PRItem -Session $Session -Path $Artifact -Destination ("C:\ProgramData\Power-Response")
 
         }
     }
         
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_BrowsingHistory.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_BrowsingHistory.zip C:\ProgramData\Power-Response") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)
