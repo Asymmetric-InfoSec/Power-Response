@@ -113,7 +113,6 @@ function Copy-PRItem {
                 $GetContent = @{
                     Encoding = 'Byte'
                     Force = $true
-                    Raw = $true
                 }
 
                 # MD5 hash generator
