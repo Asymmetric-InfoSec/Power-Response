@@ -113,7 +113,7 @@ process{
     
     If (!$TestRemoteDumpPath){
 
-        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ('C:\ProgramData\Power-Response' | Out-Null}
+        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ('C:\ProgramData\Power-Response') | Out-Null}
     
     }
 
