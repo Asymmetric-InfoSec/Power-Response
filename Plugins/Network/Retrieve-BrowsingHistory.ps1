@@ -144,13 +144,13 @@ process{
     }
         
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_BrowsingHistory.zip C:\ProgramData\Power-Response") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\BrowsingHistory.zip C:\ProgramData\Power-Response") -f (Split-Path $Installexe -Leaf))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)
     try {
 
-        Copy-Item -Path (("C:\ProgramData\{0}_BrowsingHistory.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
+        Copy-Item -Path ("C:\ProgramData\BrowsingHistory.zip") -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
 
     } catch {
 
@@ -165,7 +165,7 @@ process{
     }
     
     # Delete initial artifacts, 7za, and binaries from remote machine
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}_BrowsingHistory.zip, C:\ProgramData\{0}") -f ($Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Remove-Item -Force -Recurse -Path C:\ProgramData\BrowsingHistory.zip, C:\ProgramData\Power-Response")
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
 }
