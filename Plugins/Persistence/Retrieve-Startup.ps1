@@ -111,11 +111,11 @@ process {
     }
 
     #Create Output directory structure on remote host
-    $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0])) -ErrorAction SilentlyContinue} -ArgumentList $Session.ComputerName
+    $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\Power-Response") -ErrorAction SilentlyContinue}
 
     If (!$TestRemoteDumpPath){
 
-        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ("C:\ProgramData\{0}" -f $($args[0])) | Out-Null} -ArgumentList $Session.ComputerName
+        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ("C:\ProgramData\Power-Response" -f $($args[0])) | Out-Null}
     
     }
 
@@ -126,7 +126,7 @@ process {
     )
            
     # Stage System Artifacts           
-    Copy-PRItem -Session $Session -Path $SystemArtifacts -Destination ("C:\ProgramData\{0}" -f $Session.ComputerName)
+    Copy-PRItem -Session $Session -Path $SystemArtifacts -Destination ("C:\ProgramData\Power-Response")
 
 
     #Collect user artifacts    
@@ -150,13 +150,13 @@ process {
     }
         
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a -pinfected -tzip 'C:\ProgramData\{1}_Startup.zip' C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a -pinfected -tzip 'C:\ProgramData\Startup.zip' C:\ProgramData\Power-Response") -f (Split-Path $Installexe -Leaf))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)
     try {
 
-        Copy-Item -Path (("C:\ProgramData\{0}_Startup.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
+        Copy-Item -Path (("C:\ProgramData\Startup.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
 
     } catch {
 
@@ -171,6 +171,6 @@ process {
     }
     
     # Delete initial artifacts, 7za, and binaries from remote machine
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}_Startup.zip, C:\ProgramData\{0}") -f ($Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock("Remove-Item -Force -Recurse -Path C:\ProgramData\Startup.zip, C:\ProgramData\Power-Response")
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 }
