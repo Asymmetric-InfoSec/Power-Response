@@ -471,6 +471,8 @@ function Get-PRPath {
         [Switch]$Plugins,
 
         [Parameter(ParameterSetName='Output-Specific',Mandatory=$true)]
+        [Alias('HuntName')]
+        [Alias('ScopeName')]
         [String]$ComputerName,
 
         [Parameter(ParameterSetName='Output-Specific')]
@@ -1206,7 +1208,8 @@ function Out-PRFile {
         [PSObject]$InputObject,
 
         [Parameter(Mandatory=$true)]
-        [Alias('Hunt')]
+        [Alias('HuntName')]
+        [Alias('ScopeName')]
         [String]$ComputerName,
 
         [String]$Plugin = $global:PowerResponse.Location.FullName,
