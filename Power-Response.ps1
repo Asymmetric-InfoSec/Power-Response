@@ -128,8 +128,8 @@ function Copy-PRItem {
             process {
                 foreach ($Item in $Path) {
                     try {
-                        # Get any nested items in the case of a directory ignoring any streams
-                        $Items = Get-ChildItem -File -Force -Recurse -Path ($Item -Replace ':([^\\]+)$') -ErrorAction 'Stop' | Select-Object -ExpandProperty 'FullName'
+                        # Resolve wildcards into full path(s), can't use Resolve-Path since it doesn't have a -Force parameter to see system files
+                        $Items = Get-Item -Force -Path ($Item -Replace ':([^\\]+)$') -ErrorAction 'Stop' | Foreach-Object { if ($PSItem.PSIsContainer) { Get-ChildItem -File -Force -Recurse -Path $PSItem.FullName } else { $PSItem } } | Select-Object -ExpandProperty 'FullName'
                     } catch {
                         # Failed to get any children
                         $Items = $Item
