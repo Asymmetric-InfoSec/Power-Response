@@ -163,13 +163,13 @@ process{
             "$env:SystemRoot\System32\config\SECURITY",
             "$env:SystemRoot\System32\config\SECURITY.LOG1",
             "$env:SystemRoot\System32\config\SECURITY.LOG2",
-            "$env:SystemRoot\Users\*\NTUSER.DAT",
-            "$env:SystemRoot\Users\*\NTUSER.DAT.LOG1",
-            "$env:SystemRoot\Users\*\NTUSER.DAT.LOG2",
-            "$env:SystemRoot\Users\*\AppData\Local\Microsoft\Windows\UsrClass.dat",
-            "$env:SystemRoot\Users\*\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1",
-            "$env:SystemRoot\Users\*\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2",
-            "$env:SystemRoot\Windows\System32\config\RegBack\*"
+            "$env:SystemDrive\Users\*\NTUSER.DAT",
+            "$env:SystemDrive\Users\*\NTUSER.DAT.LOG1",
+            "$env:SystemDrive\Users\*\NTUSER.DAT.LOG2",
+            "$env:SystemDrive\Users\*\AppData\Local\Microsoft\Windows\UsrClass.dat",
+            "$env:SystemDrive\Users\*\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1",
+            "$env:SystemDrive\Users\*\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2",
+            "$env:SystemRoot\System32\config\RegBack\*"
         )
 
         # Copy items to the staging location
