@@ -68,14 +68,6 @@ process{
     $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
     $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
 
-    #Velociraptor checks
-    $VeloTestPath = "C:\ProgramData\Velociraptor*.exe"
-    $VeloFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $VeloTestPath
-
-    #Velociraptor BIN locations
-    $Velo_64 = ("{0}\Velociraptor_x64.exe" -f (Get-PRPath -Bin))
-    $Velo_32 = ("{0}\Velociraptor_x86.exe" -f (Get-PRPath -Bin))
-
     if (!$7zFlag){
 
         # Verify that 7za executables are located in (Get-PRPath -Bin)
@@ -90,23 +82,6 @@ process{
         } elseif (!$7z32bitTestPath) {
 
             Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-        }
-    }
-
-    if (!$VeloFlag){
-
-        #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
-
-        $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
-        $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
-
-        if (!$Velo_64TestPath) {
-
-            Throw "64 bit version of Velociraptor not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-        } elseif (!$Velo_32TestPath) {
-
-            Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
         }
     }
 
@@ -125,7 +100,7 @@ process{
             New-Item -Type Directory -Path $Output | Out-Null
         }
 
-        #Determine system architecture and select proper 7za.exe and Velociraptor executables
+        #Determine system architecture and select proper 7za.exe executable
         try {
          
             $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
@@ -133,12 +108,10 @@ process{
             if ($Architecture -eq "64-bit") {
 
                 $Installexe = $7za64
-                $Velo_exe = $Velo_64
 
             } elseif ($Architecture -eq "32-bit") {
 
                 $Installexe = $7za32
-                $Velo_exe = $Velo_32
 
             } else {
             
@@ -152,7 +125,7 @@ process{
             Continue
         }
 
-        # Copy 7zip and Velociraptor to remote machine
+        # Copy 7zip to remote machine
         if (!$7zFlag){
 
             try {
@@ -164,19 +137,6 @@ process{
                 Throw "Could not copy 7zip to remote machine. Quitting..."
             }
 
-        }
-
-        if (!$VeloFlag){
-
-          try {
-
-                Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
-
-            } catch {
-
-                Throw "Could not copy Velociraptor to remote machine. Quitting..."
-            }
-          
         }
 
         #Create Output directory structure on remote host
@@ -202,51 +162,19 @@ process{
             "$env:SystemRoot\System32\config\SOFTWARE.LOG2",
             "$env:SystemRoot\System32\config\SECURITY",
             "$env:SystemRoot\System32\config\SECURITY.LOG1",
-            "$env:SystemRoot\System32\config\SECURITY.LOG2"
-
+            "$env:SystemRoot\System32\config\SECURITY.LOG2",
+            "$env:SystemRoot\Users\*\NTUSER.DAT",
+            "$env:SystemRoot\Users\*\NTUSER.DAT.LOG1",
+            "$env:SystemRoot\Users\*\NTUSER.DAT.LOG2",
+            "$env:SystemRoot\Users\*\AppData\Local\Microsoft\Windows\UsrClass.dat",
+            "$env:SystemRoot\Users\*\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1",
+            "$env:SystemRoot\Users\*\AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2",
+            "$env:SystemRoot\Windows\System32\config\RegBack\*"
         )
-               
-        foreach ($Artifact in $SystemArtifacts){
 
-            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
-            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
-        }
+        # Copy items to the staging location
+        Copy-PRItem -Session $Session -Path $SystemArtifacts -Destination (Join-Path -Path 'C:\ProgramData' -ChildPath $Session.ComputerName)
 
-        $SystemArtifacts2 = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem 'C:\Windows\System32\config\RegBack\' -Force}
-           
-        foreach ($Artifact in $SystemArtifacts2){
-
-            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp '\\.\{1}' C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact.FullName, $Session.ComputerName))
-            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
-        }
-        
-        #Collect User Artifacts
-
-        $UserArtifacts = @(
-
-            "NTUSER.DAT",
-            "NTUSER.DAT.LOG1",
-            "NTUSER.DAT.LOG2",
-            "AppData\Local\Microsoft\Windows\UsrClass.dat",
-            "AppData\Local\Microsoft\Windows\UsrClass.dat.LOG1",
-            "AppData\Local\Microsoft\Windows\UsrClass.dat.LOG2"
-
-            )
-
-        # Grab list of user profiles
-        $Users = Invoke-Command -Session $Session -Scriptblock {Get-CimInstance -ClassName Win32_UserProfile | Select-Object -ExpandProperty LocalPath | Select-String Users}
-
-        # Iterate through each user profile grabbing the artifacts
-        foreach ($User in $Users){
-
-            foreach ($Artifact in $UserArtifacts) {
-
-                $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\{1}\{2} C:\ProgramData\{3}") -f ((Split-Path $Velo_exe -Leaf), $User, $Artifact,$Session.ComputerName))
-                Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
-            }
-         
-        }
-            
         # Compress artifacts directory      
         $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_RegistryHives.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
@@ -265,13 +193,6 @@ process{
         if (!$7zFlag){
 
             $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Installexe -Leaf))
-            Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
-        }
-        
-        #Delete Velociraptor if deployed by plugin
-        if (!$VeloFlag){
-
-            $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Velo_exe -Leaf))
             Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
         }
     
