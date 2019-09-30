@@ -19,9 +19,9 @@
     Date Created: 4/5/2019
     Twitter: @5ynax
     
-    Last Modified By: 
-    Last Modified Date: 
-    Twitter: 
+    Last Modified By: Drew Schmitt
+    Last Modified Date: 9/27/2019
+    Twitter: @5ynax
   
 #>
 
@@ -42,14 +42,6 @@ process{
     $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
     $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
 
-    #Velociraptor checks
-    $VeloTestPath = "C:\ProgramData\Velociraptor*.exe"
-    $VeloFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $VeloTestPath
-
-    #Velociraptor BIN locations
-    $Velo_64 = ("{0}\Velociraptor_x64.exe" -f (Get-PRPath -Bin))
-    $Velo_32 = ("{0}\Velociraptor_x86.exe" -f (Get-PRPath -Bin))
-
     if (!$7zFlag){
 
         # Verify that 7za executables are located in (Get-PRPath -Bin)
@@ -67,23 +59,6 @@ process{
         }
     }
 
-    if (!$VeloFlag){
-
-        #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
-
-        $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
-        $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
-
-        if (!$Velo_64TestPath) {
-
-            Throw "64 bit version of Velociraptor not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-        } elseif (!$Velo_32TestPath) {
-
-            Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
-        }
-    }
-
     # Set $Output for where to store recovered artifacts
     $Output= (Get-PRPath -ComputerName $Session.ComputerName -Directory ('EventLogFiles_{0:yyyyMMdd}' -f (Get-Date)))
 
@@ -93,7 +68,7 @@ process{
         New-Item -Type Directory -Path $Output | Out-Null
     }
 
-    #Determine system architecture and select proper 7za.exe and Velociraptor executables
+    #Determine system architecture and select proper 7za.exe executables
     try {
      
         $Architecture = Invoke-Command -Session $Session -ScriptBlock {(Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture}
@@ -101,12 +76,10 @@ process{
         if ($Architecture -eq "64-bit") {
 
             $Installexe = $7za64
-            $Velo_exe = $Velo_64
 
         } elseif ($Architecture -eq "32-bit") {
 
             $Installexe = $7za32
-            $Velo_exe = $Velo_32
 
         } else {
         
@@ -120,7 +93,7 @@ process{
         Continue
     }
 
-    # Copy 7zip and Velociraptor to remote machine
+    # Copy 7zip to remote machine
 
     if (!$7zFlag){
 
@@ -134,44 +107,35 @@ process{
         } 
     }
 
-    if (!$VeloFlag){
-
-        try {
-
-            Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
-
-        } catch {
-
-            Throw "Could not copy Velociraptor to remote machine. Quitting..."
-        }
-    }
-
     #Create Output directory structure on remote host
-    $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0])) -ErrorAction SilentlyContinue} -ArgumentList $Session.ComputerName
+    $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\Power-Response") -ErrorAction SilentlyContinue}
 
     If (!$TestRemoteDumpPath){
 
-        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ("C:\ProgramData\{0}" -f $($args[0])) | Out-Null} -ArgumentList $Session.ComputerName
+        Invoke-Command -Session $Session -ScriptBlock {New-Item -Type Directory -Path ("C:\ProgramData\Power-Response") | Out-Null}
     
     }
 
     #Collect System Artifacts    
     $SystemArtifacts = Invoke-Command -Session $Session -ScriptBlock {Get-ChildItem 'C:\Windows\System32\winevt\logs\' -Force}
            
-    foreach ($Artifact in $SystemArtifacts){
+    foreach ($SystemArtifact in $SystemArtifacts){
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp '\\.\{1}' C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact.FullName, $Session.ComputerName))
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
+        $Artifact = ('C:\Windows\System32\winevt\logs\{0}' -f $SystemArtifact)
+
+        # Stage System Artifacts           
+        Copy-PRItem -Session $Session -Path $Artifact -Destination ("C:\ProgramData\Power-Response")
+
     }
     
     # Compress artifacts directory      
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\{1}_EventLogFiles.zip C:\ProgramData\{1}") -f ((Split-Path $Installexe -Leaf), $Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' a C:\ProgramData\EventLogFiles.zip C:\ProgramData\Power-Response") -f (Split-Path $Installexe -Leaf))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue | Out-Null
 
     # Copy artifacts back to $Output (Uses $Session)
     try {
 
-        Copy-Item -Path (("C:\ProgramData\{0}_EventLogFiles.zip") -f ($Session.ComputerName)) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
+        Copy-Item -Path (("C:\ProgramData\EventLogFiles.zip")) -Destination "$Output\" -FromSession $Session -Force -ErrorAction Stop
 
     } catch {
 
@@ -185,15 +149,8 @@ process{
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
     }
     
-    #Delete Velociraptor if deployed by plugin
-    if (!$VeloFlag){
-
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Velo_exe -Leaf))
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
-    }
-    
     # Delete remaining artifacts from remote machine
-    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}_EventLogFiles.zip, C:\ProgramData\{0}") -f ($Session.ComputerName))
+    $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\EventLogFiles.zip, C:\ProgramData\Power-Response"))
     Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
 
 }

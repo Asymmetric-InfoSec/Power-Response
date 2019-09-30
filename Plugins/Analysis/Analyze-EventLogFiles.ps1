@@ -129,56 +129,56 @@ process{
 
      $WinFirewallLog = @{
 
-        LogName = "Microsoft-Windows-Windows Firewall With Advanced Security%254Firewall.evtx"
+        LogName = "Microsoft-Windows-Windows Firewall With Advanced Security%4Firewall.evtx"
         ProcessedEvents = 2003
         OutputName = 'WindowsFirewallEvents.csv'
     }
 
      $PowerShellLog = @{
 
-        LogName = "Microsoft-Windows-PowerShell%254Operational.evtx"
+        LogName = "Microsoft-Windows-PowerShell%4Operational.evtx"
         ProcessedEvents = 4104,4105,4106
         OutputName = 'PowerShellEvents.csv'
     }
 
      $WMILog = @{
 
-        LogName = "Microsoft-Windows-WMI-Activity%254Operational.evtx"
+        LogName = "Microsoft-Windows-WMI-Activity%4Operational.evtx"
         ProcessedEvents = 5857,5858,5859,5860,5861
         OutputName = 'WMIEvents.csv'
     }
 
      $RDP_TC_RDPClientLog = @{
 
-        LogName = "Microsoft-Windows-TerminalServices-RDPClient%254Operational.evtx"
+        LogName = "Microsoft-Windows-TerminalServices-RDPClient%4Operational.evtx"
         ProcessedEvents = 1024,1102
         OutputName = 'RDPClientEvents.csv'
     }
 
      $RDP_TC_RCMLog = @{
 
-        LogName = "Microsoft-Windows-TerminalServices-RemoteConnectionManager%254Operational.evtx"
+        LogName = "Microsoft-Windows-TerminalServices-RemoteConnectionManager%4Operational.evtx"
         ProcessedEvents = 1149
         OutputName = 'RDPConnManagerEvents.csv'
     }
 
      $RDP_TC_LSMLog = @{
 
-        LogName = "Microsoft-Windows-TerminalServices-LocalSessionManager%254Operational.evtx"
+        LogName = "Microsoft-Windows-TerminalServices-LocalSessionManager%4Operational.evtx"
         ProcessedEvents = 21,22,25,41
         OutputName = 'RDPLocalSessionManEvents.csv'
     }
 
      $RDP_RdpTSLog = @{
 
-        LogName = "Microsoft-Windows-RemoteDesktopServices-RdpCoreTS%254Operational.evtx"
+        LogName = "Microsoft-Windows-RemoteDesktopServices-RdpCoreTS%4Operational.evtx"
         ProcessedEvents = 98,131
         OutputName = 'RDPCoreTSEvents.csv'
     }
 
      $SchedTasksLog = @{
 
-        LogName = "Microsoft-Windows-TaskScheduler%254Operational.evtx"
+        LogName = "Microsoft-Windows-TaskScheduler%4Operational.evtx"
         ProcessedEvents = 106,140,141,200,201
         OutputName = 'ScheduledTaskEvents.csv'
     }
@@ -207,7 +207,7 @@ process{
                 if (!(Test-Path $EvtxDataExtracted)){
 
                     #Decompress zipped archive
-                    $Command = ("& '{0}\{1}' x '{2}\{3}_EventLogFiles.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$EvtxPath,$Machine
+                    $Command = ("& '{0}\{1}' x '{2}\EventLogFiles.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$EvtxPath
 
                     Invoke-Expression -Command $Command | Out-Null
                 }
@@ -216,7 +216,7 @@ process{
                 foreach ($Log in $MachineLogs){
 
                     #Process and store in analysis directory
-                    $Command = ("& '{0}\EvtxExplorer\EvtxECmd.exe' -f {1}\{2}\C\Windows\System32\winevt\Logs\{3} --csv {4} --csvf {5} --inc {6}") -f ((Get-PRPath -Bin),$EvtxPath,$Machine,$Log.LogName,$EvtxProcessed,$Log.OutputName,($Log.ProcessedEvents -join ','))
+                    $Command = ("& '{0}\EvtxExplorer\EvtxECmd.exe' -f {1}\Power-Response\C\Windows\System32\winevt\Logs\{2} --csv {3} --csvf {4} --inc {5}") -f ((Get-PRPath -Bin),$EvtxPath,$Log.LogName,$EvtxProcessed,$Log.OutputName,($Log.ProcessedEvents -join ','))
 
                     Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\EvtxECmd_Log.txt" -f $EvtxProcessed) -Append
 
