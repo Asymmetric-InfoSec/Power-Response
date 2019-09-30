@@ -52,10 +52,6 @@ process{
     $VeloTestPath = "C:\ProgramData\Velociraptor*.exe"
     $VeloFlag = Invoke-Command -Session $Session -ScriptBlock {Test-Path $($args[0])} -ArgumentList $VeloTestPath
 
-    #Velociraptor BIN locations
-    $Velo_64 = ("{0}\Velociraptor_x64.exe" -f (Get-PRPath -Bin))
-    $Velo_32 = ("{0}\Velociraptor_x86.exe" -f (Get-PRPath -Bin))
-
     if (!$7zFlag){
 
         # Verify that 7za executables are located in (Get-PRPath -Bin)
@@ -70,23 +66,6 @@ process{
         } elseif (!$7z32bitTestPath) {
 
             Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-        }
-    }
-
-    if (!$VeloFlag){
-
-        #Verify that Velociraptor executables are located in (Get-PRPath -Bin) (For locked files)
-
-        $Velo_64TestPath = Get-Item -Path $Velo_64 -ErrorAction SilentlyContinue
-        $Velo_32TestPath = Get-Item -Path $Velo_32 -ErrorAction SilentlyContinue
-
-        if (!$Velo_64TestPath) {
-
-            Throw "64 bit version of Velociraptor not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-        } elseif (!$Velo_32TestPath) {
-
-            Throw "32 bit version of Velociraptor not detected in Bin. Place 32bit executable in Bin directory and try again."
         }
     }
 
@@ -107,12 +86,10 @@ process{
         if ($Architecture -eq "64-bit") {
 
             $Installexe = $7za64
-            $Velo_exe = $Velo_64
 
         } elseif ($Architecture -eq "32-bit") {
 
             $Installexe = $7za32
-            $Velo_exe = $Velo_32
 
         } else {
         
@@ -140,19 +117,6 @@ process{
         } 
     }
 
-    if (!$VeloFlag){
-
-         try {
-
-            Copy-Item -Path $Velo_exe -Destination "C:\ProgramData" -ToSession $Session -Force -ErrorAction Stop
-
-        } catch {
-
-            Throw "Could not copy Velociraptor to remote machine. Quitting..."
-        }
-
-    }
-
     #Create Output directory structure on remote host
     $TestRemoteDumpPath = Invoke-Command -Session $Session -ScriptBlock {Get-Item -Path ("C:\ProgramData\{0}" -f $($args[0])) -ErrorAction SilentlyContinue} -ArgumentList $Session.ComputerName
 
@@ -172,8 +136,7 @@ process{
            
     foreach ($Artifact in $SystemArtifacts){
 
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("& 'C:\ProgramData\{0}' fs --accessor ntfs cp \\.\{1} C:\ProgramData\{2}") -f ((Split-Path $Velo_exe -Leaf), $Artifact, $Session.ComputerName))
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock -ErrorAction SilentlyContinue  | Out-Null
+        Copy-PRItem -Session $Session -Path $SystemArtifacts -Destination ('C:\ProgramData\{0}' -f $Session.ComputerName)
     }
 
     # Compress artifacts directory      
@@ -194,13 +157,6 @@ process{
     if (!$7zFlag){
 
         $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Installexe -Leaf))
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
-    }
-    
-    #Delete Velociraptor if deployed by plugin
-    if (!$VeloFlag){
-
-        $ScriptBlock = $ExecutionContext.InvokeCommand.NewScriptBlock(("Remove-Item -Force -Recurse -Path C:\ProgramData\{0}") -f (Split-Path $Velo_exe -Leaf))
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Out-Null
     }
     
