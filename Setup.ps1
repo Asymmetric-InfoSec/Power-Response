@@ -20,9 +20,9 @@
     Date Created: 4/22/2019
     Twitter: @5ynax
     
-    Last Modified By: Gavin Prentice
-    Last Modified Date: 6/5/2019
-    Twitter: @valrkey
+    Last Modified By: Drew Schmitt
+    Last Modified Date: 9/30/2019
+    Twitter: @5ynax
   
 #>
 [CmdletBinding()]
@@ -114,18 +114,6 @@ process{
         @{
 
             Name = "7za"; URL = 'https://www.7-zip.org/a/7z1900-extra.7z'; Rename = ''; Type = '7za'
-
-            },
-
-        @{
-
-            Name = "Velociraptor_x86"; URL = 'https://github.com/Velocidex/velociraptor/releases/download/0.2.9/velociraptor-v0.2.9-windows-4.0-386.exe'; Rename = 'velociraptor_x86.exe'; Type = 'binary'
-
-            },
-
-        @{
-
-            Name = "Velociraptor_x64"; URL = 'https://github.com/Velocidex/velociraptor/releases/download/0.2.9/velociraptor-v0.2.9-windows-4.0-amd64.exe'; Rename = 'velociraptor_x64.exe'; Type = 'binary'
 
             },
 
