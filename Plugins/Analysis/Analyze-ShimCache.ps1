@@ -126,7 +126,7 @@ process{
 
                 if (!(Test-Path $ShimDataExtracted)){
 
-                    $Command = ("& '{0}\{1}' x '{2}\{4}_RegistryHives.zip' -o{2}\") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShimDataPath,$AnalysisDate,$Machine
+                    $Command = ("& '{0}\{1}' x '{2}\{3}_RegistryHives.zip' -o{2}\") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShimDataPath,$Machine
 
                     Invoke-Expression -Command $Command | Out-Null 
                 }

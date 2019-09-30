@@ -145,7 +145,7 @@ process {
 
             $Artifact = ('{0}\{1}' -f $User,$UserArtifact)
 
-            Copy-PRItem -Session $Session -Path $Artifact -Destination ("C:\ProgramData\{0}" -f $Session.ComputerName)
+            Copy-PRItem -Session $Session -Path $Artifact -Destination ("C:\ProgramData\Power-Response")
         }
     }
         
