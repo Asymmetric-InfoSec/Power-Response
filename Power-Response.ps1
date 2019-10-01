@@ -411,48 +411,6 @@ function Get-Config {
     }
 }
 
-function Get-Menu {
-    param (
-        [String]$Title,
-        [String[]]$Choice,
-        [Switch]$Back
-    )
-
-    process {
-        # Add the 'Back' option to $Choice
-        if ($Back) {
-            [String[]]$Choice = @('..') + $Choice | Where-Object { $PSItem }
-        }
-
-        # Loop until $UserInput exists and is 0 <= $UserInput <= $Choice.Length-1
-        do {
-            # Print Title
-            Write-Host ("`n  {0}:" -f $Title)
-
-            # Loop through the $Choice array and print off each line
-            for ($i=0; $i -lt $Choice.Length; $i++) {
-                # Line format: [#] - $Choice[#]
-                $Line = '[{0}] - {1}' -f $i,$Choice[$i]
-
-                Write-Host $Line
-            }
-
-            # Write an extra line for formatting
-            Write-Host ''
-
-            # Get $UserInput
-            $UserInput = Read-PRHost
-
-            # Try to interpret the $UserInput as a command
-            if ($UserInput) {
-                Invoke-PRCommand -UserInput $UserInput | Out-Default
-            }
-        } while (!$UserInput -or (0..($Choice.Length-1)) -NotContains $UserInput)
-
-        return $Choice[$UserInput]
-    }
-}
-
 function Get-PRPath {
     [CmdletBinding(DefaultParameterSetName='Output-Specific')]
     param (
@@ -1372,6 +1330,29 @@ function Read-PRHost {
     }
 }
 
+function Write-PRContext {
+    param (
+        [String[]]$Choice
+    )
+
+    process {
+        # Compute $Title - Power-Response\CurrentPath
+        $Title = $global:PowerResponse.Location.FullName -Replace $global:PowerResponse.Regex.Plugins
+
+        # Print Title
+        $Lines = @("`n  {0}:" -f $Title)
+
+        # Add each $Choice to the $Lines list
+        0..($Choice.Length-1) | Foreach-Object { $Lines += '[{0}] - {1}' -f $PSItem,$Choice[$PSItem] }
+
+        # Extra blank line
+        $Lines += ''
+
+        # Write the $Lines to the screen
+        Write-Host -Object ($Lines -Join "`n")
+    }
+}
+
 function Write-PRLog {
     param (
         [Parameter(Mandatory=$true)]
@@ -1521,45 +1502,44 @@ if ($ENV:UserName -ne $global:PowerResponse.Config.AdminUserName -and $Credentia
 # Trap 'exit's and Ctrl-C interrupts
 try {
     # Loop through searching for a script file and setting parameters
-    do {
-        # While the $global:PowerResponse.Location is a directory
-        while ($global:PowerResponse.Location.PSIsContainer) {
-            # Compute $Title - Power-Response\CurrentPath
-            $Title = $global:PowerResponse.Location.FullName -Replace $global:PowerResponse.Regex.Plugins
+    do {        
+        # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
+        $Choice = Get-ChildItem -Path $global:PowerResponse.Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property 'PSIsContainer','Name' | Select-Object -ExpandProperty 'Name'
 
-            # Compute $Choice - directories starting with alphanumeric character | files ending in .ps1
-            $Choice = Get-ChildItem -Path $global:PowerResponse.Location.FullName | Where-Object { ($PSItem.PSIsContainer -and ($PSItem.Name -Match '^[A-Za-z0-9]')) -or (!$PSItem.PSIsContainer -and ($PSItem.Name -Match '\.ps1$')) } | Sort-Object -Property 'PSIsContainer','Name'
+        # If we don't have a single $Choice which is our location name, print context
+        if ($Choice -ne $global:PowerResponse.Location.Name) {
+            # Add the 'Back' option to $Choice
+            if ($Plugins.FullName -NotMatch [Regex]::Escape($global:PowerResponse.Location.FullName)) {
+                [String[]]$Choice = @('..') + $Choice | Where-Object { $PSItem }
+            }
 
-            #Compute $Back - ensure we are not at the $Plugins directory
-            $Back = $Plugins.FullName -NotMatch [Regex]::Escape($global:PowerResponse.Location.FullName)
+            # Write context to the screen, showing the back option if anywhere but the $Plugins directory
+            Write-PRContext -Choice $Choice
+        }
 
-            # Get the next directory selection from the user, showing the back option if anywhere but the $Plugins directory
-            $Selection = Get-Menu -Title $Title -Choice $Choice -Back:$Back
+        # Get $UserInput
+        $UserInput = (Read-PRHost).Trim()
 
-            # Get the selected $global:PowerResponse.Location item
+        # Interpret $UserInput as a location move, or power-response command
+        if (!$global:PowerResponse.Location.PSIsContainer -and $UserInput -and (0..($Choice.Length-1)) -Contains $UserInput) {
             try {
-                $global:PowerResponse.Location = Get-Item (('{0}\{1}' -f $global:PowerResponse.Location.FullName,$Selection) -Replace '\\$')
+                # Get the selected $global:PowerResponse.Location item
+                $global:PowerResponse.Location = Get-Item -Path (Join-Path -Path $global:PowerResponse.Location.FullName -ChildPath $Choice[$UserInput])
             } catch {
                 Write-Warning 'Something went wrong, please try again'
             }
-        }
 
-        # Format all the $global:PowerResponse.Parameters to form to the selected $global:PowerResponse.Location
-        Format-Parameter
+            if (!$global:PowerResponse.Location.PSIsContainer) {
+                # Format all the $global:PowerResponse.Parameters to form to the selected $global:PowerResponse.Location
+                Format-Parameter
 
-        # Show all of the $global:PowerResponse.Parameters relevent to the selected $CommandParameters
-        Invoke-ShowCommand
-
-        # Until the $global:PowerResponse.Location is no longer a file, interpret $UserInput as commands
-        do {
-            # Get $UserInput
-            $UserInput = (Read-PRHost).Trim()
-
-            # Interpret $UserInput as a command and pass the $global:PowerResponse.Location
-            if ($UserInput) {
-                Invoke-PRCommand -UserInput $UserInput | Out-Default
+                # Show all of the $global:PowerResponse.Parameters relevent to the selected $CommandParameters
+                Invoke-ShowCommand
             }
-        } while (!$global:PowerResponse.Location.PSIsContainer)
+        } else {
+            # Run the input as a command
+            Invoke-PRCommand -UserInput $UserInput | Out-Default
+        }
     } while ($True)
 } finally {
     # Write a log to indicate framework exit
