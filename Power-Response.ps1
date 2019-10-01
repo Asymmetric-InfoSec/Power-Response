@@ -1521,7 +1521,7 @@ try {
         $UserInput = (Read-PRHost).Trim()
 
         # Interpret $UserInput as a location move, or power-response command
-        if (!$global:PowerResponse.Location.PSIsContainer -and $UserInput -and (0..($Choice.Length-1)) -Contains $UserInput) {
+        if ($global:PowerResponse.Location.PSIsContainer -and $UserInput -and (0..($Choice.Length-1)) -Contains $UserInput) {
             try {
                 # Get the selected $global:PowerResponse.Location item
                 $global:PowerResponse.Location = Get-Item -Path (Join-Path -Path $global:PowerResponse.Location.FullName -ChildPath $Choice[$UserInput])
