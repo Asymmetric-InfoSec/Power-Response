@@ -979,7 +979,9 @@ function Invoke-PRPlugin {
         [System.Management.Automation.Runspaces.PSSession[]]$Session,
 
         [Alias('ScopeName')]
-        [String]$HuntName
+        [String]$HuntName,
+
+        [Switch]$NoAnalyze
     )
 
     begin {
@@ -1197,7 +1199,7 @@ function Invoke-PRPlugin {
         $AnalysisPath = '{0}\Analysis\{1}' -f (Get-PRPath -Plugins),($Path -Replace '.+-','Analyze-')
 
         # If auto execution of analysis plugins is set and we have a valid $AnalysisPath
-        if ($global:PowerResponse.Config.AutoAnalyze -and $AnalysisPath -ne $Path -and (Test-Path -Path $AnalysisPath)) {
+        if ($global:PowerResponse.Config.AutoAnalyze -and !$NoAnalyze -and $AnalysisPath -ne $Path -and (Test-Path -Path $AnalysisPath)) {
             Write-Host -Object ('Detected Analysis Plugin {0}' -f (Get-Item -Path $AnalysisPath).BaseName.ToUpper())
 
             # Invoke the $AnalysisPath plugin
