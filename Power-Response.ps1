@@ -1493,12 +1493,6 @@ if ('UserInput' -as [Type] -ne $null) {
     }
 }
 
-# Save the execution location
-$SavedLocation = Get-Location
-
-# Set the location to Bin folder to allow easy asset access
-Set-Location -Path (Get-PRPath -Bin)
-
 # Get the $Plugins directory item
 $Plugins = Get-Item -Path (Get-PRPath -Plugins)
 
@@ -1568,9 +1562,6 @@ try {
         } while (!$global:PowerResponse.Location.PSIsContainer)
     } while ($True)
 } finally {
-    # Set location back to original $SavedLocation
-    Set-Location -Path $SavedLocation
-
     # Write a log to indicate framework exit
     Write-PRLog -Message 'Exited the Power-Response framework'
 
