@@ -6,6 +6,7 @@
     ####   HashAlgorithm - Hash algorithm to use for file integrity log (defaults to SHA256)
     ####   OutputType - Default output type for plugins (defaults to CSV,XLSX)
     ####   PromptText - Text to show with your prompt (defaults to power-response)
+    ####   RemoteStageDirectory - Stage directory for any executables and file copies (defaults to C:\ProgramData\Power-Response)
     ####   ThrottleLimit - Maximum number of concurrent connections (defaults to 32)
     # AdminUserName = $ENV:UserName
     # AutoAnalyze = $true
@@ -13,6 +14,7 @@
     # HashAlgorithm = 'SHA256'
     # OutputType = 'CSV','XLSX'
     # PromptText = 'power-response'
+    # RemoteStagingDirectory = 'C:\ProgramData\Power-Response'
     # ThrottleLimit = 32
     # --------- End General Section ----------
 

@@ -339,8 +339,7 @@ function Get-CommandParameter {
 
 function Get-Config {
     param (
-        [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot),
-        [String[]]$RootKeys
+        [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot)
     )
 
     process {
@@ -352,6 +351,7 @@ function Get-Config {
             HashAlgorithm = 'SHA256'
             OutputType = @('CSV','XLSX')
             PromptText = 'power-response'
+            RemoteStagePath = 'C:\ProgramData\Power-Response'
             ThrottleLimit = 32
 
             # C:\Path\To\Power-Response\{FolderName}
@@ -491,13 +491,12 @@ function Get-PRPlugin {
 
 function Import-Config {
     param (
-        [String]$Path,
-        [String[]]$RootKeys
+        [String]$Path
     )
 
     begin {
         # List out required values to check for
-        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','HashAlgorithm','OutputType','Path','PromptText','PSSession','ThrottleLimit')
+        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','HashAlgorithm','OutputType','Path','PromptText','PSSession','RemoteStagePath','ThrottleLimit')
         $PathRequiredValues = @('Bin','Logs','Output','Plugins')
         $PSSessionRequiredValues = @('NoMachineProfile')
     }
@@ -1452,7 +1451,7 @@ Write-Host -Object $Banner
 $global:PowerResponse = @{}
 
 # Import $global:PowerResponse.Config from data file
-Import-Config -Path $ConfigPath -RootKeys @('AdminUserName','AutoAnalyze','AutoClear','ExcelName','HashAlgorithm','OutputType','PromptText','ThrottleLimit','Path','PSSession')
+Import-Config -Path $ConfigPath
 
 # Write a log to indicate framework startup
 Write-PRLog -Message 'Began the Power-Response framework'
