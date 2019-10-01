@@ -297,10 +297,7 @@ function Format-Parameter {
                 }
 
                 # Write an appropriate $Warning
-                Write-Warning -Message $Warning
-
-                # Write an appropriate log
-                Write-Log -Message $Warning
+                Write-PRWarning -Message $Warning
 
                 # Remove the $CommandParam key from $global:PowerResponse.Parameters
                 $null = $global:PowerResponse.Parameters.Remove($CommandParam)
@@ -324,10 +321,7 @@ function Get-CommandParameter {
             $Message = 'Malformed plugin selected: {0}' -f $PSItem
 
             # Write error $Message
-            Write-Warning -Message $Message
-
-            # Write log $Message
-            Write-Log -Message $Message
+            Write-PRWarning -Message $Message
 
             # If the failure occurred getting the Location's parameters, move back to avoid repeat errors
             if ($Path -eq $global:PowerResponse.Location.FullName) {
@@ -687,7 +681,7 @@ function Invoke-RemoveCommand {
             $null = $Arguments | Foreach-Object { $global:PowerResponse.Parameters.Remove($PSItem) }
 
             # Write parameter removal log
-            Write-Log ('Removed Parameter(s): ''{0}''' -f ($Arguments -Join ''', '''))
+            Write-PRLog ('Removed Parameter(s): ''{0}''' -f ($Arguments -Join ''', '''))
         }
 
         # If ComputerName parameter got removed
@@ -740,19 +734,13 @@ function Invoke-RunCommand {
                     $Message = 'Unable to connect to computer: {0}' -f $ComputerName
 
                     # Write $Message to host
-                    Write-Host -Object $Message
-
-                    # Write log $Message
-                    Write-Log -Message $Message
+                    Write-PRHost -Message $Message
                 } catch {
                     # Format warning $Message
                     $Message = 'Error creating Session: {0}' -f $PSItem
 
                     # Write warning $Message
-                    Write-Warning -Message ("{0}`n`tSkipping plugin execution" -f $Message)
-
-                    # Write log $Message
-                    Write-Log -Message $Message
+                    Write-PRWarning -Message ("{0}`n`tSkipping plugin execution" -f $Message)
 
                     return
                 }
@@ -762,31 +750,21 @@ function Invoke-RunCommand {
             $Message = 'Plugin Execution Started at {0}' -f (Get-Date)
 
             # Write execution to host
-            Write-Host -Object $Message
-
-            # Write execution log
-            Write-Log -Message $Message
-
-            # Invoke the PR Plugin
+            Write-PRHost -Message $Message
 
             try {
-
+                # Invoke the PR Plugin
                 Invoke-PRPlugin -Path $global:PowerResponse.Location -Session $Session
 
             } catch {
-                    
-                    # Format warning $Message
-                    $Message = 'Error Invoking Plugin: Session, privilege, or availability error cccurred'
+                # Format warning $Message
+                $Message = 'Error Invoking Plugin: Session, privilege, or availability error cccurred'
 
-                    # Write warning $Message
-                    Write-Warning -Message ("{0}`n`tSkipping plugin execution" -f $Message)
+                # Write warning $Message
+                Write-Warning -Message $Message -Append "`n`tSkipping plugin execution"
 
-                    # Write log $Message
-                    Write-Log -Message $Message
-
-                    return
+                return
             }
-            
 
             # Protect any files that were copied to this particular $global:PowerResponse.OutputPath
             Protect-PRFile
@@ -838,7 +816,7 @@ function Invoke-SetCommand {
         }
 
         # Write a set parameter log
-        Write-Log -Message ('Set Parameter: ''{0}'' = ''{1}''' -f $Arguments[0], $global:PowerResponse.Parameters.($Arguments[0]))
+        Write-PRLog -Message ('Set Parameter: ''{0}'' = ''{1}''' -f $Arguments[0], $global:PowerResponse.Parameters.($Arguments[0]))
 
         # If we have a file $global:PowerResponse.Location, format the $global:PowerResponse.Parameters
         if (!$global:PowerResponse.Location.PSIsContainer) {
@@ -997,10 +975,7 @@ function Invoke-PRPlugin {
             $Message = 'Empty or invalid plugin identifier passed: {0}' -f (@($PSBoundParameters.Name,$PSBoundParameters.Path) -Join '')
 
             # Write error $Message
-            Write-Warning -Message $Message
-
-            # Write log $Message
-            Write-Log -Message $Message
+            Write-PRWarning -Message $Message
 
             return
         }
@@ -1048,10 +1023,7 @@ function Invoke-PRPlugin {
                 $Message = 'Plugin {0} Job Creation Error: {1}' -f $Item.BaseName.ToUpper(),$PSItem
 
                 # Write warning $Message
-                Write-Warning -Message $Message
-
-                # Write log $Message
-                Write-Log -Message $Message
+                Write-PRWarning -Message $Message
             }
 
             # If we successfully created the $Job
@@ -1080,10 +1052,7 @@ function Invoke-PRPlugin {
                     $Message = 'Plugin {0} Execution Succeeded for {1} at {2}' -f $Item.BaseName.ToUpper(),$Result.Name,(Get-Date)
 
                     # Write host $Message
-                    Write-Host -Object $Message
-
-                    # Write log $Message
-                    Write-Log -Message $Message
+                    Write-PRHost -Message $Message
                 }
 
                 # Gather the $RemoteError
@@ -1094,10 +1063,7 @@ function Invoke-PRPlugin {
                     $Message = 'Plugin {0} Execution Error for {1}: {2}' -f $Item.BaseName.ToUpper(),$RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
 
                     # Write warning $Message
-                    Write-Warning -Message $Message
-
-                    # Write log $Message
-                    Write-Log -Message $Message
+                    Write-PRWarning -Message $Message
                 }
 
                 # Remove the $Job
@@ -1138,20 +1104,14 @@ function Invoke-PRPlugin {
                         $Message = 'Plugin {0} Execution Succeeded for {1}' -f $Item.BaseName.ToUpper(),$Result.Name
 
                         # Write host $Message
-                        Write-Host -Object $Message
-
-                        # Write log $Message
-                        Write-Log -Message $Message
+                        Write-PRHost -Message $Message
                     }
                 } catch {
                     # Format warning $Message
                     $Message = 'Plugin {0} Execution Error: {1}' -f $Item.BaseName.ToUpper(),$PSItem
 
                     # Write warning $Message to screen along with some admin advice
-                    Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
-
-                    # Write execution $Message to log
-                    Write-Log -Message $Message
+                    Write-PRWarning -Message $Message -Append "`nAre you running as admin?"
                 }
 
             } else {
@@ -1178,17 +1138,14 @@ function Invoke-PRPlugin {
                         $Message = 'Plugin {0} Execution Succeeded for {1} at {2}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$SessionInstance.ComputerName, (Get-Date)
 
                         # Write execution success message
-                        Write-Host -Object $Message
+                        Write-PRHost -Message $Message
                     } catch {
                         # Format warning $Message
                         $Message = 'Plugin {0} Execution Error for {1}: {2}' -f $Item.BaseName.ToUpper(),$SessionInstance.ComputerName,$PSItem
 
                         # Write warning $Message to screen along with some admin advice
-                        Write-Warning -Message ("{0}`nAre you running as admin?" -f $Message)
+                        Write-PRWarning -Message $Message -Append "`nAre you running as admin?"
                     }
-
-                    # Write execution $Message to log
-                    Write-Log -Message $Message
                 }
             }
         }
@@ -1358,10 +1315,7 @@ function Out-PRFile {
             $Message = '{0} output export error: {1}' -f $FilePath,$PSItem
 
             # Write output object export warning
-            Write-Warning -Message $Message
-
-            # Write output object export error log
-            Write-Log -Message $Message
+            Write-PRWarning -Message $Message
 
             # Remove the created $Path file
             Remove-Item -Force -Path $FilePath
@@ -1392,17 +1346,14 @@ function Protect-PRFile {
                     $Message = 'Protected file: ''{0}'' with {1} hash: ''{2}''' -f ($PSItem.Path -Replace $global:PowerResponse.Regex.Output), $PSItem.Algorithm, $PSItem.Hash
 
                     # Write protection and integrity log
-                    Write-Log -Message $Message
+                    Write-PRLog -Message $Message
                 }
             } catch {
                 # Format the warning $Message
                 $Message = 'Encountered error protecting file ''{0}'': {1}' -f $File,$PSItem
 
                 # Print the warning $Message
-                Write-Warning -Message $Message
-
-                # Write the log $Message
-                Write-Log -Message $Message
+                Write-PRWarning -Message $Message
             }
         }
     }
@@ -1421,7 +1372,7 @@ function Read-PRHost {
     }
 }
 
-function Write-Log {
+function Write-PRLog {
     param (
         [Parameter(Mandatory=$true)]
         [String]$Message
@@ -1453,6 +1404,57 @@ function Write-Log {
     }
 }
 
+function Write-PRError {
+    param (
+        [Parameter(Mandatory=$true)]
+        [String]$Message,
+        [String]$Prepend,
+        [String]$Append
+    )
+
+    process {
+        # Print error message to screen
+        Write-Error -Message ($Prepend + $Message + $Append) -ErrorAction 'Continue'
+
+        # Write message to log
+        Write-PRLog -Message $Message
+    }
+}
+
+function Write-PRHost {
+    param (
+        [Parameter(Mandatory=$true)]
+        [String]$Message,
+        [String]$Prepend,
+        [String]$Append
+    )
+
+    process {
+        # Print message to screen
+        Write-Host -Object ($Prepend + $Message + $Append)
+
+        # Write message to log
+        Write-PRLog -Message $Message
+    }
+}
+
+function Write-PRWarning {
+    param (
+        [Parameter(Mandatory=$true)]
+        [String]$Message,
+        [String]$Prepend,
+        [String]$Append
+    )
+
+    process {
+        # Print warning message to screen
+        Write-Warning -Message ($Prepend + $Message + $Append)
+
+        # Write message to log
+        Write-PRLog -Message $Message
+    }
+}
+
 # $Banner for Power-Response
 $Banner = @'
     ____                                ____
@@ -1463,7 +1465,7 @@ $Banner = @'
                                                    /_/
 '@
 
-Write-Host $Banner
+Write-Host -Object $Banner
 
 # Initialize $global:PowerResponse hashtable
 $global:PowerResponse = @{}
@@ -1472,12 +1474,12 @@ $global:PowerResponse = @{}
 Import-Config -Path $ConfigPath -RootKeys @('AdminUserName','AutoAnalyze','AutoClear','ExcelName','HashAlgorithm','OutputType','PromptText','ThrottleLimit','Path','PSSession')
 
 # Write a log to indicate framework startup
-Write-Log -Message 'Began the Power-Response framework'
+Write-PRLog -Message 'Began the Power-Response framework'
 
 # UserInput class is designed to separate user input strings to successfully casted string type parameters
 # Essentially acts like a string for our purposes
 if ('UserInput' -as [Type] -ne $null) {
-    Write-Log -Message 'Creating UserInput class'
+    Write-PRLog -Message 'Creating UserInput class'
     class UserInput {
         [String]$Value
 
@@ -1570,7 +1572,7 @@ try {
     Set-Location -Path $SavedLocation
 
     # Write a log to indicate framework exit
-    Write-Log -Message 'Exited the Power-Response framework'
+    Write-PRLog -Message 'Exited the Power-Response framework'
 
     # Remove $global:PowerResponse hashtable
     Remove-Variable -Name 'PowerResponse' -Scope 'global'

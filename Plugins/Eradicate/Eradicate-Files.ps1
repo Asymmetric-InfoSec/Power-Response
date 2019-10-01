@@ -74,7 +74,6 @@ process{
 
     foreach ($Message in $Messages){
 
-        Write-Warning "$Message"
-        Write-Log "$Message"
+        Write-PRWarning -Message $Message
     }  
 }
