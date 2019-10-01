@@ -19,7 +19,10 @@ function Copy-PRItem {
         [String[]]$Path,
 
         [Parameter(Position=2,Mandatory=$true)]
-        [String]$Destination
+        [String]$Destination,
+
+        [Parameter(Position=3)]
+        [String]$Algorithm = $global:PowerResponse.Config.HashAlgorithm
     )
 
     begin {
@@ -30,7 +33,10 @@ function Copy-PRItem {
                 [String[]]$Path,
 
                 [Parameter(Position=1,Mandatory=$true)]
-                [String]$Destination
+                [String]$Destination,
+
+                [Parameter(Position=2,Mandatory=$true)]
+                [String]$Algorithm
             )
 
             begin {
@@ -40,7 +46,8 @@ function Copy-PRItem {
                     param (
                         [String]$Path,
                         [String]$Destination,
-                        [String]$Hash
+                        [String]$Hash,
+                        [String]$Algorithm
                     )
 
                     process {
@@ -49,10 +56,11 @@ function Copy-PRItem {
 
                         # Select the relevent metadata
                         if ($Item -ne $null) {
-                            $MetaData = $Item | Select-Object @{Name='Item'; Expression={$PSItem.Name}},'Directory','CreationTimeUtc',@{Name='ModifiedTimeUtc'; Expression={$PSItem.LastWriteTimeUTC}},@{Name='AccessTimeUtc'; Expression={$PSItem.LastAccessTimeUTC}},@{Name='MD5'; Expression={$Hash}}
+                            $MetaData = $Item | Select-Object @{Name='Item'; Expression={$PSItem.Name}},'Directory','CreationTimeUtc',@{Name='ModifiedTimeUtc'; Expression={$PSItem.LastWriteTimeUTC}},@{Name='AccessTimeUtc'; Expression={$PSItem.LastAccessTimeUTC}},@{Name=$Algorithm; Expression={$Hash}}
                         } else {
-                            $MetaData = '' | Select-Object @{Name='Item'; Expression={Split-Path -Leaf -Path $Path}},@{Name='Directory'; Expression={Split-Path -Parent -Path $Path}},'CreationTimeUtc','ModifiedTimeUtc','AccessTimeUtc',@{Name='MD5'; Expression={$Hash}}
+                            $MetaData = '' | Select-Object @{Name='Item'; Expression={Split-Path -Leaf -Path $Path}},@{Name='Directory'; Expression={Split-Path -Parent -Path $Path}},'CreationTimeUtc','ModifiedTimeUtc','AccessTimeUtc',@{Name=$Algorithm; Expression={$Hash}}
                         }
+
                         # Build destination csv
                         $DestinationCsv = Join-Path -Path $Destination -ChildPath 'CopyItems_Metadata.csv'
 
@@ -114,9 +122,6 @@ function Copy-PRItem {
                     Encoding = 'Byte'
                     Force = $true
                 }
-
-                # MD5 hash generator
-                $MD5Generator = [System.Security.Cryptography.HashAlgorithm]::Create('MD5')
 
                 ### Ensure destination folder exists
                 # Create $Destination directory if it doesn't exist
@@ -186,10 +191,10 @@ function Copy-PRItem {
                         [IO.File]::WriteAllBytes($Location, $Bytes)
 
                         # Compute the hash of bytes
-                        $Hash = ($MD5Generator.ComputeHash($Bytes) | Foreach-Object { $PSItem.ToString('X2') }) -Join ''
+                        $Hash = Get-FileHash -Algorithm $Algorithm -Path $Location | Select-Object -ExpandProperty 'Hash'
 
                         # Add to the meta data file
-                        AddMetaData -Path $GetContent.Path -Destination $Destination -Hash $Hash
+                        AddMetaData -Path $GetContent.Path -Destination $Destination -Hash $Hash -Algorithm $Algorithm
                     }
                 }
             }
@@ -199,7 +204,7 @@ function Copy-PRItem {
     process {
         try {
             # Invoke CopyFile on sessions
-            Invoke-Command -ScriptBlock $function:CopyItem -Session $Session -ArgumentList @($Path),$Destination
+            Invoke-Command -ScriptBlock $function:CopyItem -Session $Session -ArgumentList @($Path),$Destination,$Algorithm
         } catch {
             # Caught error
             Write-Error -Message "Invoke command error: $PSItem" -ErrorAction 'Continue'
