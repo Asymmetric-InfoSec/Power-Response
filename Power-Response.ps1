@@ -337,78 +337,29 @@ function Get-CommandParameter {
     }
 }
 
-function Get-Config {
+function Get-PRConfig {
     param (
-        [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot)
+        [String]$Key,
+        [String]$Subkey
     )
 
     process {
-        # Default 'Config' values
-        $Default = @{
-            AdminUserName = $ENV:UserName
-            AutoAnalyze = $true
-            AutoClear = $true
-            EncryptPassword = 'infected'
-            HashAlgorithm = 'SHA256'
-            OutputType = @('CSV','XLSX')
-            PromptText = 'power-response'
-            RemoteStagePath = 'C:\ProgramData\Power-Response'
-            ThrottleLimit = 32
+        # Build the $Command
+        $Command = @('$global:PowerResponse.Config',$Key,$Subkey) -join '.' -Replace '\.+$'
 
-            # C:\Path\To\Power-Response\{FolderName}
-            Path = @{
-               Bin = '{0}\Bin' -f $PSScriptRoot
-               Logs = '{0}\Logs' -f $PSScriptRoot
-               Output = '{0}\Output' -f $PSScriptRoot
-               Plugins = '{0}\Plugins' -f $PSScriptRoot
-            }
-
-            # PSSession options
-            PSSession = @{
-                NoMachineProfile = $true
-            }
-        }
-
-        # Try to import the data, on failure set to default
         try {
-            # If the Config file $Path does not exist, throw an error to skip to catch block
-            if (!(Test-Path $Path)) {
-                throw 'Path does not exist'
-            }
-
-            # Get the Config file at $Path
-            $File = Get-Item -Path $Path
-
-            # Import the Config data file and bind it to the $Config variable
-            Import-LocalizedData -BindingVariable 'Config' -BaseDirectory $File.PSParentPath -FileName $File.Name
+            # Invoke the expression to get the Config value
+            $Value = Invoke-Expression -Command $Command -ErrorAction 'Stop'
         } catch {
-            # Either intentionally threw an error on file absense, or Import-LocalizedData failed
-            Write-Verbose ('Unable to import config on ''Path'': ''{0}''' -f $Path)
-            $Config = $Default
+            # Format $Message
+            $Message = 'Unknown Config value {0}' -f (@($Key,$Subkey) -join '.' -Replace '\.+$')
+
+            # Write warning
+            Write-PRWarning -Message $Message
         }
 
-        # Check for unexpected values in Config file
-        if ($RootKeys) {
-            # Iterate through Config.Keys and keep any values not contained in expected $RootKeys
-            $UnexpectedRootKeys = $Config.Keys | Where-Object { $RootKeys -NotContains $PSItem }
-
-            # If we found unexpected keys, print a warning message
-            if ($UnexpectedRootKeys) {
-                Write-Warning ('Discovered unexpected keys in config file ''{0}'':' -f $Path)
-                Write-Warning ('    ''{0}''' -f ($UnexpectedRootKeys -Join ''', '''))
-                Write-Warning  'Removing these values from the Config hashtable'
-
-                # Remove any detected unexpected keys from $Config
-                $null = $UnexpectedRootKeys | % { $Config.Remove($PSItem) }
-            }
-        }
-
-        # If no value is provided in the config file, set the default values
-        $Default.Keys | Where-Object { $Config.Keys -NotContains $PSItem } | Foreach-Object { $Config.$PSItem = $Default.$PSItem }
-        $Default.Path.Keys | Where-Object { $Config.Path.Keys -NotContains $PSItem } | Foreach-Object { $Config.Path.$PSItem = $Default.Path.$PSItem }
-        $Default.PSSession.Keys | Where-Object { $Config.PSSession.Keys -NotContains $PSItem } | Foreach-Object { $Config.PSSession.$PSItem = $Default.PSSession.$PSItem }
-
-        return $Config
+        # Return the Config hashtable
+        return $Value
     }
 }
 
@@ -492,7 +443,7 @@ function Get-PRPlugin {
 
 function Import-Config {
     param (
-        [String]$Path
+        [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot)
     )
 
     begin {
@@ -503,18 +454,66 @@ function Import-Config {
     }
 
     process {
-        # Pull the config information from the provided $Path
-        $Config = Get-Config @PSBoundParameters
+        # Default 'Config' values
+        $Default = @{
+            AdminUserName = $ENV:UserName
+            AutoAnalyze = $true
+            AutoClear = $true
+            EncryptPassword = 'infected'
+            HashAlgorithm = 'SHA256'
+            OutputType = @('CSV','XLSX')
+            PromptText = 'power-response'
+            RemoteStagePath = 'C:\ProgramData\Power-Response'
+            ThrottleLimit = 32
+
+            # C:\Path\To\Power-Response\{FolderName}
+            Path = @{
+               Bin = '{0}\Bin' -f $PSScriptRoot
+               Logs = '{0}\Logs' -f $PSScriptRoot
+               Output = '{0}\Output' -f $PSScriptRoot
+               Plugins = '{0}\Plugins' -f $PSScriptRoot
+            }
+
+            # PSSession options
+            PSSession = @{
+                NoMachineProfile = $true
+            }
+        }
+
+        # Try to import the data, on failure set to default
+        try {
+            # If the Config file $Path does not exist, throw an error to skip to catch block
+            if (!(Test-Path $Path)) {
+                throw 'Path does not exist'
+            }
+
+            # Get the Config file at $Path
+            $File = Get-Item -Path $Path
+
+            # Import the Config data file and bind it to the $Config variable
+            Import-LocalizedData -BindingVariable 'Config' -BaseDirectory $File.PSParentPath -FileName $File.Name
+        } catch {
+            # Either intentionally threw an error on file absense, or Import-LocalizedData failed
+            Write-Verbose ('Unable to import config on ''Path'': ''{0}''' -f $Path)
+            $Config = $Default
+        }
+
+        # If no value is provided in the config file, set the default values
+        $Default.Keys | Where-Object { $Config.Keys -NotContains $PSItem } | Foreach-Object { $Config.$PSItem = $Default.$PSItem }
+        $Default.Path.Keys | Where-Object { $Config.Path.Keys -NotContains $PSItem } | Foreach-Object { $Config.Path.$PSItem = $Default.Path.$PSItem }
+        $Default.PSSession.Keys | Where-Object { $Config.PSSession.Keys -NotContains $PSItem } | Foreach-Object { $Config.PSSession.$PSItem = $Default.PSSession.$PSItem }
 
         # Check for required $Config value existence (sanity check - should never fail with default values)
         [String[]]$TopMissing = $TopRequiredValues | Where-Object { $Config.Keys -NotContains $PSItem -or !$Config.$PSItem -eq $null }
         [String[]]$PathMissing = $PathRequiredValues | Where-Object { $Config.Path.Keys -NotContains $PSItem -or !$Config.Path.$PSItem -eq $null }
         [String[]]$PSSessionMissing = $PSSessionRequiredValues | Where-Object { $Config.PSSession.Keys -NotContains $PSItem -or !$Config.PSSession.$PSItem -eq $null }
 
+        # Throw error for missing config values after default values have been processed
         if ($TopMissing + $PathMissing + $PSSessionMissing) {
             throw ('Missing required configuration value: {0}' -f ($TopMissing + ($PathMissing | Foreach-Object { 'Path.{0}' -f $PSItem }) + ($PSSessionMissing | Foreach-Object { 'PSSession.{0}' -f $PSItem })))
         }
 
+        # Set global config object
         $global:PowerResponse.Config = $Config
 
         # Loop through $DirPath
