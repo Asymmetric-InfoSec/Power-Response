@@ -348,6 +348,7 @@ function Get-Config {
             AdminUserName = $ENV:UserName
             AutoAnalyze = $true
             AutoClear = $true
+            EncryptPassword = 'infected'
             HashAlgorithm = 'SHA256'
             OutputType = @('CSV','XLSX')
             PromptText = 'power-response'
@@ -496,7 +497,7 @@ function Import-Config {
 
     begin {
         # List out required values to check for
-        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','HashAlgorithm','OutputType','Path','PromptText','PSSession','RemoteStagePath','ThrottleLimit')
+        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','EncryptPassword','HashAlgorithm','OutputType','Path','PromptText','PSSession','RemoteStagePath','ThrottleLimit')
         $PathRequiredValues = @('Bin','Logs','Output','Plugins')
         $PSSessionRequiredValues = @('NoMachineProfile')
     }
