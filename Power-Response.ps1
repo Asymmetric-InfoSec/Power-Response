@@ -1010,6 +1010,9 @@ function Invoke-PRPlugin {
 
                     # Write host $Message
                     Write-PRHost -Message $Message
+
+                    # Write host log success
+                    Write-PRPluginLog -ComputerName $Result.Name -Plugin $Item.BaseName -Success
                 }
 
                 # Gather the $RemoteError
@@ -1021,6 +1024,9 @@ function Invoke-PRPlugin {
 
                     # Write warning $Message
                     Write-PRWarning -Message $Message
+
+                    # Write host log failure
+                    Write-PRPluginLog -ComputerName $RemoteError.OriginInfo.PSComputerName -Plugin $Item.BaseName
                 }
 
                 # Remove the $Job
@@ -1062,6 +1068,9 @@ function Invoke-PRPlugin {
 
                         # Write host $Message
                         Write-PRHost -Message $Message
+
+                        # Write host log success
+                        Write-PRPluginLog -ComputerName $Result.Name -Plugin $Item.BaseName -Success
                     }
                 } catch {
                     # Format warning $Message
@@ -1069,6 +1078,9 @@ function Invoke-PRPlugin {
 
                     # Write warning $Message to screen along with some admin advice
                     Write-PRWarning -Message $Message -Append "`nAre you running as admin?"
+
+                    # Write host log success
+                    Write-PRPluginLog -ComputerName $Session.ComputerName -Plugin $Item.BaseName
                 }
 
             } else {
@@ -1096,12 +1108,18 @@ function Invoke-PRPlugin {
 
                         # Write execution success message
                         Write-PRHost -Message $Message
+
+                        # Write host log success
+                        Write-PRPluginLog -ComputerName $SessionInstance.ComputerName -Plugin $Item.BaseName -Success
                     } catch {
                         # Format warning $Message
                         $Message = 'Plugin {0} Execution Error for {1}: {2}' -f $Item.BaseName.ToUpper(),$SessionInstance.ComputerName,$PSItem
 
                         # Write warning $Message to screen along with some admin advice
                         Write-PRWarning -Message $Message -Append "`nAre you running as admin?"
+
+                        # Write host log success
+                        Write-PRPluginLog -ComputerName $SessionInstance.ComputerName -Plugin $Item.BaseName
                     }
                 }
             }
@@ -1312,6 +1330,48 @@ function Protect-PRFile {
                 # Print the warning $Message
                 Write-PRWarning -Message $Message
             }
+        }
+    }
+}
+
+function Write-PRPluginLog {
+    param (
+        [String[]]$ComputerName,
+        [String]$Plugin,
+        [Switch]$Success
+    )
+
+    process {
+        # Build $LogLine
+        $LogLine = [PSCustomObject]@{
+            Date = '{0:u}' -f (Get-Date)
+            UserName = $ENV:UserName
+            Plugin = $Plugin
+            Success = $Success
+        }
+
+        # Loop through each $Computer
+        foreach ($Computer in $ComputerName) {
+            # Get the log file name
+            $FileName = '{0}_plugin-log.csv' -f $Computer.ToLower()
+
+            # Get the log path
+            $LogPath = Join-Path -Path (Get-PRPath -Output) -ChildPath $Computer | Join-Path -ChildPath $FileName
+
+            Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $false -ErrorAction 'SilentlyContinue'
+
+            try {
+                # Write the $LogLine to $LogPath
+                $LogLine | Export-Csv -NoTypeInformation -Append -Path $LogPath -ErrorAction 'Stop'
+            } catch {
+                # Unable to write plugin log
+                $Message = 'Unable to write entry to plugin log {0}' -f $LogPath
+
+                # Write warning message
+                Write-PRWarning -Message $Message
+            }
+
+            Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $true -ErrorAction 'SilentlyContinue'
         }
     }
 }
