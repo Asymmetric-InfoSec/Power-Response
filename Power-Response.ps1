@@ -1110,7 +1110,7 @@ function Invoke-PRPlugin {
                         Write-PRHost -Message $Message
 
                         # Write host log success
-                        Write-PRPluginLog -ComputerName $SessionInstance.ComputerName -Plugin $Item.BaseName -Success:$true
+                        Write-PRPluginLog -ComputerName $SessionInstance.ComputerName -Plugin $Item.BaseName -Success
                     } catch {
                         # Format warning $Message
                         $Message = 'Plugin {0} Execution Error for {1}: {2}' -f $Item.BaseName.ToUpper(),$SessionInstance.ComputerName,$PSItem
@@ -1119,7 +1119,7 @@ function Invoke-PRPlugin {
                         Write-PRWarning -Message $Message -Append "`nAre you running as admin?"
 
                         # Write host log success
-                        Write-PRPluginLog -ComputerName $SessionInstance.ComputerName -Plugin $Item.BaseName -Success:$false
+                        Write-PRPluginLog -ComputerName $SessionInstance.ComputerName -Plugin $Item.BaseName
                     }
                 }
             }
@@ -1358,7 +1358,7 @@ function Write-PRPluginLog {
             # Get the log path
             $LogPath = Join-Path -Path (Get-PRPath -Output) -ChildPath $Computer | Join-Path -ChildPath $FileName
 
-            # Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $false -ErrorAction 'SilentlyContinue'
+            Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $false -ErrorAction 'SilentlyContinue'
 
             try {
                 # Write the $LogLine to $LogPath
@@ -1371,7 +1371,7 @@ function Write-PRPluginLog {
                 Write-PRWarning -Message $Message
             }
 
-            # Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $true -ErrorAction 'SilentlyContinue'
+            Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $true -ErrorAction 'SilentlyContinue'
         }
     }
 }
