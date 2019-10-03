@@ -339,33 +339,20 @@ function Get-CommandParameter {
 
 function Get-PRConfig {
     param (
-<<<<<<< HEAD
-        [String]$Key,
-        [String]$Subkey
-=======
         [String]$Property,
         [String]$Subproperty
->>>>>>> b6be58e11f78ebf02b5b6ac1772edb973fc510a0
     )
 
     process {
         # Build the $Command
-<<<<<<< HEAD
-        $Command = @('$global:PowerResponse.Config',$Key,$Subkey) -join '.' -Replace '\.+$'
-=======
         $Command = @('$global:PowerResponse.Config',$Property,$Subproperty) -join '.' -Replace '\.+$'
->>>>>>> b6be58e11f78ebf02b5b6ac1772edb973fc510a0
 
         try {
             # Invoke the expression to get the Config value
             $Value = Invoke-Expression -Command $Command -ErrorAction 'Stop'
         } catch {
             # Format $Message
-<<<<<<< HEAD
-            $Message = 'Unknown Config value {0}' -f (@($Key,$Subkey) -join '.' -Replace '\.+$')
-=======
             $Message = 'Unknown Config value {0}' -f (@($Property,$Subproperty) -join '.' -Replace '\.+$')
->>>>>>> b6be58e11f78ebf02b5b6ac1772edb973fc510a0
 
             # Write warning
             Write-PRWarning -Message $Message
