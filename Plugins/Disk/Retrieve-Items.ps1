@@ -38,130 +38,128 @@
     Twitter: @valrkey
   
 #>
-[CmdletBinding(DefaultParameterSetName='Items')]
+[CmdletBinding()]
 
 param (
 
     [Parameter(Position=0,Mandatory=$true)]
     [System.Management.Automation.Runspaces.PSSession[]]$Session,
 
-    [Parameter(Position=1,Mandatory=$true,ParameterSetName='Items')]
-    [String[]]$ItemPath,
-
-    [Parameter(Position=1,Mandatory=$true,ParameterSetName='List')]
-    [String]$ListPath,
-
-    [Parameter(Position=2)]
-    [String]$EncryptPassword = 'infected',
+    [Parameter(Position=1,Mandatory=$true)]
+    [String[]]$Path,
 
     [Parameter(Position=3)]
     [Switch]$NoEncrypt
 )
 
 process {
+    # Get stage directory
+    $RemoteStageDirectory = Get-PRConfig -Property 'RemoteStagePath'
 
-    # Resolve parameter set differences
-    switch ($PSCmdlet.ParameterSetName) {
-        'Items' { [String[]]$Items = $ItemPath }
-        'List' { [String[]]$Items = (Import-Csv -Path $ListPath | Select-Object -ExpandProperty 'Path') }
-    }
+    # Get encryption password
+    $EncryptPassword = Get-PRConfig -Property 'EncryptPassword'
 
-    # Ensure we have something to grab
-    if (!$Items) {
-        throw ('Value for ItemPath not detected for {0}. Add item path and try again' -f $Session.ComputerName)
-    }
+    # Remote archive name with second count for randomness
+    $PluginOutputName = '{0}_{1}' -f ($MyInvocation.MyCommand.Name -Replace '.+-' -Replace '\..+'),(Get-Date -UFormat %s).Split('.')[0]
 
-    # Define stage directory
-    $RemoteStageDirectory = 'C:\ProgramData\Power-Response\'
+    # Remote archive name
+    $Archive = (Join-Path -Path $RemoteStageDirectory -ChildPath $PluginOutputName) + '.zip'
 
-    # Test path for existing 7zip deploys
-    $7zTestPath = Join-Path -Path $RemoteStageDirectory -ChildPath '7za*.exe'
-
-    # Define $7za tracking structure
-    $7za = @{
-        Deploy = Invoke-Command -Session $Session -ScriptBlock { Test-Path -Path $using:7zTestPath -PathType 'Leaf' } | Where-Object { !$PSItem } | Foreach-Object { Get-PSSession -InstanceId $PSItem.RunspaceId }
-        Path = @{
-            '32-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x86.exe'
-            '64-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x64.exe'
+    # Define $Dependency tracking structure
+    $Dependency = [Ordered]@{
+        SevenZip = @{
+            Command = '& "<DEPENDENCYPATH>" a -p{0} -tzip {1} <PATH>' -f $EncryptPassword,$Archive
+            Path = @{
+                '32-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x86.exe'
+                '64-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x64.exe'
+            }
+            TestPath = @('C:\Program Files\7-Zip\7z.exe',(Join-Path -Path $RemoteStageDirectory -ChildPath '7za*.exe'))
         }
     }
 
-    foreach ($Instance in $7za.Deploy) {
-        try {
-            # Determine system $Architecture and select proper 7za.exe
-            $Architecture = Invoke-Command -Session $Instance -ScriptBlock { if (!(Test-Path -Path $using:RemoteStageDirectory -PathType 'Container')) { $null = New-Item -Path $using:RemoteStageDirectory -ItemType 'Directory' }; Get-WmiObject -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' -ErrorAction 'Stop' | Select-Object -ExpandProperty 'OSArchitecture' }
-        } catch {
-            # Unable to get $Architecture information
-            $Warning = 'Unable to determine system architecture for {0}. Data was not gathered.' -f $Instance.ComputerName
-        }
+    # Begin dependency deploy logic
+    # Verify the each $Dependency exe exists
+    $Dependency | Select-Object -ExpandProperty 'Keys' -PipelineVariable 'Dep' | Foreach-Object { $Dependency.$Dep.Path.GetEnumerator() | Where-Object { !(Test-Path -Path $PSItem.Value -PathType 'Leaf') } | Foreach-Object { throw ('{0} version of {1} not detected in Bin. Place {0} executable in Bin directory and try again.' -f $PSItem.Key,$Dep) } }
 
-        # Ensure we are tracking a sensible $Architecture
-        if ($Architecture -and $7za.Path.Keys -NotContains $Architecture) {
-            $Warning = 'Unknown system architecture ({0}) detected for {1}. Data was not gathered.)' -f $Architecture, $Instance.ComputerName
-        }
+    foreach ($Key in $Dependency.Keys) {
+        # Track all session we are deploying this dependency to
+        $Dependency.$Key.Deploy = Invoke-Command -Session $Session -ScriptBlock { $Key = $using:Key; $Dependency = $using:Dependency; Get-Item -Force -Path $Dependency.$Key.TestPath -ErrorAction 'SilentlyContinue' | Select-Object -First 1 } | Where-Object { !$PSItem } | Foreach-Object { Get-PSSession -InstanceId $PSItem.RunspaceId }
 
-        # If we ran into problems with the above checks
-        if ($Warning) {
-            # Write the warning
-            Write-Warning -Message $Warning
+        foreach ($Instance in $Dependency.$Key.Deploy) {
+            try {
+                # Determine system $Architecture and select proper executable
+                $Architecture = Invoke-Command -Session $Instance -ScriptBlock { if (!(Test-Path -Path $using:RemoteStageDirectory -PathType 'Container')) { $null = New-Item -Path $using:RemoteStageDirectory -ItemType 'Directory' }; Get-WmiObject -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' -ErrorAction 'Stop' | Select-Object -ExpandProperty 'OSArchitecture' }
+            } catch {
+                # Unable to get $Architecture information
+                $Warning = 'Unable to determine system architecture for {0}. Data was not gathered.' -f $Instance.ComputerName
+            }
 
-            # Remove the failed $Session for master and deploy list
-            $Session = $Session | Where-Object { $PSItem.ComputerName -ne $Instance.ComputerName }
-            $7za.Deploy = $7za.Deploy | Where-Object { $PSItem.ComputerName -ne $Instance.ComputerName }
+            # Ensure we are tracking a sensible $Architecture
+            if ($Architecture -and $Dependency.$Key.Path.Keys -NotContains $Architecture) {
+                $Warning = 'Unknown system architecture ({0}) detected for {1}. Data was not gathered.)' -f $Architecture, $Instance.ComputerName
+            }
 
-            # Continue to next item
-            continue
-        }
+            # If we ran into problems with the above checks
+            if ($Warning) {
+                # Write the warning
+                Write-PRWarning -Message $Warning
 
-        # Verify the each $7za $Exe exists
-        if (!(Test-Path -Path $7za.Path.$Architecture -PathType 'Leaf')) {
-            throw ('{0} version of 7za.exe not detected in Bin. Place {0} executable in Bin directory and try again.' -f $Architecture)
-        }
+                # Remove the failed $Session for master and deploy list
+                $Session = $Session | Where-Object { $PSItem.ComputerName -ne $Instance.ComputerName }
+                $Dependency.$Key.Deploy = $Dependency.$Key.Deploy | Where-Object { $PSItem.ComputerName -ne $Instance.ComputerName }
 
-        # Compute the $Remote7za path
-        $Remote7za = Join-Path -Path $RemoteStageDirectory -ChildPath (Split-Path -Leaf -Path $7za.Path.$Architecture)
+                # Continue to next item
+                continue
+            }
 
-        try {
-            # Copy 7zip executable to the remote machine
-            Copy-Item -Path $7za.Path.$Architecture -Destination $Remote7za -ToSession $Instance -Force -ErrorAction 'Stop'
-        } catch {
-            # Failed to copy 7zip
-            throw 'Could not copy 7zip to remote machine. Quitting.'
+            # Compute the $RemoteDependency path
+            $RemoteDependency = Join-Path -Path $RemoteStageDirectory -ChildPath (Split-Path -Leaf -Path $Dependency.$Key.Path.$Architecture)
+
+            try {
+                # Copy dependency executable to the remote machine
+                Copy-Item -Path $Dependency.$Key.Path.$Architecture -Destination $RemoteDependency -ToSession $Instance -Force -ErrorAction 'Stop'
+            } catch {
+                # Failed to copy dependency
+                throw ('Could not copy {0} to remote machine. Quitting.' -f $Key)
+            }
         }
     }
-
+    # End dependency deploy logic
+throw 'no.'
+    # Begin plugin logic
     try {
         # Copy the files
-        Copy-PRItem -Path $Items -Destination $RemoteStageDirectory -Session $Session
+        Copy-PRItem -Path $Path -Destination $RemoteStageDirectory -Session $Session
     } catch {
         # Caught an error
-        Write-Warning -Message "Copy-PRItem error: $PSItem"
+        Write-Warning -Message ('Copy-PRItem error: {0}' -f $PSItem)
     }
+    # End plugin logic
 
-    # Used for unique naming of zip archive
-    $Seconds = (Get-Date -UFormat %s).Split('.')[0]
-
-    # Remote archive path
-    $Archive = "$RemoteStageDirectory\RetrievedItems_$Seconds.zip"
-
-    # Compress the non-exe files in the remote stage directory
+    # Loop through dependencies and run the associated commands in order
     Invoke-Command -Session $Session -ScriptBlock {
-        # Get actual 7zip path
-        $7zipPath = Get-Item -Path $using:7zTestPath | Select-Object -First 1 -ExpandProperty 'FullName'
+        # Pull remote Dependency into a local variable in each session
+        $Dependency = $using:Dependency
 
         # Get all non-exe paths in the remote stage directory
         $Path = Get-ChildItem -Force -Path $using:RemoteStageDirectory -Exclude '*.exe' | Select-Object -ExpandProperty 'FullName'
 
-        # Create compression command
-        $Command = "$7zipPath a -p$using:EncryptPassword -tzip $using:Archive {0}" -f ($Path -Join ' ')
+        foreach ($Key in $Dependency.Keys) {
+            # Get actual dependency path
+            $DependencyPath = Get-Item -Path $Dependency.$Key.TestPath | Select-Object -First 1 -ExpandProperty 'FullName'
 
-        # Execute compression command
-        $null = Invoke-Expression -Command $Command
+            # Create dependency command
+            $Command = $Dependency.$Key.Command -Replace '<DEPENDENCYPATH>',$DependencyPath -Replace '<PATH>',($Path -Join ' ')
+
+            # Execute dependency command
+            $null = Invoke-Expression -Command $Command
+        }
     }
 
+    # Copy output archive back to each output directory
     foreach ($Instance in $Session) {
         # Set output for each specific instance of session
-        $Output = Get-PRPath -ComputerName $Instance.ComputerName -Directory ('RetrievedItems_{0:yyyyMMdd}' -f (Get-Date))
+        $Output = Get-PRPath -ComputerName $Instance.ComputerName -Directory $PluginOutputName
 
         # Create directory if it doesn't exist
         if (!(Test-Path -Path $Output -PathType 'Container')) {
@@ -172,29 +170,18 @@ process {
         Copy-Item -Path $Archive -Destination $Output -FromSession $Instance
     }
 
-
     # Remove created files on remote machine as cleanup
     Invoke-Command -Session $Session -ScriptBlock {
-        # Get all non-exe items in remote stage directory
-        $Path = Get-ChildItem -Force -Path $using:RemoteStageDirectory -Exclude '*.exe' | Select-Object -ExpandProperty 'FullName'
+        # By default remove entire remote stage directory
+        $RemovePath = $using:RemoteStageDirectory
+
+        # Unless we have deployed exes there
+        Get-ChildItem -Force -Path $using:RemoteStageDirectory -Include '*.exe' | Select-Object -First 1 | Foreach-Object { $RemovePath = $Path }
 
         # Remove the archive
-        Remove-Item -Force -Recurse -Path $Path 
+        Remove-Item -Force -Recurse -Path $RemovePath
     }
 
-    # Remove 7zip if deployed by plugin
-    if ($7za.Deploy) {
-        Invoke-Command -Session $7za.Deploy -ScriptBlock {
-            # Get all elements in the Power-Response deploy directory
-            $Path = Get-ChildItem -Force -Path (Split-Path -Parent -Path $7zipPath)
-
-
-            # Remove entire parent directory if 7zip is only child
-            if ($Path.Count -eq 1 -and $Path.FullName -eq $7zipPath) {
-                Remove-Item -Recurse -Force -Path $Path
-            } else {
-                Remove-Item -Recurse -Force -Path $7zipPath
-            }
-        }
-    }
+    # Remove $Dependency if deployed by this plugin
+    $Dependency.Keys | Where-Object { $Dependency.$PSItem.Deploy } | Foreach-Object { Invoke-Command -Session $Dependency.$Key.Deploy -ScriptBlock { $Key = $using:Key; $Dependency = $using:Dependency; Remove-Item -Force -Path $Dependency.$Key.TestPath } }
 }
