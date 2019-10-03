@@ -204,7 +204,6 @@ function Copy-PRItem {
     process {
         try {
             # Invoke CopyFile on sessions
-            Write-Debug 'Copy-PRItem: Before Invoke Command'
             Invoke-Command -ScriptBlock $function:CopyItem -Session $Session -ArgumentList @($Path),$Destination,$Algorithm
         } catch {
             # Caught error
@@ -1048,10 +1047,8 @@ function Invoke-PRPlugin {
                 $ReleventParameters.Session = $Session
 
                 try {
-                    Write-Debug -Message 'Pre Plugin Execution'
                     # Execute the $Path with the $ReleventParameters
                     $Results = & $Path @ReleventParameters | Group-Object -Property 'PSComputerName'
-                    Write-Debug -Message 'Post Plugin Execution'
 
                     # Write host log success
                     Write-PRPluginLog -ComputerName $Session.ComputerName -Plugin $Item.BaseName -Success
@@ -1364,7 +1361,6 @@ function Write-PRPluginLog {
             # Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $false -ErrorAction 'SilentlyContinue'
 
             try {
-                Write-Debug -Message 'About to write the thingz'
                 # Write the $LogLine to $LogPath
                 $LogLine | Export-Csv -Force -Append -NoTypeInformation -Path $LogPath -ErrorAction 'Stop'
             } catch {
