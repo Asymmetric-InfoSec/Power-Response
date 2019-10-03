@@ -339,20 +339,33 @@ function Get-CommandParameter {
 
 function Get-PRConfig {
     param (
+<<<<<<< HEAD
         [String]$Key,
         [String]$Subkey
+=======
+        [String]$Property,
+        [String]$Subproperty
+>>>>>>> b6be58e11f78ebf02b5b6ac1772edb973fc510a0
     )
 
     process {
         # Build the $Command
+<<<<<<< HEAD
         $Command = @('$global:PowerResponse.Config',$Key,$Subkey) -join '.' -Replace '\.+$'
+=======
+        $Command = @('$global:PowerResponse.Config',$Property,$Subproperty) -join '.' -Replace '\.+$'
+>>>>>>> b6be58e11f78ebf02b5b6ac1772edb973fc510a0
 
         try {
             # Invoke the expression to get the Config value
             $Value = Invoke-Expression -Command $Command -ErrorAction 'Stop'
         } catch {
             # Format $Message
+<<<<<<< HEAD
             $Message = 'Unknown Config value {0}' -f (@($Key,$Subkey) -join '.' -Replace '\.+$')
+=======
+            $Message = 'Unknown Config value {0}' -f (@($Property,$Subproperty) -join '.' -Replace '\.+$')
+>>>>>>> b6be58e11f78ebf02b5b6ac1772edb973fc510a0
 
             # Write warning
             Write-PRWarning -Message $Message
@@ -1042,6 +1055,7 @@ function Invoke-PRPlugin {
             # If the plugin is expecting a $Session of type PSSession[]
             if ($CommandParameters.Session.ParameterType.BaseType.FullName -eq 'System.Array') {
                 Write-Verbose -Message 'Detected Plugin requesting all the Sessions'
+
                 # Set $ReleventParameters.Session to the generated $Session
                 $ReleventParameters.Session = $Session
 
@@ -1049,29 +1063,8 @@ function Invoke-PRPlugin {
                     # Execute the $Path with the $ReleventParameters
                     $Results = & $Path @ReleventParameters | Group-Object -Property 'PSComputerName'
 
-                    # Loop through $Result groups
-                    foreach ($Result in $Results) {
-                        # Handle Hunt/Non-Hunt output
-                        if ($HuntName) {
-                            # Append the ComputerName to the filename
-                            $OutPRFileParameters.Append = $Result.Name.ToLower()
-                        } else {
-                            # Send output to ComputerName folder
-                            $OutPRFileParameters.ComputerName = $Result.Name
-                        }
-
-                        # Send each $Result to it's specific PR output file based on ComputerName
-                        $Result.Group | Out-PRFile @OutPRFileParameters
-
-                        # Format the remote execution success $Message
-                        $Message = 'Plugin {0} Execution Succeeded for {1}' -f $Item.BaseName.ToUpper(),$Result.Name
-
-                        # Write host $Message
-                        Write-PRHost -Message $Message
-
-                        # Write host log success
-                        Write-PRPluginLog -ComputerName $Result.Name -Plugin $Item.BaseName -Success
-                    }
+                    # Write host log success
+                    Write-PRPluginLog -ComputerName $Session.ComputerName -Plugin $Item.BaseName -Success
                 } catch {
                     # Format warning $Message
                     $Message = 'Plugin {0} Execution Error: {1}' -f $Item.BaseName.ToUpper(),$PSItem
@@ -1083,6 +1076,26 @@ function Invoke-PRPlugin {
                     Write-PRPluginLog -ComputerName $Session.ComputerName -Plugin $Item.BaseName
                 }
 
+                # Loop through $Result groups
+                foreach ($Result in $Results) {
+                    # Handle Hunt/Non-Hunt output
+                    if ($HuntName) {
+                        # Append the ComputerName to the filename
+                        $OutPRFileParameters.Append = $Result.Name.ToLower()
+                    } else {
+                        # Send output to ComputerName folder
+                        $OutPRFileParameters.ComputerName = $Result.Name
+                    }
+
+                    # Send each $Result to it's specific PR output file based on ComputerName
+                    $Result.Group | Out-PRFile @OutPRFileParameters
+
+                    # Format the remote execution success $Message
+                    $Message = 'Plugin {0} Execution Succeeded for {1}' -f $Item.BaseName.ToUpper(),$Result.Name
+
+                    # Write host $Message
+                    Write-PRHost -Message $Message
+                }
             } else {
                 Write-Verbose -Message 'Detected Plugin requesting single Session'
                 # Loop through each $SessionInstance
@@ -1362,7 +1375,7 @@ function Write-PRPluginLog {
 
             try {
                 # Write the $LogLine to $LogPath
-                $LogLine | Export-Csv -NoTypeInformation -Append -Path $LogPath -ErrorAction 'Stop'
+                $LogLine | Export-Csv -Force -Append -NoTypeInformation -Path $LogPath -ErrorAction 'Stop'
             } catch {
                 # Unable to write plugin log
                 $Message = 'Unable to write entry to plugin log {0}' -f $LogPath
