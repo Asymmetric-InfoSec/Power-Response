@@ -33,127 +33,116 @@
     Date Created: 4/11/2019
     Twitter: @5ynax
     
-    Last Modified By:
-    Last Modified Date:
-    Twitter:
+    Last Modified By: Gavin Prentice
+    Last Modified Date: 10/3/2019
+    Twitter: @valrkey
   
 #>
 
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession]$Session,
+    [System.Management.Automation.Runspaces.PSSession[]]$Session
 
-    [Parameter(Mandatory=$false,Position=1)]
-    [DateTime]$AnalyzeDate= (Get-Date)
+)
 
-    )
+process {
+    # Get the plugin name
+    $PluginName = $MyInvocation.MyCommand.Name -Replace '.+-' -Replace '\..+'
 
-process{
+    # Get encryption password
+    $EncryptPassword = Get-PRConfig -Property 'EncryptPassword'
 
-    #Verify that 7za executables are located in (Get-PRPath -Bin)
+    # Get system architecture
+    $Architecture = Get-CimInstance -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' | Select-Object -ExpandProperty 'OSArchitecture'
 
-    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
-    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
-
-    $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
-    $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
-
-    if (!$7z64bitTestPath) {
-
-        Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-    } elseif (!$7z32bitTestPath) {
-
-        Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-    }
-
-    #Verify that analysis bin dependencies are met
-    $TestBin = Test-Path ("{0}\MFTECmd.exe" -f (Get-PRPath -Bin))
-
-    if (!$TestBin){
-
-        Throw "MFTECmd not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
-    }
-
-     #Determine system architecture and select proper 7za.exe and Velociraptor executables
-    try {
-     
-        $Architecture = (Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
-    
-        if ($Architecture -eq "64-bit") {
-
-            $Installexe = $7za64
-
-        } elseif ($Architecture -eq "32-bit") {
-
-            $Installexe = $7za32
-
-        } else {
-        
-            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered.)" -f $Architecture)
-            Continue
+    # Define $Dependency tracking structure
+    $Dependency = [Ordered]@{
+        SevenZip = @{
+            Command = '& "<DEPENDENCYPATH>" x -p{0} <ZIPPATH> -o<OUTPUTPATH>' -f $EncryptPassword
+            Path = @{
+                '32-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x86.exe'
+                '64-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x64.exe'
+            }
         }
-
-    } catch {
-    
-     Write-Error ("Unable to determine system architecture. Data was not gathered.")
-        Exit
-    }
-
-    #Format String Properly for use
-    $AnalysisDate = ('{0:yyyyMMdd}' -f $AnalyzeDate)
-
-    #Build list of hosts that have been analyzed with Power-Response
-    $Machines = Get-ChildItem (Get-PRPath -Output)
-
-    #Loop through and analyze NTFS files, while skipping if the analysis directory exists
-    foreach ($Machine in $Machines){
-
-        #Path to verify for existence before processing NTFS
-        $NTFSPath = ("{0}\{1}\Disk\NTFS_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
-
-        #Determine if NTFS output directory exists
-        if (Test-Path $NTFSPath){
-
-            #Verify that NTFS has not already been analyzed
-            $NTFSProcessed = "$NTFSPath\Analysis"
-
-            if (!(Test-Path $NTFSProcessed)) {
-
-                #Create Analysis Directory
-                New-Item -Type Directory -Path $NTFSProcessed | Out-Null
-
-                #Decompress zipped archive
-                $Command = ("& '{0}\{1}' x '{2}\{3}_NTFS.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$NTFSPath,$Machine
-
-                Invoke-Expression -Command $Command | Out-Null 
-
-                #Process and store MFT
-                $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$MFT' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
-
-                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_MFT_Log.txt" -f $NTFSProcessed)
-
-                #Process and store $Secure:$SDS
-                $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$Secure`%3A`$SDS' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
-
-                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_SecureSDS_Log.txt" -f $NTFSProcessed) 
-
-                #Process and store $LogFile
-                $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$LogFile' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
-
-                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_LogFile_Log.txt" -f $NTFSProcessed)
-
-                #Process and store $UsnJrnl:$J
-                $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$Extend\`$UsnJrnl`%3A`$J' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
-
-                Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_USN_Log.txt" -f $NTFSProcessed) 
-
-            } else {
-
-                #Prevent additional processing of NTFS already analyzed
-                continue
+        MFTECmd = @{
+            Command = '& "<DEPENDENCYPATH>" -f <ARTIFACTPATH> --csv <ANALYSISFOLDERPATH>'
+            Path = @{
+                '32-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath 'MFTECmd.exe'
+                '64-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath 'MFTECmd.exe'
             }
         }
     }
+
+    # Verify the each $Dependency exe exists
+    $Dependency | Select-Object -ExpandProperty 'Keys' -PipelineVariable 'Dep' | Foreach-Object { $Dependency.$Dep.Path.GetEnumerator() | Where-Object { !(Test-Path -Path $PSItem.Value -PathType 'Leaf') } | Foreach-Object { throw ('{0} version of {1} not detected in Bin. Place {0} executable in Bin directory and try again.' -f $PSItem.Key,$Dep) } }
+
+    # Figure out which folders to process
+    $ToProcess = Get-ChildItem -Recurse -Force -Path (Get-PRPath -Output) | Where-Object { $PSItem.Name -Match $PluginName -and $PSItem.Name -NotMatch 'Analysis' -and $PSItem.PSIsContainer } | Where-Object { !(Get-ChildItem -Path $PSItem.FullName | Where-Object { $PSItem.Name -Match 'Analysis' }) }
+
+    foreach ($ArtifactDirectory in $ToProcess) {
+        # Get the zip file
+        $ZipPath = Get-ChildItem -File -Force -Path $ArtifactDirectory.FullName | Where-Object { $PSItem.Name -Match '.+\.zip' } | Select-Object -First 1 -ExpandProperty 'FullName'
+
+        # Build command
+        $Command = $Dependency.SevenZip.Command -Replace '<DEPENDENCYPATH>',$Dependency.SevenZip.Path.$Architecture -Replace '<ZIPPATH>',$ZipPath -Replace '<OUTPUTPATH>',$ArtifactDirectory.FullName
+
+        Write-Debug -Message 'Before 7za'
+
+        # Run the command
+        $null = Invoke-Expression -Command $Command
+
+        # Get the unzipped artifact paths
+        $Artifacts = Get-ChildItem -Force -Directory -Path $ArtifactDirectory.FullName | Get-ChildItem -Force -Recurse -File
+
+        # Naming convention {DIRNAME}_Analysis
+        $AnalysisDirectoryName = '{0}_Analysis' -f $ArtifactDirectory.Name
+
+        # Build Analysis directory
+        $AnalysisDirectory = Join-Path -Path $ArtifactDirectory.FullName -ChildPath $AnalysisDirectoryName | Foreach-Object { New-Item -Type 'Directory' -Path $PSItem }
+
+        foreach ($ArtifactPath in $Artifacts) {
+            # Build the log file
+            $LogFile = Join-Path -Path $AnalysisDirectory.FullName -ChildPath ('MFTECmd_{0}_Log.txt' -f $ArtifactPath.Name)
+
+            # Build the command
+            $Command = $Dependency.MFTECmd.Command -Replace '<DEPENDENCYPATH>',$Dependency.MFTECmd.Path.$Architecture -Replace '<ARTIFACTPATH>',$ArtifactPath.FullName -Replace '<ANALYSISFOLDERPATH>',$AnalysisDirectory.FullName
+
+            Write-Debug -Message 'About to MFTECmd'
+
+            # Run the command
+            Invoke-Expression -Command $Command -ErrorAction 'SilentlyContinue' | Out-File -FilePath $LogFile
+        }
+    }
+            
+        #         #Decompress zipped archive
+
+        #         Invoke-Expression -Command $Command | Out-Null 
+
+        #         #Process and store MFT
+
+        #         Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_MFT_Log.txt" -f $NTFSProcessed)
+
+        #         #Process and store $Secure:$SDS
+        #         $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$Secure`%3A`$SDS' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+
+        #         Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_SecureSDS_Log.txt" -f $NTFSProcessed) 
+
+        #         #Process and store $LogFile
+        #         $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$LogFile' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+
+        #         Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_LogFile_Log.txt" -f $NTFSProcessed)
+
+        #         #Process and store $UsnJrnl:$J
+        #         $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$Extend\`$UsnJrnl`%3A`$J' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
+
+        #         Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_USN_Log.txt" -f $NTFSProcessed) 
+
+        #     } else {
+
+        #         #Prevent additional processing of NTFS already analyzed
+        #         continue
+        #     }
+        # }
+    # }
 }

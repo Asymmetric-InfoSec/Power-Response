@@ -53,14 +53,17 @@ param (
 )
 
 process {
+    # Get the plugin name
+    $PluginName = $MyInvocation.MyCommand.Name -Replace '\..+'
+
+    # Remote archive name with second count for randomness
+    $PluginOutputName = '{0}_{1}' -f ($PluginName -Replace '.+-'),(Get-Date -UFormat %s).Split('.')[0]
+
     # Get stage directory
     $RemoteStageDirectory = Get-PRConfig -Property 'RemoteStagePath'
 
     # Get encryption password
     $EncryptPassword = Get-PRConfig -Property 'EncryptPassword'
-
-    # Remote archive name with second count for randomness
-    $PluginOutputName = '{0}_{1}' -f ($MyInvocation.MyCommand.Name -Replace '.+-' -Replace '\..+'),(Get-Date -UFormat %s).Split('.')[0]
 
     # Remote archive name
     $Archive = (Join-Path -Path $RemoteStageDirectory -ChildPath $PluginOutputName) + '.zip'
@@ -125,7 +128,7 @@ process {
         }
     }
     # End dependency deploy logic
-throw 'no.'
+
     # Begin plugin logic
     try {
         # Copy the files

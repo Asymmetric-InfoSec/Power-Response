@@ -78,7 +78,11 @@ function Copy-PRItem {
 
                     process {
                         # Sanitize any streams and the drive colon
-                        $ChildPath = $Path -Replace ':([^\\]+)$' -Replace ':'
+                        if ($Path -Match '^([^\\]+):' -and $Matches.Count -gt 1) {
+                            $Path = $Path -Replace '^([^\\]+):',$Matches[1] 
+                        }
+
+                        $ChildPath = $Path -Replace ':','%3a' -Replace '\$','%24'
 
                         # Compute destination location
                         $Location = Join-Path -Path $Destination -ChildPath $ChildPath
