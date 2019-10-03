@@ -1344,7 +1344,7 @@ function Write-PRPluginLog {
     process {
         # Build $LogLine
         $LogLine = [PSCustomObject]@{
-            Date = '{0:u}' -f (Get-Date)
+            Date = '{0:u}' -f (Get-Date).ToUniversalTime()
             UserName = $ENV:UserName
             Plugin = $Plugin
             Success = $Success
