@@ -4,13 +4,9 @@
     Plugin-Name: Retrieve-NTFSArtifacts.ps1
     
 .Description
-    This plugin collects NTFS artifacts from a remote system. The file is copied by pushing 
-    the Velociraptor binary to the the remote system, where it copies the files to 
-    C:\ProgramData\%COMPUTERNAME%. 7za.exe is also copied to the system, to then zip 
-    the directory containing the artifacts before moving them back to your local system for 
-    further analysis and processing. This plugin will remove the Velociraptor, 7zip PE, 
-    and all locally created files after successfully pulling the artifacts back to the 
-    output destination in Power-Response.
+    This plugin collects NTFS artifacts from a remote system. 
+    By default, this plugin will only run once each day unless the analyst uses the 
+    force parameter
 
 .EXAMPLE
 
@@ -144,7 +140,9 @@ process {
     }
     # End dependency deploy logic
 
-    #Collect System Artifacts    
+    # Start plguin logic
+
+    # Collect System Artifacts    
     $SystemArtifacts = @(
         'C:\$MFT',
         'C:\$Boot',
@@ -161,6 +159,8 @@ process {
         # Caught an error
         Write-Warning -Message ('Copy-PRItem error: {0}' -f $PSItem)
     }
+
+    # End plugin logic
 
     # Loop through dependencies and run the associated commands in order
     Invoke-Command -Session $Session -ScriptBlock {
