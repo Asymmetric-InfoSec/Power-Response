@@ -1362,11 +1362,15 @@ function Write-PRPluginLog {
             # Get the log path
             $LogPath = Join-Path -Path (Get-PRPath -Output) -ChildPath $Computer | Join-Path -ChildPath $FileName
 
+            # See if file already exists
+            $Append = Test-Path -Path $LogPath
+
+            # Make the log file writeable
             Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $false -ErrorAction 'SilentlyContinue'
 
             try {
                 # Write the $LogLine to $LogPath
-                $LogLine | Export-Csv -Force -Append -NoTypeInformation -Path $LogPath -ErrorAction 'Stop'
+                $LogLine | Export-Csv -Force -Append:$Append -NoTypeInformation -Path $LogPath -ErrorAction 'Stop'
             } catch {
                 # Unable to write plugin log
                 $Message = 'Unable to write entry to plugin log {0}' -f $LogPath
@@ -1375,6 +1379,7 @@ function Write-PRPluginLog {
                 Write-PRWarning -Message $Message
             }
 
+            # Make the log file readonly
             Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $true -ErrorAction 'SilentlyContinue'
         }
     }
