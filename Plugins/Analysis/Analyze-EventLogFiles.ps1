@@ -6,9 +6,7 @@
 .Description
     Analyzes recovered event logs from the remote system(s).
     There are checks built in to not analyze twice. By default, the plugin will look for 
-    results from the current date. You can specify the analysis date with the
-    $AnalyzeDate parameter. When using the $AnalyzeDate parameter, you must put your
-    date in the format of yyyyMMdd.
+    results from the current date. 
 
     Dependencies
     EvtxECmd.exe (From Eric Zimmerman's Tools. Stored in the Power-Response Bin directory)
@@ -16,12 +14,6 @@
 .EXAMPLE
     
     Power-Response Execution
-
-    For current date Analysis just execute 'run'
-
-    To specify a date
-
-    set AnalyzeDate 20190309
     run
 
 .NOTES
@@ -29,205 +21,143 @@
     Date Created: 5/23/2019
     Twitter: @5ynax
     
-    Last Modified By:
-    Last Modified Date:
-    Twitter:
+    Last Modified By: Drew Schmitt
+    Last Modified Date: 10/04/2019
+    Twitter: @5ynax
   
 #>
 
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession]$Session,
+    [System.Management.Automation.Runspaces.PSSession[]]$Session
 
-    [Parameter(Mandatory=$false,Position=1)]
-    [DateTime]$AnalyzeDate= (Get-Date)
-
-    )
+)
 
 process{
 
-    #Verify that 7za executables are located in (Get-PRPath -Bin)
+     # Get the plugin name
+    $PluginName = $MyInvocation.MyCommand.Name -Replace '.+-' -Replace '\..+'
 
-    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
-    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
+    # Get encryption password
+    $EncryptPassword = Get-PRConfig -Property 'EncryptPassword'
 
-    $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
-    $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
+    # Get system architecture
+    $Architecture = Get-CimInstance -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' | Select-Object -ExpandProperty 'OSArchitecture'
 
-    if (!$7z64bitTestPath) {
-
-        Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-    } elseif (!$7z32bitTestPath) {
-
-        Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-    }
-
-    #Verify that analysis bin dependencies are met
-    $TestBin = Test-Path ("{0}\EvtxExplorer\EvtxECmd.exe" -f (Get-PRPath -Bin))
-
-    if (!$TestBin){
-
-        Throw "EvtxECmd not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
-    }
-
-     #Determine system architecture and select proper 7za.exe and Velociraptor executables
-    try {
-     
-        $Architecture = (Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
-    
-        if ($Architecture -eq "64-bit") {
-
-            $Installexe = $7za64
-
-        } elseif ($Architecture -eq "32-bit") {
-
-            $Installexe = $7za32
-
-        } else {
-        
-            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered.)" -f $Architecture)
-            Continue
-        }
-
-    } catch {
-    
-     Write-Error ("Unable to determine system architecture. Data was not gathered.")
-
-        Exit
-    }
-
-    #Format String Properly for use
-    $AnalysisDate = ('{0:yyyyMMdd}' -f $AnalyzeDate)
-
-    #Build list of hosts that have been analyzed with Power-Response
-    $Machines = Get-ChildItem (Get-PRPath -Output)
-
-    #Hashtables for the different log types to be processed
-
-    $SecurityLog = @{
-
-        LogName = "Security.evtx"
-        ProcessedEvents = 1102,4624,4625,4634,4647,4648,4672,4688,4697,4698,4699,4700,4701,4702,4719,4720,4722,4724,4728,4732,4735,4738,4756,4765,4766,4768,4769,4771,4776,4778,4779,4798,4799,4964
-        OutputName = 'SecurityEvents.csv'
-    }
-
-     $SystemLog = @{
-
-        LogName = "System.evtx"
-        ProcessedEvents = 10000,10001,1001,10100,104,1056,20001,20002,20003,24576,24577,24579,7030,7034,7035,7036,7040,7045
-        OutputName = 'SystemEvents.csv'
-    }
-
-     $ApplicationLog = @{
-
-        LogName = "Application.evtx"
-        ProcessedEvents = 1000,1001,1002,1033,1034,11707,11708,11724
-        OutputName = 'ApplicationEvents.csv'
-    }
-
-     $WinFirewallLog = @{
-
-        LogName = "Microsoft-Windows-Windows Firewall With Advanced Security%4Firewall.evtx"
-        ProcessedEvents = 2003
-        OutputName = 'WindowsFirewallEvents.csv'
-    }
-
-     $PowerShellLog = @{
-
-        LogName = "Microsoft-Windows-PowerShell%4Operational.evtx"
-        ProcessedEvents = 4104,4105,4106
-        OutputName = 'PowerShellEvents.csv'
-    }
-
-     $WMILog = @{
-
-        LogName = "Microsoft-Windows-WMI-Activity%4Operational.evtx"
-        ProcessedEvents = 5857,5858,5859,5860,5861
-        OutputName = 'WMIEvents.csv'
-    }
-
-     $RDP_TC_RDPClientLog = @{
-
-        LogName = "Microsoft-Windows-TerminalServices-RDPClient%4Operational.evtx"
-        ProcessedEvents = 1024,1102
-        OutputName = 'RDPClientEvents.csv'
-    }
-
-     $RDP_TC_RCMLog = @{
-
-        LogName = "Microsoft-Windows-TerminalServices-RemoteConnectionManager%4Operational.evtx"
-        ProcessedEvents = 1149
-        OutputName = 'RDPConnManagerEvents.csv'
-    }
-
-     $RDP_TC_LSMLog = @{
-
-        LogName = "Microsoft-Windows-TerminalServices-LocalSessionManager%4Operational.evtx"
-        ProcessedEvents = 21,22,25,41
-        OutputName = 'RDPLocalSessionManEvents.csv'
-    }
-
-     $RDP_RdpTSLog = @{
-
-        LogName = "Microsoft-Windows-RemoteDesktopServices-RdpCoreTS%4Operational.evtx"
-        ProcessedEvents = 98,131
-        OutputName = 'RDPCoreTSEvents.csv'
-    }
-
-     $SchedTasksLog = @{
-
-        LogName = "Microsoft-Windows-TaskScheduler%4Operational.evtx"
-        ProcessedEvents = 106,140,141,200,201
-        OutputName = 'ScheduledTaskEvents.csv'
-    }
-
-    $MachineLogs = @($SecurityLog, $SystemLog, $ApplicationLog, $WinFirewallLog, $PowerShellLog, $WMILog, $RDP_TC_RDPClientLog, $RDP_TC_RCMLog, $RDP_TC_LSMLog, $RDP_RdpTSLog, $SchedTasksLog)
-
-    #Loop through and analyze prefetch files, while skipping if the analysis directory exists
-    foreach ($Machine in $Machines){
-
-        #Path to verify for existence before processing prefetch
-        $EvtxPath = ("{0}\{1}\Logs\EventLogFiles_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
-
-        #Determine if prefetch output directory exists
-        if (Test-Path $EvtxPath){
-
-            #Verify that prefetch has not already been analyzed
-            $EvtxProcessed = ("{0}\{1}\Logs\EventLogFiles_{2}\Analysis") -f (Get-PRPath -Output), $Machine, $AnalysisDate
-
-            if (!(Test-Path $EvtxProcessed)) {
-
-                #Create Analysis Directory
-                New-Item -Type Directory -Path $EvtxProcessed | Out-Null
-
-                $EvtxDataExtracted = ("{0}\{1}" -f $EvtxPath,$Machine)
-
-                if (!(Test-Path $EvtxDataExtracted)){
-
-                    #Decompress zipped archive
-                    $Command = ("& '{0}\{1}' x '{2}\EventLogFiles.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$EvtxPath
-
-                    Invoke-Expression -Command $Command | Out-Null
-                }
-
-                #Loop through and process each log in MachineLogs
-                foreach ($Log in $MachineLogs){
-
-                    #Process and store in analysis directory
-                    $Command = ("& '{0}\EvtxExplorer\EvtxECmd.exe' -f {1}\Power-Response\C\Windows\System32\winevt\Logs\{2} --csv {3} --csvf {4} --inc {5}") -f ((Get-PRPath -Bin),$EvtxPath,$Log.LogName,$EvtxProcessed,$Log.OutputName,($Log.ProcessedEvents -join ','))
-
-                    Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\EvtxECmd_Log.txt" -f $EvtxProcessed) -Append
-
-                }
-
-            } else {
-
-                #Prevent additional processing of prefetch already analyzed
-                continue
+    # Define $Dependency tracking structure
+    $Dependency = [Ordered]@{
+        SevenZip = @{
+            Command = '& "<DEPENDENCYPATH>" x -p{0} <ZIPPATH> -o<OUTPUTPATH>' -f $EncryptPassword
+            Path = @{
+                '32-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x86.exe'
+                '64-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x64.exe'
             }
         }
+        EvtxECmd = @{
+            Command = '& "<DEPENDENCYPATH>" -f "<ARTIFACTPATH>" --csv "<ANALYSISFOLDERPATH>" --csvf "<ANALYSISFILENAME>" --inc "<EVENTIDLIST>"'
+            Path = @{
+                '32-bit' = Join-Path -Path ("$(Get-PRPath -Bin)\EvtxExplorer") -ChildPath 'EvtxECmd.exe'
+                '64-bit' = Join-Path -Path ("$(Get-PRPath -Bin)\EvtxExplorer") -ChildPath 'EvtxECmd.exe'
+            }
+            Logs = @{
 
+                Security = @{
+
+                    LogName = "Security.evtx"
+                    ProcessedEvents = 1102,4624,4625,4634,4647,4648,4672,4688,4697,4698,4699,4700,4701,4702,4719,4720,4722,4724,4728,4732,4735,4738,4756,4765,4766,4768,4769,4771,4776,4778,4779,4798,4799,4964
+                }
+                System = @{
+
+                    LogName = "System.evtx"
+                    ProcessedEvents = 10000,10001,1001,10100,104,1056,20001,20002,20003,24576,24577,24579,7030,7034,7035,7036,7040,7045
+                }
+                Application = @{
+
+                    LogName = "Application.evtx"
+                    ProcessedEvents = 1000,1001,1002,1033,1034,11707,11708,11724
+                }
+                WinFirewall = @{
+
+                    LogName = "Microsoft-Windows-Windows Firewall With Advanced Security%4Firewall.evtx"
+                    ProcessedEvents = 2003
+                }
+                PowerShell = @{
+
+                    LogName = "Microsoft-Windows-PowerShell%4Operational.evtx"
+                    ProcessedEvents = 4104,4105,4106
+                }
+                WMI = @{
+
+                    LogName = "Microsoft-Windows-WMI-Activity%4Operational.evtx"
+                    ProcessedEvents = 5857,5858,5859,5860,5861
+                }
+                RDP_TC_RDPClient = @{
+
+                    LogName = "Microsoft-Windows-TerminalServices-RDPClient%4Operational.evtx"
+                    ProcessedEvents = 1024,1102
+                }
+                RDP_TC_RCM = @{
+
+                    LogName = "Microsoft-Windows-TerminalServices-RemoteConnectionManager%4Operational.evtx"
+                    ProcessedEvents = 1149
+                }
+                RDP_TC_LSM = @{
+
+                    LogName = "Microsoft-Windows-TerminalServices-LocalSessionManager%4Operational.evtx"
+                    ProcessedEvents = 21,22,25,41
+                }
+                RDP_RdpTS = @{
+
+                    LogName = "Microsoft-Windows-RemoteDesktopServices-RdpCoreTS%4Operational.evtx"
+                    ProcessedEvents = 98,131
+                }
+                SchedTasks = @{
+
+                    LogName = "Microsoft-Windows-TaskScheduler%4Operational.evtx"
+                    ProcessedEvents = 106,140,141,200,201
+                }
+            }
+        }
+    }
+
+    # Verify the each $Dependency exe exists
+    $Dependency | Select-Object -ExpandProperty 'Keys' -PipelineVariable 'Dep' | Foreach-Object { $Dependency.$Dep.Path.GetEnumerator() | Where-Object { !(Test-Path -Path $PSItem.Value -PathType 'Leaf') } | Foreach-Object { throw ('{0} version of {1} not detected in Bin. Place {0} executable in Bin directory and try again.' -f $PSItem.Key,$Dep) } }
+
+    # Figure out which folders to process
+    $ToProcess = Get-ChildItem -Recurse -Force -Path (Get-PRPath -Output) | Where-Object { $PSItem.Name -Match $PluginName -and $PSItem.Name -NotMatch 'Analysis' -and $PSItem.PSIsContainer } | Where-Object { !(Get-ChildItem -Path $PSItem.FullName | Where-Object { $PSItem.Name -Match 'Analysis' }) }
+
+    foreach ($ArtifactDirectory in $ToProcess) {
+        # Get the zip file
+        $ZipPath = Get-ChildItem -File -Force -Path $ArtifactDirectory.FullName | Where-Object { $PSItem.Name -Match '.+\.zip' } | Select-Object -First 1 -ExpandProperty 'FullName'
+
+        # Build command
+        $Command = $Dependency.SevenZip.Command -Replace '<DEPENDENCYPATH>',$Dependency.SevenZip.Path.$Architecture -Replace '<ZIPPATH>',$ZipPath -Replace '<OUTPUTPATH>',$ArtifactDirectory.FullName
+
+        # Run the command
+        $null = Invoke-Expression -Command $Command
+
+        # Get root path to all artifacts
+        $ArtifactRoot = '{0}\C\Windows\System32\winevt\logs\'
+
+        # Get the unzipped artifact paths
+        $Artifacts = $Dependency.EvtxEcmd.Logs.Keys
+
+        # Naming convention {DIRNAME}_Analysis
+        $AnalysisDirectoryName = '{0}_Analysis' -f $ArtifactDirectory.Name
+
+        # Build Analysis directory
+        $AnalysisDirectory = Join-Path -Path $ArtifactDirectory.FullName -ChildPath $AnalysisDirectoryName | Foreach-Object { New-Item -Type 'Directory' -Path $PSItem }
+
+        foreach ($ArtifactPath in $Artifacts) {
+            # Build the log file
+            $LogFile = Join-Path -Path $AnalysisDirectory.FullName -ChildPath ('EvtxECmd_{0}_Log.txt' -f $ArtifactPath)
+
+            # Build the command
+            $Command = $Dependency.EvtxECmd.Command -Replace '<DEPENDENCYPATH>',$Dependency.EvtxECmd.Path.$Architecture -Replace '<ARTIFACTPATH>',('{0}\{1}' -f $ArtifactRoot,$ArtifactPath) -Replace '<ANALYSISFOLDERPATH>',$AnalysisDirectory.FullName -Replace '<ANALYSISFILENAME>',('{0}_EvtxECMD_Data.csv' -f $ArtifactPath) -Replace '<EVENTIDLIST>',($Dependency.EvtxEcmd.Logs.$ArtifactPath.ProcessedEvents)
+
+            # Run the command
+            Invoke-Expression -Command $Command -ErrorAction 'SilentlyContinue' | Out-File -FilePath $LogFile
+        }
     }
 }
