@@ -87,8 +87,6 @@ process {
         # Build command
         $Command = $Dependency.SevenZip.Command -Replace '<DEPENDENCYPATH>',$Dependency.SevenZip.Path.$Architecture -Replace '<ZIPPATH>',$ZipPath -Replace '<OUTPUTPATH>',$ArtifactDirectory.FullName
 
-        Write-Debug -Message 'Before 7za'
-
         # Run the command
         $null = Invoke-Expression -Command $Command
 
@@ -108,41 +106,8 @@ process {
             # Build the command
             $Command = $Dependency.MFTECmd.Command -Replace '<DEPENDENCYPATH>',$Dependency.MFTECmd.Path.$Architecture -Replace '<ARTIFACTPATH>',$ArtifactPath.FullName -Replace '<ANALYSISFOLDERPATH>',$AnalysisDirectory.FullName
 
-            Write-Debug -Message 'About to MFTECmd'
-
             # Run the command
             Invoke-Expression -Command $Command -ErrorAction 'SilentlyContinue' | Out-File -FilePath $LogFile
         }
     }
-            
-        #         #Decompress zipped archive
-
-        #         Invoke-Expression -Command $Command | Out-Null 
-
-        #         #Process and store MFT
-
-        #         Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_MFT_Log.txt" -f $NTFSProcessed)
-
-        #         #Process and store $Secure:$SDS
-        #         $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$Secure`%3A`$SDS' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
-
-        #         Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_SecureSDS_Log.txt" -f $NTFSProcessed) 
-
-        #         #Process and store $LogFile
-        #         $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$LogFile' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
-
-        #         Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_LogFile_Log.txt" -f $NTFSProcessed)
-
-        #         #Process and store $UsnJrnl:$J
-        #         $Command = ("& '{0}\MFTECmd.exe' -f '{1}\{2}\c\`$Extend\`$UsnJrnl`%3A`$J' --csv {3}") -f (Get-PRPath -Bin),$NTFSPath,$Machine,$NTFSProcessed
-
-        #         Invoke-Expression -Command $Command -ErrorAction SilentlyContinue | Out-File -FilePath ("{0}\MFTEECmd_USN_Log.txt" -f $NTFSProcessed) 
-
-        #     } else {
-
-        #         #Prevent additional processing of NTFS already analyzed
-        #         continue
-        #     }
-        # }
-    # }
 }
