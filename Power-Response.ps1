@@ -169,7 +169,7 @@ function Copy-PRItem {
                             Write-Verbose -Message ("Unable to read file: {0} normally, assuming locked" -f $GetContent.Path)
 
                             # Ensure PowerForensics is loaded
-                            if (('PowerForensics.FileSystem.Ntfs.FileRecord' -as [Type]) -eq $null) {
+                            if (('PowerForensics.FileSystems.Ntfs.FileRecord' -as [Type]) -eq $null) {
                                 LoadPowerForensics
                             }
 
