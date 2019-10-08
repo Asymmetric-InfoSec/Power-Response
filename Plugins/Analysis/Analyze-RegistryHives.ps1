@@ -6,27 +6,20 @@
 .Description
     Analyzes recovered registry hives for all hosts that you have collected data from.
     There are checks built in to not analyze twice. By default, the plugin will look for 
-    results from the current date. You can specify the analysis date with the
-    $AnalyzeDate parameter. When using the $AnalyzeDate parameter, you must put your
-    date in the format of yyyyMMdd.
-
+    results from the current date. 
     Dependencies
+
     RECmd.exe (From Eric Zimmerman's Tools. Stored in the Power-Response Bin directory)
 
     Note: The entire registry explorer directory needs to be included (extract it from the 
     zip and copy the entire directory to BIN)
 
-    Refere to the Batch File for more details on what registry keys are analyzed
+    Refer to the RECmd Batch File for more details on what registry keys are analyzed
 
 .EXAMPLE
     
     Power-Response Execution
 
-    For current date Analysis just execute 'run'
-
-    To specify a date
-
-    set AnalyzeDate 20190309
     run
 
 .NOTES
@@ -34,135 +27,86 @@
     Date Created: 4/12/2019
     Twitter: @5ynax
     
-    Last Modified By:
-    Last Modified Date:
-    Twitter:
+    Last Modified By: Drew Schmitt
+    Last Modified Date: 10/04/2019
+    Twitter: @5ynax
   
 #>
 
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession]$Session,
-
-    [Parameter(Mandatory=$false,Position=1)]
-    [DateTime]$AnalyzeDate= (Get-Date),
+    [System.Management.Automation.Runspaces.PSSession[]]$Session,
 
     [Parameter(Mandatory=$false,Position=2)]
     [String]$BatchFile= ("{0}\RegistryExplorer\RECmd_Batch_MC.reb" -f (Get-PRPath -Bin))
 
-    )
+)
 
 process{
 
-    #Verify that 7za executables are located in (Get-PRPath -Bin)
+    # Get the plugin name
+    $PluginName = $MyInvocation.MyCommand.Name -Replace '.+-' -Replace '\..+'
 
-    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
-    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
+    # Get encryption password
+    $EncryptPassword = Get-PRConfig -Property 'EncryptPassword'
 
-    $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
-    $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
+    # Get system architecture
+    $Architecture = Get-CimInstance -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' | Select-Object -ExpandProperty 'OSArchitecture'
 
-    if (!$7z64bitTestPath) {
-
-        Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-    } elseif (!$7z32bitTestPath) {
-
-        Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-    }
-
-    #Verify that analysis bin dependencies are met
-    $TestBin = Test-Path ("{0}\RegistryExplorer\RECmd.exe" -f (Get-PRPath -Bin))
-
-    if (!$TestBin){
-
-        Throw "RECmd not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
-    }
-
-     #Determine system architecture and select proper 7za.exe and Velociraptor executables
-    try {
-     
-        $Architecture = (Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
-    
-        if ($Architecture -eq "64-bit") {
-
-            $Installexe = $7za64
-
-        } elseif ($Architecture -eq "32-bit") {
-
-            $Installexe = $7za32
-
-        } else {
-        
-            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered." -f $Architecture)
-            Continue
-        }
-
-    } catch {
-    
-     Write-Error ("Unable to determine system architecture. Data was not gathered.")
-        Exit
-    }
-
-    #Format String Properly for use
-    $AnalysisDate = ('{0:yyyyMMdd}' -f $AnalyzeDate)
-
-    $TestPlugins = Test-Path ("{0}\RegistryExplorer\Plugins" -f (Get-PRPath -Bin))
-
-    if (!$TestPlugins){
-
-        Throw "Plugins directory not found in {0}\RegistryExplorer\Plugins\. Place plugins directory in {0}\RegistryExplorer\ directory and try again." -f (Get-PRPath -Bin)
-    }
-
-    $TestBatch = Test-Path $BatchFile
-
-    if (!$TestBatch){
-
-        Throw "Specified batch file not found in {0}\RegistryExplorer\. Place batch file in {0}\RegistryExplorer\ directory and try again." -f (Get-PRPath -Bin)
-    }
-
-    #Build list of hosts that have been analyzed with Power-Response
-    $Machines = Get-ChildItem (Get-PRPath -Output)
-
-    #Loop through and analyze registry hive files, while skipping if the analysis directory exists
-    foreach ($Machine in $Machines){
-
-        #Path to verify for existence before processing registry hives
-        $RegPath = ("{0}\{1}\Disk\RegistryHives_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
-
-        #Determine if registry explorer output directory exists
-        if (Test-Path $RegPath){
-
-            #Verify that registry hives have not already been analyzed
-            $RegProcessed = "$RegPath\Analysis"
-
-            if (!(Test-Path $RegProcessed)) {
-
-                #Create Analysis Directory
-                New-Item -Type Directory -Path $RegProcessed | Out-Null
-
-                $RegistryDataExtracted = ("{0}\{1}" -f $RegPath,$Machine)
-
-                if (!(Test-Path $RegistryDataExtracted)){
-
-                    #Decompress zipped archive
-                    $Command = ("& '{0}\{1}' x '{2}\{3}_RegistryHives.zip' -o{2}") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$RegPath,$Machine
-
-                    Invoke-Expression -Command $Command | Out-Null
-
-                }
-
-                #Process and store in analysis directory
-                $Command = ("& '{0}\RegistryExplorer\RECmd.exe' --bn {1} -d {2}\{3} --csv {4}") -f (Get-PRPath -Bin),$BatchFile,$RegPath,$Machine,$RegProcessed
-
-                Invoke-Expression -Command $Command | Out-File -FilePath ("{0}\RBECmd_Log.txt" -f $RegProcessed)
-
-            } else {
-
-                #Prevent additional processing of registry hives already analyzed
-                continue
+    # Define $Dependency tracking structure
+    $Dependency = [Ordered]@{
+        SevenZip = @{
+            Command = '& "<DEPENDENCYPATH>" x -p{0} <ZIPPATH> -o<OUTPUTPATH>' -f $EncryptPassword
+            Path = @{
+                '32-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x86.exe'
+                '64-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x64.exe'
             }
+        }
+        RECmd = @{
+            Command = '& "<DEPENDENCYPATH>" --bn "<BATCHPATH>" -d "<ARTIFACTPATH>" --csv "<ANALYSISFOLDERPATH>"'
+            Path = @{
+                '32-bit' = Join-Path -Path ("{0}\RegistryExplorer" -f $(Get-PRPath -Bin)) -ChildPath 'RECmd.exe'
+                '64-bit' = Join-Path -Path ("{0}\RegistryExplorer" -f $(Get-PRPath -Bin)) -ChildPath 'RECmd.exe'
+            }
+        }
+    }
+
+    # Verify the each $Dependency exe exists
+    $Dependency | Select-Object -ExpandProperty 'Keys' -PipelineVariable 'Dep' | Foreach-Object { $Dependency.$Dep.Path.GetEnumerator() | Where-Object { !(Test-Path -Path $PSItem.Value -PathType 'Leaf') } | Foreach-Object { throw ('{0} version of {1} not detected in Bin. Place {0} executable in Bin directory and try again.' -f $PSItem.Key,$Dep) } }
+
+    # Figure out which folders to process
+    $ToProcess = Get-ChildItem -Recurse -Force -Path (Get-PRPath -Output) | Where-Object { $PSItem.Name -Match $PluginName -and $PSItem.Name -NotMatch 'Analysis' -and $PSItem.PSIsContainer } | Where-Object { !(Get-ChildItem -Path $PSItem.FullName | Where-Object { $PSItem.Name -Match 'Analysis' }) }
+
+    foreach ($ArtifactDirectory in $ToProcess) {
+        # Get the zip file
+        $ZipPath = Get-ChildItem -File -Force -Path $ArtifactDirectory.FullName | Where-Object { $PSItem.Name -Match '.+\.zip' } | Select-Object -First 1 -ExpandProperty 'FullName'
+
+        # Build command
+        $Command = $Dependency.SevenZip.Command -Replace '<DEPENDENCYPATH>',$Dependency.SevenZip.Path.$Architecture -Replace '<ZIPPATH>',$ZipPath -Replace '<OUTPUTPATH>',$ArtifactDirectory.FullName
+
+        # Run the command
+        $null = Invoke-Expression -Command $Command
+
+        # Get the unzipped artifact paths
+        # Unique to each plugin
+        $Artifacts = Get-ChildItem -Force -Directory -Path $ArtifactDirectory.FullName | Where-Object { $PSItem.Name -eq 'C' -and $PSItem.PSIsContainer}
+
+        # Naming convention {DIRNAME}_Analysis
+        $AnalysisDirectoryName = '{0}_Analysis' -f $ArtifactDirectory.Name
+
+        # Build Analysis directory
+        $AnalysisDirectory = Join-Path -Path $ArtifactDirectory.FullName -ChildPath $AnalysisDirectoryName | Foreach-Object { New-Item -Type 'Directory' -Path $PSItem }
+
+        foreach ($ArtifactPath in $Artifacts) {
+            # Build the log file
+            $LogFile = Join-Path -Path $AnalysisDirectory.FullName -ChildPath ('RECmd_{0}_Log.txt' -f $ArtifactPath.Name)
+
+            # Build the command
+            $Command = $Dependency.RECmd.Command -Replace '<DEPENDENCYPATH>',$Dependency.RECmd.Path.$Architecture -Replace '<BATCHPATH>',$BatchFile -Replace '<ARTIFACTPATH>',$ArtifactPath.FullName -Replace '<ANALYSISFOLDERPATH>',$AnalysisDirectory.FullName
+
+            # Run the command
+            Invoke-Expression -Command $Command -ErrorAction 'SilentlyContinue' | Out-File -FilePath $LogFile
         }
     }
 }
