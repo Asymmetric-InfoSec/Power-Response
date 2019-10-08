@@ -194,6 +194,12 @@ function Copy-PRItem {
                         # For now, write the file to disk. Eventually GZIP stream the bytes
                         [IO.File]::WriteAllBytes($Location, $Bytes)
 
+                        # Null out bytes
+                        $Bytes = $null
+
+                        # Send garbage collector to reclaim memory
+                        [System.GC]::Collect()
+
                         # Compute the hash of bytes
                         $Hash = Get-FileHash -Algorithm $Algorithm -Path $Location | Select-Object -ExpandProperty 'Hash'
 
