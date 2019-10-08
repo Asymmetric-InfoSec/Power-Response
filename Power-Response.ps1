@@ -1359,8 +1359,16 @@ function Write-PRPluginLog {
             # Get the log file name
             $FileName = '{0}_plugin-log.csv' -f $Computer.ToLower()
 
+            # Get the directory path
+            $Directory = Join-Path -Path (Get-PRPath -Output) -ChildPath $Computer
+
+            # Create containing directory if it doesnt' exist yet
+            if (!(Test-Path -PathType 'Container' -Path $Directory)) {
+                $null = New-Item -Type 'Directory' -Path $Directory
+            }
+
             # Get the log path
-            $LogPath = Join-Path -Path (Get-PRPath -Output) -ChildPath $Computer | Join-Path -ChildPath $FileName
+            $LogPath = Join-Path -Path $Directory -ChildPath $FileName
 
             # See if file already exists
             $Append = Test-Path -Path $LogPath
