@@ -132,6 +132,9 @@ function Copy-PRItem {
                 if (!(Test-Path -Path $Destination -PathType 'Container')) {
                     $null = New-Item -Type 'Directory' -Path $Destination
                 }
+
+                # Save error action preference for later manipulation
+                $SavedErrorActionPreference = $ErrorActionPreference
             }
 
             process {
@@ -145,25 +148,27 @@ function Copy-PRItem {
                     }
 
                     foreach ($File in $Items) {
+                        # Force error action preference to SilentlyContinue for ReadAllBytes/Get-Content calls
+                        $ErrorActionPreference = 'SilentlyContinue'
+
                         # Split out any file $Stream as a separate argument
                         if ($File -Match ':([^\\]+)$' -and $Matches.Count -gt 1) {
+                            # Split stream apart from path
                             $GetContent.Stream = $Matches[1]
                             $GetContent.Path = $File -Split ':([^\\]+)$' | Select-Object -First 1
+
+                            # Get the content of the file
+                            $Bytes = Get-Content @GetContent
                         } else {
-                            $null = $GetContent.Remove('Stream')
+                            $GetContent.Stream = ''
                             $GetContent.Path = $File
+
+                            # Get the content of the file
+                            $Bytes = [System.IO.File]::ReadAllBytes($GetContent.Path)
                         }
 
-                        # Create the end $Location full path
-                        $Location = GetLocation -Path $File -Destination $Destination
-
-                        # Verbose print results
-                        Write-Verbose -Message ("File:     '{0}'" -f $GetContent.Path)
-                        Write-Verbose -Message ("Location: '{0}'" -f $Location)
-                        Write-Verbose -Message ("Stream:   '{0}'" -f $GetContent.Stream)
-
-                        # Get the content of the file
-                        $Bytes = Get-Content @GetContent -ErrorAction 'SilentlyContinue'
+                        # Reset error action preference to previous state
+                        $ErrorActionPreference = $SavedErrorActionPreference
 
                         if ($Bytes -eq $null) {
                             Write-Verbose -Message ("Unable to read file: {0} normally, assuming locked" -f $GetContent.Path)
@@ -178,10 +183,13 @@ function Copy-PRItem {
                                 $Bytes = [PowerForensics.FileSystems.Ntfs.FileRecord]::GetContentBytes($GetContent.Path, $GetContent.Stream)
                             } catch [System.Management.Automation.MethodInvocationException] {
                                 # Unable to find file
-                                Write-Warning -Message ("Unable to collect file: {0}" -f $GetContent.Path)
+                                Write-Warning -Message ("Unable to collect file: {0}" -f $File)
                                 continue
                             }
                         }
+
+                        # Create the end $Location full path
+                        $Location = GetLocation -Path $File -Destination $Destination
 
                         # Get the containing directory
                         $Directory = Split-Path -Parent -Path $Location
@@ -191,8 +199,13 @@ function Copy-PRItem {
                             $null = New-Item -ItemType 'Directory' -Path $Directory
                         }
 
+                        # Verbose print results
+                        Write-Verbose -Message ("File:     '{0}'" -f $GetContent.Path)
+                        Write-Verbose -Message ("Location: '{0}'" -f $Location)
+                        Write-Verbose -Message ("Stream:   '{0}'" -f $GetContent.Stream)
+
                         # For now, write the file to disk. Eventually GZIP stream the bytes
-                        [IO.File]::WriteAllBytes($Location, $Bytes)
+                        [System.IO.File]::WriteAllBytes($Location, $Bytes)
 
                         # Null out bytes
                         $Bytes = $null
@@ -1314,7 +1327,7 @@ function Out-PRFile {
 function Protect-PRFile {
     param (
         [Parameter(Position=0)]
-        [String[]]$Path = (Get-ChildItem -File -Recurse -Attributes '!ReadOnly' -Exclude '*.xlsx' -Path (Get-PRPath -Output) -ErrorAction 'SilentlyContinue' | Select-Object -ExpandProperty 'FullName'),
+        [String[]]$Path = (Get-ChildItem -File -Force -Recurse -Attributes '!ReadOnly' -Exclude '*.xlsx' -Path (Get-PRPath -Output) -ErrorAction 'SilentlyContinue' | Select-Object -ExpandProperty 'FullName'),
 
         [ValidateSet('SHA1','SHA256','SHA384','SHA512','MACTripleDES','MD5','RIPEMD160')]
         [String]$HashAlgorithm = $global:PowerResponse.Config.HashAlgorithm
