@@ -741,7 +741,7 @@ function Invoke-RunCommand {
                 $Message = 'Error Invoking Plugin: Session, privilege, or availability error cccurred'
 
                 # Write warning $Message
-                Write-Warning -Message $Message -Append "`n`tSkipping plugin execution"
+                Write-PRWarning -Message $Message -Append "`n`tSkipping plugin execution"
 
                 return
             }
