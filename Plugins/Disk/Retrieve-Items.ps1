@@ -173,6 +173,9 @@ process {
         Copy-Item -Path $Archive -Destination $Output -FromSession $Instance
     }
 
+    # Remove $Dependency if deployed by this plugin
+    $Dependency.Keys | Where-Object { $Dependency.$PSItem.Deploy } | Foreach-Object { Invoke-Command -Session $Dependency.$Key.Deploy -ScriptBlock { $Key = $using:Key; $Dependency = $using:Dependency; Remove-Item -Force -Path $Dependency.$Key.TestPath } }
+
     # Remove created files on remote machine as cleanup
     Invoke-Command -Session $Session -ScriptBlock {
         # By default remove entire remote stage directory
