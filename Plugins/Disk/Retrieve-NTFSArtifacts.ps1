@@ -172,7 +172,7 @@ process {
 
         foreach ($Key in $Dependency.Keys) {
             # Get actual dependency path
-            $DependencyPath = Get-Item -Path $Dependency.$Key.TestPath | Select-Object -First 1 -ExpandProperty 'FullName'
+            $DependencyPath = Get-Item -Path $Dependency.$Key.TestPath -ErrorAction 'SilentlyContinue' | Select-Object -First 1 -ExpandProperty 'FullName'
 
             # Create dependency command
             $Command = $Dependency.$Key.Command -Replace '<DEPENDENCYPATH>',$DependencyPath -Replace '<PATH>',($Path -Join ' ')
@@ -197,7 +197,7 @@ process {
     }
 
     # Remove $Dependency if deployed by this plugin
-    $Dependency.Keys | Where-Object { $Dependency.$PSItem.Deploy } | Foreach-Object { Invoke-Command -Session $Dependency.$Key.Deploy -ScriptBlock { $Key = $using:Key; $Dependency = $using:Dependency; Remove-Item -Force -Path $Dependency.$Key.TestPath } }
+    $Dependency.Keys | Where-Object { $Dependency.$PSItem.Deploy } | Foreach-Object { Invoke-Command -Session $Dependency.$Key.Deploy -ScriptBlock { $Key = $using:Key; $Dependency = $using:Dependency; Remove-Item -Force -Path $Dependency.$Key.TestPath -ErrorAction 'SilentlyContinue' } }
 
     # Remove created files on remote machine as cleanup
     Invoke-Command -Session $Session -ScriptBlock {
