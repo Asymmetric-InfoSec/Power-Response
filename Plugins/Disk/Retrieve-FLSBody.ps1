@@ -160,7 +160,7 @@ process{
     # End plugin logic
    
     # Loop through dependencies and run the associated commands in order
-    $bullshit = Invoke-Command -Session $Session -ScriptBlock {
+    Invoke-Command -Session $Session -ScriptBlock {
         # Pull remote Dependency into a local variable in each session
         $Dependency = [Ordered]@{
             FLS = @{
