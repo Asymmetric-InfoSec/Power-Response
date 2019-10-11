@@ -41,7 +41,6 @@ param (
 
 process{
 
-
     # Get the plugin name
     $PluginName = $MyInvocation.MyCommand.Name -Replace '\..+'
 
@@ -103,7 +102,6 @@ process{
             TestPath = @('C:\Program Files\7-Zip\7z.exe',(Join-Path -Path $RemoteStageDirectory -ChildPath '7za*.exe'))
         }
     }
-
     
     # Begin dependency deploy logic
     # Verify the each $Dependency exe exists
@@ -195,10 +193,10 @@ process{
 
             $Command
             # Execute dependency command
-            #$null = Invoke-Expression -Command $Command
+            $null = Invoke-Expression -Command $Command
         }
     }
-    Write-Debug "test"
+    
     # Copy output archive back to each output directory
     foreach ($Instance in $Session) {
         # Set output for each specific instance of session
