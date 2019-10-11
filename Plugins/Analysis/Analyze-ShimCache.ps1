@@ -29,118 +29,83 @@
     Date Created: 4/11/2019
     Twitter: @5ynax
     
-    Last Modified By:
-    Last Modified Date:
-    Twitter:
+    Last Modified By: Drew Schmitt
+    Last Modified Date: 10/11/2019
+    Twitter: @5ynax
   
 #>
 
 param (
 
     [Parameter(Mandatory=$true,Position=0)]
-    [System.Management.Automation.Runspaces.PSSession]$Session,
+    [System.Management.Automation.Runspaces.PSSession[]]$Session
 
-    [Parameter(Mandatory=$false,Position=1)]
-    [DateTime]$AnalyzeDate= (Get-Date)
-
-    )
+)
 
 process{
 
-    #Verify that 7za executables are located in (Get-PRPath -Bin)
+     # Get the plugin name
+    $PluginName = $MyInvocation.MyCommand.Name -Replace '.+-' -Replace '\..+'
 
-    $7za32 = ("{0}\7za_x86.exe" -f (Get-PRPath -Bin))
-    $7za64 = ("{0}\7za_x64.exe" -f (Get-PRPath -Bin))
+    # Get encryption password
+    $EncryptPassword = Get-PRConfig -Property 'EncryptPassword'
 
-    $7z64bitTestPath = Get-Item -Path $7za64 -ErrorAction SilentlyContinue
-    $7z32bitTestPath = Get-Item -Path $7za32 -ErrorAction SilentlyContinue
+    # Get system architecture
+    $Architecture = Get-CimInstance -Class 'Win32_OperatingSystem' -Property 'OSArchitecture' | Select-Object -ExpandProperty 'OSArchitecture'
 
-    if (!$7z64bitTestPath) {
-
-        Throw "64 bit version of 7za.exe not detected in Bin. Place 64bit executable in Bin directory and try again."
-
-    } elseif (!$7z32bitTestPath) {
-
-        Throw "32 bit version of 7za.exe not detected in Bin. Place 32bit executable in Bin directory and try again."
-    }
-
-    #Verify that analysis bin dependencies are met
-    $TestBin = Test-Path ("{0}\AppCompatCacheParser.exe" -f (Get-PRPath -Bin))
-
-    if (!$TestBin){
-
-        Throw "AppCompatCacheParser not found in {0}. Place executable in binary directory and try again." -f (Get-PRPath -Bin)
-    }
-
-     #Determine system architecture and select proper 7za.exe and Velociraptor executables
-    try {
-     
-        $Architecture = (Get-WmiObject -Class Win32_OperatingSystem -Property OSArchitecture -ErrorAction Stop).OSArchitecture
-    
-        if ($Architecture -eq "64-bit") {
-
-            $Installexe = $7za64
-
-        } elseif ($Architecture -eq "32-bit") {
-
-            $Installexe = $7za32
-
-        } else {
-        
-            Write-Error ("Unknown system architecture ({0}) detected. Data was not gathered.)" -f $Architecture)
-            Continue
-        }
-
-    } catch {
-    
-     Write-Error ("Unable to determine system architecture. Data was not gathered.")
-        Exit
-    }
-
-    #Format String Properly for use
-    $AnalysisDate = ('{0:yyyyMMdd}' -f $AnalyzeDate)
-
-    #Build list of hosts that have been analyzed with Power-Response
-    $Machines = Get-ChildItem (Get-PRPath -Output)
-
-    #Loop through and analyze shimcache files, while skipping if the analysis directory exists
-    foreach ($Machine in $Machines){
-
-        #Path to verify for existence before processing shimcache
-        $ShimCachePath = ("{0}\{1}\Execution\ShimCache_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
-        $ShimDataPath = ("{0}\{1}\Disk\RegistryHives_{2}") -f (Get-PRPath -Output), $Machine, $AnalysisDate
-
-        #Determine if shimcache output directory exists
-        if (Test-Path $ShimCachePath){
-
-            #Verify that shimcache has not already been analyzed
-            $ShimCacheProcessed = "$ShimCachePath\Analysis"
-
-            if (!(Test-Path $ShimCacheProcessed)) {
-
-                #Create Analysis Directory
-                New-Item -Type Directory -Path $ShimCacheProcessed | Out-Null
-
-                #Decompress zipped archive if necessary
-                $ShimDataExtracted = ("{0}\{1}" -f $ShimDataPath, $Machine)
-
-                if (!(Test-Path $ShimDataExtracted)){
-
-                    $Command = ("& '{0}\{1}' x '{2}\{3}_RegistryHives.zip' -o{2}\") -f (Get-PRPath -Bin),(Split-Path $Installexe -Leaf),$ShimDataPath,$Machine
-
-                    Invoke-Expression -Command $Command | Out-Null 
-                }
-                
-                #Process and store in analysis directory
-                $Command = ("& '{0}\AppCompatCacheParser.exe' -f '{1}\{2}\c\windows\System32\config\SYSTEM' --csv {3}") -f (Get-PRPath -Bin),$ShimDataPath,$Machine,$ShimCacheProcessed
-
-                Invoke-Expression -Command $Command  | Out-File -FilePath ("{0}\AppCompatParser_Log.txt" -f $ShimCacheProcessed)
-
-            } else {
-
-                #Prevent additional processing of shimcache already analyzed
-                continue
+    # Define $Dependency tracking structure
+    $Dependency = [Ordered]@{
+        SevenZip = @{
+            Command = '& "<DEPENDENCYPATH>" x -p{0} <ZIPPATH> -o<OUTPUTPATH>' -f $EncryptPassword
+            Path = @{
+                '32-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x86.exe'
+                '64-bit' = Join-Path -Path (Get-PRPath -Bin) -ChildPath '7za_x64.exe'
             }
+        }
+        AppCompatParser = @{
+            Command = '& "<DEPENDENCYPATH>" -f "<ARTIFACTPATH>" --csv "<ANALYSISFOLDERPATH>"'
+            Path = @{
+                '32-bit' = Join-Path -Path ("{0}" -f $(Get-PRPath -Bin)) -ChildPath 'AppCompatCacheParser.exe'
+                '64-bit' = Join-Path -Path ("{0}" -f $(Get-PRPath -Bin)) -ChildPath 'AppCompatCacheParser.exe'
+            }
+        }
+    }
+
+    # Verify the each $Dependency exe exists
+    $Dependency | Select-Object -ExpandProperty 'Keys' -PipelineVariable 'Dep' | Foreach-Object { $Dependency.$Dep.Path.GetEnumerator() | Where-Object { !(Test-Path -Path $PSItem.Value -PathType 'Leaf') } | Foreach-Object { throw ('{0} version of {1} not detected in Bin. Place {0} executable in Bin directory and try again.' -f $PSItem.Key,$Dep) } }
+
+    # Figure out which folders to process
+    $ToProcess = Get-ChildItem -Recurse -Force -Path (Get-PRPath -Output) | Where-Object { $PSItem.Name -Match $PluginName -and $PSItem.Name -NotMatch 'Analysis' -and $PSItem.PSIsContainer } | Where-Object { !(Get-ChildItem -Path $PSItem.FullName | Where-Object { $PSItem.Name -Match 'Analysis' }) }
+
+    foreach ($ArtifactDirectory in $ToProcess) {
+        # Get the zip file
+        $ZipPath = Get-ChildItem -File -Force -Path $ArtifactDirectory.FullName | Where-Object { $PSItem.Name -Match '.+\.zip' } | Select-Object -First 1 -ExpandProperty 'FullName'
+
+        # Build command
+        $Command = $Dependency.SevenZip.Command -Replace '<DEPENDENCYPATH>',$Dependency.SevenZip.Path.$Architecture -Replace '<ZIPPATH>',$ZipPath -Replace '<OUTPUTPATH>',$ArtifactDirectory.FullName
+
+        # Run the command
+        $null = Invoke-Expression -Command $Command
+
+        # Get the unzipped artifact paths
+        # Unique to each plugin
+        $Artifacts = Get-ChildItem -Recurse -Force -File -Path $ArtifactDirectory.FullName | Where-Object { $PSItem.Name -eq 'SYSTEM' -and !$PSItem.PSIsContainer}
+
+        # Naming convention {DIRNAME}_Analysis
+        $AnalysisDirectoryName = '{0}_Analysis' -f $ArtifactDirectory.Name
+
+        # Build Analysis directory
+        $AnalysisDirectory = Join-Path -Path $ArtifactDirectory.FullName -ChildPath $AnalysisDirectoryName | Foreach-Object { New-Item -Type 'Directory' -Path $PSItem }
+        Write-debug 'test1'
+        foreach ($ArtifactPath in $Artifacts) {
+            # Build the log file
+            $LogFile = Join-Path -Path $AnalysisDirectory.FullName -ChildPath ('AppCompatParser_{0}_Log.txt' -f $ArtifactPath.Name)
+
+            # Build the command
+            $Command = $Dependency.AppCompatParser.Command -Replace '<DEPENDENCYPATH>',$Dependency.AppCompatParser.Path.$Architecture -Replace '<ARTIFACTPATH>',$ArtifactPath.FullName -Replace '<ANALYSISFOLDERPATH>',$AnalysisDirectory.FullName
+
+            # Run the command
+            Invoke-Expression -Command $Command -ErrorAction 'SilentlyContinue' | Out-File -FilePath $LogFile
         }
     }
 }
