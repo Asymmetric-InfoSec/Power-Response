@@ -160,7 +160,7 @@ process{
     # End plugin logic
    
     # Loop through dependencies and run the associated commands in order
-    Invoke-Command -Session $Session -ScriptBlock {
+    Invoke-Command -Session $Session -ErrorAction SilentlyContinue -ScriptBlock {
         # Pull remote Dependency into a local variable in each session
         $Dependency = [Ordered]@{
             FLS = @{
@@ -191,9 +191,8 @@ process{
             # Create dependency command
             $Command = $Dependency.$Key.Command -Replace '<DEPENDENCYPATH>',$DependencyPath -Replace '<PATH>',($Path -Join ' ') -Replace '<ORIGINALOUTFILE>',('{0}\{1}' -f $Using:RemoteStageDirectory,$Using:OriginalOutFile) -Replace '<FINALOUTFILE>',('{0}\{1}' -f $Using:RemoteStageDirectory,$Using:FinalOutFile)
 
-            $Command
             # Execute dependency command
-            $null = Invoke-Expression -Command $Command
+            $null = Invoke-Expression -Command $Command -ErrorAction SilentlyContinue
         }
     }
     
