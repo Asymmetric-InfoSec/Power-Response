@@ -138,7 +138,7 @@ process{
         $null = Invoke-Expression -Command $Command
 
         # Get root path to all artifacts
-        $ArtifactRoot = '{0}\C\Windows\System32\winevt\logs\'
+        $ArtifactRoot = '{0}\C\Windows\System32\winevt\logs' -f $ArtifactDirectory.FullName)
 
         # Get the unzipped artifact paths
         $Artifacts = $Dependency.EvtxEcmd.Logs.Keys
@@ -154,7 +154,7 @@ process{
             $LogFile = Join-Path -Path $AnalysisDirectory.FullName -ChildPath ('EvtxECmd_{0}_Log.txt' -f $ArtifactPath)
 
             # Build the command
-            $Command = $Dependency.EvtxECmd.Command -Replace '<DEPENDENCYPATH>',$Dependency.EvtxECmd.Path.$Architecture -Replace '<ARTIFACTPATH>',('{0}\{1}' -f $ArtifactRoot,$ArtifactPath) -Replace '<ANALYSISFOLDERPATH>',$AnalysisDirectory.FullName -Replace '<ANALYSISFILENAME>',('{0}_EvtxECMD_Data.csv' -f $ArtifactPath) -Replace '<EVENTIDLIST>',($Dependency.EvtxEcmd.Logs.$ArtifactPath.ProcessedEvents)
+            $Command = $Dependency.EvtxECmd.Command -Replace '<DEPENDENCYPATH>',$Dependency.EvtxECmd.Path.$Architecture -Replace '<ARTIFACTPATH>',('{0}\{1}' -f $ArtifactRoot,($Dependency.Evtxecmd.Logs.$ArtifactPath.LogName)) -Replace '<ANALYSISFOLDERPATH>',$AnalysisDirectory.FullName -Replace '<ANALYSISFILENAME>',('{0}_EvtxECMD_Data.csv' -f $ArtifactPath) -Replace '<EVENTIDLIST>',($Dependency.EvtxEcmd.Logs.$ArtifactPath.ProcessedEvents)
 
             # Run the command
             Invoke-Expression -Command $Command -ErrorAction 'SilentlyContinue' | Out-File -FilePath $LogFile
