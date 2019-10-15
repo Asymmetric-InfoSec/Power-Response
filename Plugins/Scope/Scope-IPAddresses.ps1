@@ -67,7 +67,7 @@ process {
        $null = New-Item -Type Directory -Path $Output
     }
 
-    #Generate files list based on parameter set
+    #Generate  based on parameter set
     switch ($PSCmdlet.ParameterSetName){
 
         "Address" {[String[]]$Addresses = $Address}
@@ -79,16 +79,16 @@ process {
 
         $ScriptBlock = {
 
-            # Determine if the IP address is found on system
+            # Determine if  found on system
             $IPAddressEval = netstat -naob | Select-String -pattern ".*$Using:AddressItem.*" | Select-Object -ExpandProperty Matches | Select-Object -ExpandProperty Value
 
-            # Determine if IP address is found on system
+            # Determine if found on system
             # return PSCustomObject for recording in CSV
             $OutHash =@{ Host = $env:COMPUTERNAME; Detected = [Boolean]$IPAddressEval; Address = $Using:AddressItem; Details = ($IPAddressEval -Join "`n")}
             return [PSCustomObject]$OutHash
         }
 
-        #Generate output fules from scoping data collected (1 csv output file per file scoped)
+        #Generate output fules from scoping data collected 
         $OutputPath = ('{0}\Scope_{1}_{2}.csv' -f $Output,$AddressItem,$Seconds)
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Export-CSV -Path $OutputPath -Append -NoTypeInformation
 
