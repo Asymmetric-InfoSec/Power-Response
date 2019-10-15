@@ -45,12 +45,12 @@ param (
     [Parameter(ParameterSetName = "AddressList",Position = 0,Mandatory = $true)]
     [String]$AddressList,
 
-    [Parameter(ParameterSetName = "Address",Position = 2,Mandatory = $true)]
-    [Parameter(ParameterSetName = "AddressList",Position = 2,Mandatory = $true)]
+    [Parameter(ParameterSetName = "Address",Position = 1,Mandatory = $true)]
+    [Parameter(ParameterSetName = "AddressList",Position = 1,Mandatory = $true)]
     [String]$ScopeName,
 
-    [Parameter(ParameterSetName = "Address",Position = 3,Mandatory = $true)]
-    [Parameter(ParameterSetName = "AddressList",Position = 3,Mandatory = $true)]
+    [Parameter(ParameterSetName = "Address",Position = 2,Mandatory = $true)]
+    [Parameter(ParameterSetName = "AddressList",Position = 2,Mandatory = $true)]
     [System.Management.Automation.Runspaces.PSSession[]]$Session
 )
 
