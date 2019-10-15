@@ -68,7 +68,7 @@ process {
        $null = New-Item -Type Directory -Path $Output
     }
 
-    #Generate files list based on parameter set
+    #Generate based on parameter set
     switch ($PSCmdlet.ParameterSetName){
 
         "Process" {[String[]]$Processes = $Process}
@@ -80,10 +80,10 @@ process {
 
         $ScriptBlock = {
 
-            # Determine if the process is found on system
+            # Determine if found on system
             $ProcessEval = Get-CimInstance -ClassName win32_process -Filter "name LIKE '$Using:ProcessItem%'"
 
-            # Determine if process is found on system
+            # Determine if found on system
             $NameArray = ($ProcessEval.Name -Join "`n")
             $EPArray = ($ProcessEval.ExecutablePath -Join "`n")
             $CMDLineArray = ($ProcessEval.Commandline -Join "`n")

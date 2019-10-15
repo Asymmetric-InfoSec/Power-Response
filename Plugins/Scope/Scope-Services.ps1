@@ -79,10 +79,10 @@ process {
         
         $ScriptBlock = {
             
-            # Determine if the IP address is found on system
+            # Determine if found on system
             $ServiceEval = Get-CimInstance -ClassName win32_service -Filter "name LIKE '$Using:ServiceItem%'"
 
-            # Determine if service is found on system
+            # Determine if found on system
             $NameArray = ($ServiceEval.Name -Join "`n")
             $DNArray = ($ServiceEval.DisplayName -Join "`n")
             $PIDArray = ($ServiceEval.ProcessID -Join "`n")

@@ -75,7 +75,7 @@ process{
        $null = New-Item -Type Directory -Path $Output
     }
 
-    #Generate files list based on parameter set
+    #Generate based on parameter set
     switch ($PSCmdlet.ParameterSetName){
 
         "File" {[String[]]$Files = $File}
@@ -87,10 +87,9 @@ process{
 
         $ScriptBlock = {
 
-            # Determine if file is found on system
+            # Determine if found on system
             $FileEvalPath = Get-ChildItem -Path $Using:FileStartPath -Recurse -Name -Include $Using:FileItem -ErrorAction SilentlyContinue
 
-            # Append eval results to CSV
             if ($FileEvalPath){
 
                 # return PSCustomObject for recording in CSV - includes path of discovered child object
@@ -105,7 +104,7 @@ process{
             }      
         }
 
-        #Generate output fules from scoping data collected (1 csv output file per file scoped)
+        #Generate output fules from scoping data collected
         $OutputPath = ('{0}\Scope_{1}_{2}.csv' -f $Output,$FileItem,$Seconds)
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Export-CSV -Path $OutputPath -Append -NoTypeInformation
 
