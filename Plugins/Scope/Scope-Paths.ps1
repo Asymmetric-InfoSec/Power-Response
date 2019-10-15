@@ -56,8 +56,7 @@ param (
 
 process {
 
-    #$Output = (Get-PRPath -ScopeName $ScopeName)
-    $Output = "C:\Tools\Power-Response\Output\$ScopeName"
+    $Output = ('{0}\{1}' -f (Get-PRPath -Output),$ScopeName)
 
     #Get seconds for unique naming
     $Seconds = (Get-Date -UFormat %s).Split('.')[0]
