@@ -73,7 +73,7 @@ process{
     #Create output directory if needed
     if (!(Test-Path $Output)){
 
-        New-Item -Type Directory -Path $Output
+       $null = New-Item -Type Directory -Path $Output
     }
 
     #Generate files list based on parameter set
@@ -97,20 +97,20 @@ process{
                 $FilePathArray += ($FileEvalPath -Join "`n")
 
                 # return PSCustomObject for recording in CSV - includes path of discovered child object
-                $OutHash =@{ Host = $env:COMPUTERNAME; Detected = "True"; Path = $FilePathArray}
+                $OutHash =@{ Host = $env:COMPUTERNAME; File = "$Using:FileItem"; Detected = "True"; Path = $FilePathArray}
                 return [PSCustomObject]$OutHash
                 
-                } else {
+            } else {
 
                 # return PSCustomObject for recording in CSV
-                $OutHash =@{ Host = $env:COMPUTERNAME; Detected = "False"; Path = $null}
+                $OutHash =@{ Host = $env:COMPUTERNAME; File = "$Using:FileItem"; Detected = "False"; Path = $null}
                 return [PSCustomObject]$OutHash
             }      
         }
 
         #Generate output fules from scoping data collected (1 csv output file per file scoped)
         $OutputPath = ('{0}\Scope_{1}_{2}.csv' -f $Output,$FileItem,$Seconds)
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Export-CSV -Path $OutputPath -Append
+        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Export-CSV -Path $OutputPath -Append -NoTypeInformation
 
     }   
 }
