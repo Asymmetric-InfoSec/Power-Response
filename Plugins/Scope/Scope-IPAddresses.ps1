@@ -70,8 +70,8 @@ process {
     #Generate files list based on parameter set
     switch ($PSCmdlet.ParameterSetName){
 
-            "Address" {[String[]]$Addresses = $Address}
-            "AddressList"{[String[]]$Addresses = (Import-CSV -Path $AddressList | Select-Object -ExpandProperty 'Address')}
+        "Address" {[String[]]$Addresses = $Address}
+        "AddressList"{[String[]]$Addresses = (Import-CSV -Path $AddressList | Select-Object -ExpandProperty 'Address')}
 
     }
 

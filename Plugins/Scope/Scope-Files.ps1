@@ -78,8 +78,8 @@ process{
     #Generate files list based on parameter set
     switch ($PSCmdlet.ParameterSetName){
 
-            "File" {[String[]]$Files = $File}
-            "FileList"{[String[]]$Files = (Import-CSV -Path $FileList | Select-Object -ExpandProperty 'File')}
+        "File" {[String[]]$Files = $File}
+        "FileList"{[String[]]$Files = (Import-CSV -Path $FileList | Select-Object -ExpandProperty 'File')}
 
     }
 
@@ -93,10 +93,8 @@ process{
             # Append eval results to CSV
             if ($FileEvalPath){
 
-                $FilePathArray += ($FileEvalPath -Join "`n")
-
                 # return PSCustomObject for recording in CSV - includes path of discovered child object
-                $OutHash =@{ Host = $env:COMPUTERNAME; File = "$Using:FileItem"; Detected = "True"; Path = $FilePathArray}
+                $OutHash =@{ Host = $env:COMPUTERNAME; File = "$Using:FileItem"; Detected = "True"; Path = ($FileEvalPath -Join "`n")}
                 return [PSCustomObject]$OutHash
                 
             } else {
