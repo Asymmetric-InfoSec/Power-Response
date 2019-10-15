@@ -6,7 +6,7 @@
 .Description
     Performs scoping based on a list of processes provided via string array
     or CSV input file. The output will return True or False based on
-    whether or not the file was discovered on the system.
+    whether or not it was discovered on the system.
 
     Note: The CSV import file must have a column header of 'Process'
 
