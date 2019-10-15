@@ -67,7 +67,7 @@ process {
         $null = New-Item -Type Directory -Path $Output
     }
 
-    #Generate list based on parameter set
+    #Generate based on parameter set
     switch ($PSCmdlet.ParameterSetName){
 
         "Path" {[String[]]$Paths = $Path}
