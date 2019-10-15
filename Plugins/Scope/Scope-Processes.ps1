@@ -6,7 +6,7 @@
 .Description
     Performs scoping based on a list of processes provided via string array
     or CSV input file. The output will return True or False based on
-    whether or not the file was discovered on the system.
+    whether or not it was discovered on the system.
 
     Note: The CSV import file must have a column header of 'Process'
 
@@ -95,7 +95,7 @@ process {
             return [PSCustomObject]$OutHash
         }
 
-        #Generate output fules from scoping data collected (1 csv output file per file scoped)
+        #Generate output fules from scoping data collected
         $OutputPath = ('{0}\Scope_{1}_{2}.csv' -f $Output,$ProcessItem,$Seconds)
         Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Export-CSV -Path $OutputPath -Append -NoTypeInformation
 
