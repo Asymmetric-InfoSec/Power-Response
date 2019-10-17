@@ -101,11 +101,12 @@ process {
             $null = New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS
             
             # Determine if found on system
-            $FullKeyEval = ((Get-Item -Path $Using:RegistryKeyItem).Name -Join "`n")
+            $FullKeyEval = ((Get-Item -Path $Using:RegistryKeyItem).Name -Join "`n" -ErrorAction SilentlyContinue)
 
             # return PSCustomObject for recording in CSV
             $OutHash =@{Host = $env:COMPUTERNAME; Detected = [Boolean]$FullKeyEval; Keys = $FullKeyEval}
-            return [PSCustomObject]$OutHash
+            
+            return [PSCustomObject]$OutHash | Select Host, Detected, Keys
 
             $null = Remove-PSDrive -Name HKU -Force       
         }

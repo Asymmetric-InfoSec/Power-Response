@@ -93,12 +93,10 @@ process {
                     $null = Stop-ScheduledTask -TaskName $Using:ScheduledTaskItem
                     $null = Unregister-ScheduledTask -TaskName $Using:ScheduledTaskItem -Confirm:$false
                     $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$true; Task=$ScheduledTaskInfo.TaskName; Path=$ScheduledTaskInfo.TaskPath; TaskAction=$ScheduledTaskInfo.Actions.Execute; Notes='' }
-                    return [PSCustomObject]$Outhash
 
                 } catch {
 
                     $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$false; Task=$Using:ScheduledTaskItem; Path=''; TaskAction=''; Notes='There was a problem stopping or unregistering the scheduled task' }
-                    return [PSCustomObject]$Outhash
 
                 }
             }
@@ -109,15 +107,15 @@ process {
                     $Path = (('C:\Windows\System32\Tasks\{0}' -f $Using:TaskPath) -Replace '\\\\','\' -Replace '\*','')
                     $null = Get-ChildItem -Path $Path -Recurse -File -Force -Include "*$Using:ScheduledTaskItem" -ErrorAction Stop | Remove-Item -Force -ErrorAction Stop
                     $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$true; Task=$Using:ScheduledTaskItem; Path=''; TaskAction=''; Notes='Scheduled Task file removed manually' }
-                    return [PSCustomObject]$Outhash
 
                 } catch {
 
                     $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$false; Task=$Using:ScheduledTaskItem; Path=''; TaskAction=''; Notes='There was a problem manually removing the scheduled task file' }
-                    return [PSCustomObject]$Outhash
 
                 }
             }
+
+            return [PSCustomObject]$Outhash | Select Host, Eradicated, Task, Path, TaskAction, Notes
         }
 
         #Generate output from data collected 

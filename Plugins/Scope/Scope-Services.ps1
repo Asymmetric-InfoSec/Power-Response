@@ -80,7 +80,7 @@ process {
         $ScriptBlock = {
             
             # Determine if found on system
-            $ServiceEval = Get-CimInstance -ClassName win32_service -Filter "name LIKE '$Using:ServiceItem%'"
+            $ServiceEval = Get-CimInstance -ClassName win32_service -Filter "name LIKE '$Using:ServiceItem%'" -ErrorAction SilentlyContinue
 
             # Determine if found on system
             $NameArray = ($ServiceEval.Name -Join "`n")
@@ -93,7 +93,7 @@ process {
 
             # return PSCustomObject for recording in CSV
             $OutHash =@{ Host = $env:COMPUTERNAME; Detected = [Boolean]$ServiceEval; Name = $NameArray; DisplayName = $DNArray; PID = $PIDArray; Path = $PathArray; ServiceType = $STArray; StartMode = $SMArray; Status = $StatusArray }
-            return [PSCustomObject]$OutHash
+            return [PSCustomObject]$OutHash | Select Host, Detected, Name, DisplayName, PID, Path,ServiceType, StartMode, Status
         }
         
         #Generate output fules from scoping data collected

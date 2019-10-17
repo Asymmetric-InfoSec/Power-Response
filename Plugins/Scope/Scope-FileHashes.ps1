@@ -100,7 +100,6 @@ process {
 
                 # return PSCustomObject for recording in CSV
                 $OutHash =@{Host = $env:COMPUTERNAME; Detected = [Boolean]$HashEval; Algorithm = $HashEval.Algorithm; Hash = $HashEval.Hash ; Path = $HashEval.Path}
-                return [PSCustomObject]$OutHash
 
                 }
 
@@ -110,10 +109,11 @@ process {
 
                     # return PSCustomObject for recording in CSV
                     $OutHash =@{Host = $env:COMPUTERNAME; Detected = [Boolean]$HashEval; Algorithm = $Using:Algorithm; Hash = $HashEval.Hash ; Path = ($HashEval.Path -Join "`n")}
-                    return [PSCustomObject]$OutHash
 
                 }
             }
+
+            return [PSCustomObject]$OutHash | Select Host, Detected, Hash, Path, Algorithm
         }
         
         #Generate output fules from scoping data collected

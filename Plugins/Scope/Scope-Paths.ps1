@@ -85,7 +85,8 @@ process {
             # Return PSCustomObject for recording in CSV - includes path of discovered child object
             # Apprend results to csv
             $OutHash =@{ Host = $env:COMPUTERNAME; Path = "$Using:PathItem"; Detected = [Boolean]$PathEval}
-            return [PSCustomObject]$OutHash
+            
+            return [PSCustomObject]$OutHash | Select Host, Detected, Path
                     
         }
         

@@ -91,8 +91,9 @@ process {
             $PPIDArray = ($ProcessEval.ParentProcessID -Join "`n")
 
             # return PSCustomObject for recording in CSV
-            $OutHash = @{ Host = $env:COMPUTERNAME; Detected = [Boolean]$ProcessEval; Name = $NameArray; ExecutablePath = $EPArray; Commandline = $CMDLineArray; PID = $PIDArray; ParentPID = $PPIDArray }
-            return [PSCustomObject]$OutHash
+            $OutHash = @{ Host = $env:COMPUTERNAME; Detected = [Boolean]$ProcessEval; Name = $NameArray; ExecutablePath = $EPArray; Commandline = $CMDLineArray; PID = $PIDArray; PPID = $PPIDArray }
+            
+            return [PSCustomObject]$OutHash | Select Host, Detected, Name, ExecutablePath, Commandline, PID, PPID
         }
 
         #Generate output fules from scoping data collected

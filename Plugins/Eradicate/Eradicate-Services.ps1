@@ -84,14 +84,14 @@ process {
                 $Command = "sc.exe delete $Using:ServiceItem"
                 $null = Invoke-Expression -Command $Command -ErrorAction Stop
                 $Outhash = @{ Host=$ENV:ComputerName; Service=$Using:ServiceItem; Eradicated=$true }
-                return [PSCustomObject]$Outhash
 
             } catch {
 
                 $Outhash = @{ Host=$ENV:ComputerName; Service=$Using:ServiceItem; Eradicated=$false }
-                return [PSCustomObject]$Outhash
 
             }
+
+            return [PSCustomObject]$Outhash | Select Host, Eradicated, Service
         }
 
         #Generate output from data collected 

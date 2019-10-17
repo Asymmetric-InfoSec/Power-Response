@@ -81,14 +81,14 @@ process{
 
                 $null = Remove-Item -Path $Using:PathItem -Recurse -Force -ErrorAction Stop
                 $Outhash = @{ Host=$ENV:ComputerName; Path=$Using:PathItem; Eradicated=$true}
-                return [PSCustomObject]$Outhash
 
             } catch {
 
                 $Outhash = @{ Host=$ENV:ComputerName; Path=$Using:PathItem; Eradicated=$false }
-                return [PSCustomObject]$Outhash
 
             }
+
+            return [PSCustomObject]$Outhash | Select Host, Eradicated, Path
         }
 
         #Generate output from data collected 
