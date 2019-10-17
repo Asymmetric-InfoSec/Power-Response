@@ -88,7 +88,8 @@ process {
                     
             # return PSCustomObject for recording in CSV
             $OutHash =@{ Host = $env:COMPUTERNAME; Detected = [Boolean]$UserEval; Name = $NameArray; Enabled = $EnabledArray }
-            return [PSCustomObject]$OutHash
+            
+            return [PSCustomObject]$OutHash | Select Host, Detected, Name, Enabled
         }
         
         #Generate output fules from scoping data collected

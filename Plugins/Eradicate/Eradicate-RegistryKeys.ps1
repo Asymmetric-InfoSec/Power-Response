@@ -96,7 +96,6 @@ process {
                 if (!$Using:Recurse -and $KeyCount -gt 0) {
 
                     $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$false; Key = $Using:RegKeyItem; Notes = 'Key has subkeys, run with recursion' }
-                    return [PSCustomObject]$Outhash
                 }
 
                 if ($Using:Recurse -or $KeyCount -eq 0) {
@@ -116,21 +115,19 @@ process {
                         }
                         
                         $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$true; Key = $Using:RegKeyItem; Notes = '' }
-                        return [PSCustomObject]$Outhash
                         
 
                     } catch {
 
                         $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$false; Key = $Using:RegKeyItem; Notes = 'Error removing key' }
-                        return [PSCustomObject]$Outhash
                     }
                 }
             } catch {
 
                 $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$false; Key = $Using:RegKeyItem; Notes = 'Error getting key info' }
-                return [PSCustomObject]$Outhash
             }
             
+            return [PSCustomObject]$Outhash | Select Host, Eradicated, Key, Notes
             $null = Remove-PSDrive -Name HKU -Force -ErrorAction SilentlyContinue
         }
 

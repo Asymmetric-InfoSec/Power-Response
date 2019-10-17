@@ -94,14 +94,14 @@ process{
 
                 # return PSCustomObject for recording in CSV - includes path of discovered child object
                 $OutHash =@{ Host = $env:COMPUTERNAME; File = "$Using:FileItem"; Detected = "True"; Path = ($FileEvalPath -Join "`n")}
-                return [PSCustomObject]$OutHash
                 
             } else {
 
                 # return PSCustomObject for recording in CSV
                 $OutHash =@{ Host = $env:COMPUTERNAME; File = "$Using:FileItem"; Detected = "False"; Path = $null}
-                return [PSCustomObject]$OutHash
-            }      
+            }
+
+            return [PSCustomObject]$OutHash | Select Host, Detected, File, Path      
         }
 
         #Generate output fules from scoping data collected

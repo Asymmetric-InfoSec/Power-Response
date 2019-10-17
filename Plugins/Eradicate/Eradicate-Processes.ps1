@@ -82,15 +82,15 @@ process {
 
                 $ProcessInfo = Get-WMIObject win32_process -Filter "Name LIKE '$Using:ProcessItem%'" -ErrorAction Stop
                 $null = Get-Process -Name $Using:ProcessItem -ErrorAction Stop | Stop-Process -Force -ErrorAction Stop
-                $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$true; Process=$ProcessInfo.ProcessName; PID = $ProcessInfo.ProcessId; PPID = $ProcessInfo.ParentProcessId; Path = $ProcessInfo.ExecutablePath; CommandLine = $ProcessInfo.Commandline }
-                return [PSCustomObject]$Outhash
+                $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$true; ProcessName=$ProcessInfo.ProcessName; PID = $ProcessInfo.ProcessId; PPID = $ProcessInfo.ParentProcessId; Path = $ProcessInfo.ExecutablePath; CommandLine = $ProcessInfo.Commandline }
 
             } catch {
 
-                $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$false; ProcessName=$ProcessInfo.ProcessName; PID = $ProcessInfo.ProcessId; PPID = $ProcessInfo.ParentProcessId; Path = $ProcessInfo.ExecutablePath; CommandLine = $ProcessInfo.Commandline }
-                return [PSCustomObject]$Outhash
+                $Outhash = @{ Host=$ENV:ComputerName; Eradicated=$false; ProcessName=$Using:ProcessItem; PID = ''; PPID =''; Path =''; CommandLine ='' }
 
             }
+
+            return [PSCustomObject]$OutHash | Select Host, Eradicated, ProcessName, PID, PPID, Path, Commandline
         }
 
         #Generate output from data collected 

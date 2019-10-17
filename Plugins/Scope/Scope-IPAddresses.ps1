@@ -85,7 +85,8 @@ process {
             # Determine if found on system
             # return PSCustomObject for recording in CSV
             $OutHash =@{ Host = $env:COMPUTERNAME; Detected = [Boolean]$IPAddressEval; Address = $Using:AddressItem; Details = ($IPAddressEval -Join "`n")}
-            return [PSCustomObject]$OutHash
+            
+            return [PSCustomObject]$OutHash | Select Host, Detected, Address, Details
         }
 
         #Generate output fules from scoping data collected 
