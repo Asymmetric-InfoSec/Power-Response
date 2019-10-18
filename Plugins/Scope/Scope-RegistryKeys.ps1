@@ -98,7 +98,7 @@ process {
         $ScriptBlock = {
 
             #Mount PS Drive for processes
-            $null = New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS
+            $null = New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS -ErrorACtion SilentlyContinue
             
             # Determine if found on system
             $FullKeyEval = ((Get-Item -Path $Using:RegistryKeyItem).Name -Join "`n" -ErrorAction SilentlyContinue)
@@ -108,7 +108,7 @@ process {
             
             return [PSCustomObject]$OutHash | Select Host, Detected, Keys
 
-            $null = Remove-PSDrive -Name HKU -Force       
+            $null = Remove-PSDrive -Name HKU -Force -ErrorAction SilentlyContinue       
         }
         
         #Generate output fules from scoping data collected
