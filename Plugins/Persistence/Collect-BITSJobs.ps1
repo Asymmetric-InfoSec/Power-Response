@@ -36,10 +36,10 @@ process{
 
     try {
 
-        Get-BitsTransfer -AllUsers | Select *
+        Get-BitsTransfer -AllUsers | Select * -ErrorAction Stop
     
     } catch {
 
-        Write-Warning "Could not collect BITS Jobs Info."
+        Write-Warning "Could not collect BITS Jobs Info or there was no BITS Jobs to collect."
     }
 }

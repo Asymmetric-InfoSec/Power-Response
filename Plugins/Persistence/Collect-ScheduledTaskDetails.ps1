@@ -42,6 +42,6 @@ process{
     
     } catch {
 
-        Write-Warning "Could not collect scheduled task info."
+        Write-Warning "Could not collect scheduled task details."
     }
 }

@@ -79,31 +79,36 @@ process{
     # Remote archive name with second count for randomness
     $PluginOutputName = '{0}_{1}' -f ($PluginName -Replace '.+-'),(Get-Date -UFormat %s).Split('.')[0]
 
-    $SessionCopy = $Session
 
     # If we are not forcing through, see if we have collected artifacts already
     if (!$Force) {
+        # Make a copy of session for manipulation
+        $SessionCopy = $Session
+
         # Loop through each session computer name
         foreach ($ComputerName in $Session.ComputerName) {
             # Determine where the plugin log is
             $LogPath = Join-Path (Get-PRPath -Output) -ChildPath $ComputerName | Join-Path -ChildPath ('{0}_plugin-log.csv' -f $ComputerName) 
 
-            # Check if this plugin has already been executed today
-            Import-Csv -Path $LogPath -ErrorAction 'SilentlyContinue' | Where-Object { $PSItem.Success -and $PSItem.Plugin -eq $PluginName -and [DateTime]$PSItem.Date -gt (Get-Date).ToUniversalTime().Date } | Select-Object -First 1 | Foreach-Object {
-                # Write warning message to use Force parameter
-                Write-PRWarning -Message ("Plugin {0} has already been executed for system {1}. If you want to execute it again, use the 'Force' parameter" -f $PluginName,$ComputerName)
+            # Make sure log file is there
+            if (Test-Path -Path $LogPath -PathType 'Leaf') {
+                # Check if this plugin has already been executed today
+                Import-Csv -Path $LogPath -ErrorAction 'SilentlyContinue' | Where-Object { $PSItem.Success -and $PSItem.Plugin -eq $PluginName -and [DateTime]$PSItem.Date -gt (Get-Date).ToUniversalTime().Date } | Select-Object -First 1 | Foreach-Object {
+                    # Write warning message to use Force parameter
+                    Write-PRWarning -Message ("Plugin {0} has already been executed for system {1}. If you want to execute it again, use the 'Force' parameter" -f $PluginName,$ComputerName)
 
-                # Remove already executed session from tracked session list
-                $SessionCopy = $SessionCopy | Where-Object { $PSItem.ComputerName -ne $ComputerName }
+                    # Remove already executed session from tracked session list
+                    $SessionCopy = $SessionCopy | Where-Object { $PSItem.ComputerName -ne $ComputerName }
+                }
             }
         }
-    }
 
-    # If we don't have any sessions left, return
-    if ($SessionCopy) {
-        $Session = $SessionCopy
-    } else {
-        return
+        # If we don't have any sessions left, return
+        if ($SessionCopy) {
+            $Session = $SessionCopy
+        } else {
+            return
+        }
     }
 
     # Get stage directory

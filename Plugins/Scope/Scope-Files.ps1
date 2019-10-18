@@ -6,7 +6,7 @@
 .Description
     Performs scoping based on a list of files (names only) provided via string array
     or CSV input file. The output will return True or False based on
-    whether or not the file was discovered on the system.
+    whether or not it was discovered on the system.
 
     Note: The CSV import file must have a column header of 'File'
     
@@ -64,8 +64,7 @@ param(
 
 process{
 
-    #$Output = (Get-PRPath -ScopeName $ScopeName)
-    $Output = "C:\Tools\Power-Response\Output\$ScopeName"
+    $Output = ('{0}\{1}' -f (Get-PRPath -Output),$ScopeName)
 
     #Get seconds for unique naming
     $Seconds = (Get-Date -UFormat %s).Split('.')[0]
@@ -73,14 +72,14 @@ process{
     #Create output directory if needed
     if (!(Test-Path $Output)){
 
-        New-Item -Type Directory -Path $Output
+       $null = New-Item -Type Directory -Path $Output
     }
 
-    #Generate files list based on parameter set
+    #Generate based on parameter set
     switch ($PSCmdlet.ParameterSetName){
 
-            "File" {[String[]]$Files = $File}
-            "FileList"{[String[]]$Files = (Import-CSV -Path $FileList | Select-Object -ExpandProperty 'File')}
+        "File" {[String[]]$Files = $File}
+        "FileList"{[String[]]$Files = (Import-CSV -Path $FileList | Select-Object -ExpandProperty 'File')}
 
     }
 
@@ -88,29 +87,26 @@ process{
 
         $ScriptBlock = {
 
-            # Determine if file is found on system
+            # Determine if found on system
             $FileEvalPath = Get-ChildItem -Path $Using:FileStartPath -Recurse -Name -Include $Using:FileItem -ErrorAction SilentlyContinue
 
-            # Append eval results to CSV
             if ($FileEvalPath){
 
-                $FilePathArray += ($FileEvalPath -Join "`n")
-
                 # return PSCustomObject for recording in CSV - includes path of discovered child object
-                $OutHash =@{ Host = $env:COMPUTERNAME; Detected = "True"; Path = $FilePathArray}
-                return [PSCustomObject]$OutHash
+                $OutHash =@{ Host = $env:COMPUTERNAME; File = "$Using:FileItem"; Detected = "True"; Path = ($FileEvalPath -Join "`n")}
                 
-                } else {
+            } else {
 
                 # return PSCustomObject for recording in CSV
-                $OutHash =@{ Host = $env:COMPUTERNAME; Detected = "False"; Path = $null}
-                return [PSCustomObject]$OutHash
-            }      
+                $OutHash =@{ Host = $env:COMPUTERNAME; File = "$Using:FileItem"; Detected = "False"; Path = $null}
+            }
+
+            return [PSCustomObject]$OutHash | Select Host, Detected, File, Path      
         }
 
-        #Generate output fules from scoping data collected (1 csv output file per file scoped)
+        #Generate output fules from scoping data collected
         $OutputPath = ('{0}\Scope_{1}_{2}.csv' -f $Output,$FileItem,$Seconds)
-        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Export-CSV -Path $OutputPath -Append
+        Invoke-Command -Session $Session -ScriptBlock $ScriptBlock | Export-CSV -Path $OutputPath -Append -NoTypeInformation
 
     }   
 }
