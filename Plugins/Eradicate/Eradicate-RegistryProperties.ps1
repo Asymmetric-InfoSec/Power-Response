@@ -1,20 +1,19 @@
 <#
 
 .SYNOPSIS
-    Plugin-Name: Scope-RegistryProperties.ps1
+    Plugin-Name: Eradicate-RegistryProperties.ps1
     
 .Description
-    Performs scoping based on a list of registry key/value pairs provided via string array
-    or CSV input file. The output will return True or False based on
-    whether or not it was discovered on the system.
+    This plugin allows for incident responders to eradicate registry keys from
+    known compromised systems. This plugin can take an explicit list of
+    paths or a CSV list of different paths to eradicate from the 
+    target machines.
 
-    Note: The CSV import file must have a column header of 'RegKeyProperty'
+    Note: If using a CSV of paths, the header must be 'RegKeyProperty '
 
-    Note: Keep in mind that this scoping plugin scopes based on properties that belong to a 
-    specific key and not necessarily for keys themselves. If you want to scope based on the 
-    existence of keys, use Scope-RegistryKeys.ps1.
-
-    Note: PowerShell has a hard time with wildcarding multiple keys at one time using Get-Item
+    Note: This plugin is meant for the eradication of registry keys and not 
+    registry properties. To eradicate registry properties, use the 
+    Eradicate-RegistryKeys.ps1 plugin
 
     --Key Formatting Notes--
 
@@ -76,7 +75,7 @@ param (
 
     [Parameter(ParameterSetName = "RegKeyProperty",Position = 1,Mandatory = $true)]
     [Parameter(ParameterSetName = "RegKeyPropertyList",Position = 1,Mandatory = $true)]
-    [String]$ScopeName,
+    [String]$EradicateName,
 
     [Parameter(ParameterSetName = "RegKeyProperty",Position = 2,Mandatory = $true)]
     [Parameter(ParameterSetName = "RegKeyPropertyList",Position = 2,Mandatory = $true)]
@@ -85,7 +84,7 @@ param (
 
 process {
 
-    $Output = ('{0}\{1}' -f (Get-PRPath -Output),$EradicateName)
+    $Output = ('{0}\{1}' -f (Get-PRPath -Output),$ScopeName)
 
     #Get seconds for unique naming
     $Seconds = (Get-Date -UFormat %s).Split('.')[0]
@@ -116,12 +115,29 @@ process {
             # Determine if found on system
             $FullPropertyEval = (Get-ItemProperty -Path ($RegKeyValue.Split(';')[0]) -Name ($RegKeyValue.Split(';')[1]) -ErrorAction SilentlyContinue)
 
-            # return PSCustomObject for recording in CSV
-            $OutHash =@{Host = $env:COMPUTERNAME; Detected = [Boolean]$FullPropertyEval; RegKey = $RegKeyValue.Split(';')[0]; RegProperty = $RegKeyValue.Split(';')[1]}
-            
-            return [PSCustomObject]$OutHash | Select Host, Detected, RegKey, RegProperty
+            if ($FullPropertyEval){
 
-            $null = Remove-PSDrive -Name HKU -Force -ErrorAction SilentlyContinue      
+                try {
+
+                    Remove-ItemProperty -Path $RegKeyValue.Split(';')[0] -Name $RegKeyValue.Split(';')[1] -Force -ErrorAction Stop
+                    [PSCustomObject]$OutHash = @{Host = $env:COMPUTERNAME; Eradicated = $true; RegKey = $RegKeyValue.Split(';')[0]; RegProperty = $RegKeyValue.Split(';')[1]; Notes = '' }
+
+                } catch {
+
+                    [PSCustomObject]$OutHash = @{Host = $env:COMPUTERNAME; Eradicated = $false; RegKey = $RegKeyValue.Split(';')[0]; RegProperty = $RegKeyValue.Split(';')[1]; Notes = 'There was a problem removing the property.' }
+
+                }
+            }
+
+            if (!$FullPropertyEval){
+
+                # return PSCustomObject for recording in CSV
+                $OutHash =@{Host = $env:COMPUTERNAME; Eradicated = $false; RegKey = $RegKeyValue.Split(';')[0]; RegProperty = $RegKeyValue.Split(';')[1]; Notes = 'Reg key or property not found' }
+            }
+            
+            $null = Remove-PSDrive -Name HKU -Force -ErrorAction SilentlyContinue 
+
+            return [PSCustomObject]$OutHash | Select Host, Eradicated, RegKey, RegProperty, Notes         
         }
         
         #Generate output fules from scoping data collected
