@@ -62,10 +62,11 @@ process {
     # Remote archive name with second count for randomness
     $PluginOutputName = '{0}_{1}' -f ($PluginName -Replace '.+-'),(Get-Date -UFormat %s).Split('.')[0]
 
-    $SessionCopy = $Session
-
     # If we are not forcing through, see if we have collected artifacts already
     if (!$Force) {
+        # Make a copy of session for manipulation
+        $SessionCopy = $Session
+
         # Loop through each session computer name
         foreach ($ComputerName in $Session.ComputerName) {
             # Determine where the plugin log is
@@ -83,14 +84,15 @@ process {
                 }
             }
         }
+
+        # If we don't have any sessions left, return
+        if ($SessionCopy) {
+            $Session = $SessionCopy
+        } else {
+            return
+        }
     }
 
-    # If we don't have any sessions left, return
-    if ($SessionCopy) {
-        $Session = $SessionCopy
-    } else {
-        return
-    }
 
     # Get stage directory
     $RemoteStageDirectory = Get-PRConfig -Property 'RemoteStagePath'
