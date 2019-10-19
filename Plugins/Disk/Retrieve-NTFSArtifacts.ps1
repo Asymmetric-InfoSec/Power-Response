@@ -151,7 +151,7 @@ process {
     $SystemArtifacts = @(
         'C:\$MFT',
         'C:\$Boot',
-        'C:\$Secure:$SDS',
+        #'C:\$Secure:$SDS',
         'C:\$LogFile',
         'C:\$Extend\$UsnJrnl:$J'
     )
