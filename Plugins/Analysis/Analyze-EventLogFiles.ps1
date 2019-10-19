@@ -138,7 +138,7 @@ process{
         $null = Invoke-Expression -Command $Command
 
         # Get root path to all artifacts
-        $ArtifactRoot = '{0}\C\Windows\System32\winevt\logs' -f $ArtifactDirectory.FullName)
+        $ArtifactRoot = '{0}\C\Windows\System32\winevt\logs' -f $ArtifactDirectory.FullName
 
         # Get the unzipped artifact paths
         $Artifacts = $Dependency.EvtxEcmd.Logs.Keys

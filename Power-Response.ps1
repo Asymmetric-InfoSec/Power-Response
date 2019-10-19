@@ -449,7 +449,7 @@ function Get-PRPlugin {
 
     process {
         # Check if $Name is a direct path
-        $Item = Get-Item -Path $Name -ErrorAction 'SilentlyContinue'
+        $Item = Get-Item -Path $Name -ErrorAction 'Ignore'
 
         # If $Item exists and is a file object with full path matching the Plugins regular expression, return it
         if ($Item -and !$Item.PSIsContainer -and $Item.FullName -Match $global:PowerResponse.Regex.Plugins) {
@@ -738,7 +738,7 @@ function Invoke-RunCommand {
 
             } catch {
                 # Format warning $Message
-                $Message = 'Error Invoking Plugin: Session, privilege, or availability error cccurred'
+                $Message = 'Error Invoking Plugin: Session, privilege, or availability error cccurred: {0}' -f $PSItem
 
                 # Write warning $Message
                 Write-PRWarning -Message $Message -Append "`n`tSkipping plugin execution"
@@ -980,10 +980,14 @@ function Invoke-PRPlugin {
     }
 
     process {
+        # Clear $Error log
+        $Error.Clear()
+
+        # Ensure we log the plugin execution
+        $LoggedPlugin = $false
+
         # If $CommandParameters doesn't contain 'Session'
         if ($CommandParameters.Keys -NotContains 'Session') {
-            # Clear $Error log
-            $Error.Clear()
 
             # Compile $InvokeCommandParameters HashTable
             $InvokeCommandParameters = @{
@@ -997,63 +1001,13 @@ function Invoke-PRPlugin {
 
             try {
                 # Invoke the script file as a $Job with the $ArgumentList
-                $Job = Invoke-Command @InvokeCommandParameters
+                $Results = Invoke-Command @InvokeCommandParameters | Receive-Job -Wait -AutoRemoveJob -ErrorAction 'SilentlyContinue'
             } catch {
-                # Format remoting warning $Message
-                $Message = 'Plugin {0} Job Creation Error: {1}' -f $Item.BaseName.ToUpper(),$PSItem
+                # Encountered an error
+                Write-PRPluginLog -FrameworkFailure -ComputerName $Session.ComputerName -Plugin $Item.BaseName -RemoteErrors $PSItem
 
-                # Write warning $Message
-                Write-PRWarning -Message $Message
-            }
-
-            # If we successfully created the $Job
-            if ($Job) {
-                # Wait for the $Job to complete
-                $null = Wait-Job -Job $Job
-
-                # Receive the $Results of the $Job and group them by PSComputerName
-                $Results = Receive-Job -Job $Job -ErrorAction 'SilentlyContinue' | Group-Object -Property 'PSComputerName'
-
-                # Loop through $Result groups
-                foreach ($Result in $Results) {
-                    # Handle Hunt/Non-Hunt output
-                    if ($HuntName) {
-                        # Append the ComputerName to the filename
-                        $OutPRFileParameters.Append = $Result.Name.ToLower()
-                    } else {
-                        # Send output to ComputerName folder
-                        $OutPRFileParameters.ComputerName = $Result.Name
-                    }
-
-                    # Send each $Result to it's specific PR output file based on ComputerName
-                    $Result.Group | Out-PRFile @OutPRFileParameters
-
-                    # Format the remote execution success $Message
-                    $Message = 'Plugin {0} Execution Succeeded for {1} at {2}' -f $Item.BaseName.ToUpper(),$Result.Name,(Get-Date)
-
-                    # Write host $Message
-                    Write-PRHost -Message $Message
-
-                    # Write host log success
-                    Write-PRPluginLog -ComputerName $Result.Name -Plugin $Item.BaseName -Success
-                }
-
-                # Gather the $RemoteError
-                $RemoteErrors = $Error | Where-Object { $PSItem -is [System.Management.Automation.Runspaces.RemotingErrorRecord] }
-
-                foreach ($RemoteError in $RemoteErrors) {
-                    # Format the remote error $Message
-                    $Message = 'Plugin {0} Execution Error for {1}: {2}' -f $Item.BaseName.ToUpper(),$RemoteError.OriginInfo.PSComputerName,$RemoteError.Exception
-
-                    # Write warning $Message
-                    Write-PRWarning -Message $Message
-
-                    # Write host log failure
-                    Write-PRPluginLog -ComputerName $RemoteError.OriginInfo.PSComputerName -Plugin $Item.BaseName
-                }
-
-                # Remove the $Job
-                Remove-Job -Job $Job
+                # Inform future plugin log
+                $LoggedPlugin = $true
             }
         } else {
             # Initialize $ReleventParameters Hashtable
@@ -1069,84 +1023,67 @@ function Invoke-PRPlugin {
                 # Set $ReleventParameters.Session to the generated $Session
                 $ReleventParameters.Session = $Session
 
+                Write-Verbose -Message ('Executing {0}' -f $Item.BaseName.ToUpper())
+
                 try {
                     # Execute the $Path with the $ReleventParameters
-                    $Results = & $Path @ReleventParameters | Group-Object -Property 'PSComputerName'
-
-                    # Write host log success
-                    Write-PRPluginLog -ComputerName $Session.ComputerName -Plugin $Item.BaseName -Success
+                    $Results = & $Path @ReleventParameters
+                    # $Job = Start-Job -ScriptBlock $function:InvokePRSplat -ArgumentList @($Path, $ReleventParameters)
                 } catch {
-                    # Format warning $Message
-                    $Message = 'Plugin {0} Execution Error: {1}' -f $Item.BaseName.ToUpper(),$PSItem
+                    # Encountered an error
+                    Write-PRPluginLog -FrameworkFailure -ComputerName $Session.ComputerName -Plugin $Item.BaseName -RemoteErrors $PSItem
 
-                    # Write warning $Message to screen along with some admin advice
-                    Write-PRWarning -Message $Message -Append "`nAre you running as admin?"
-
-                    # Write host log success
-                    Write-PRPluginLog -ComputerName $Session.ComputerName -Plugin $Item.BaseName
-                }
-
-                # Loop through $Result groups
-                foreach ($Result in $Results) {
-                    # Handle Hunt/Non-Hunt output
-                    if ($HuntName) {
-                        # Append the ComputerName to the filename
-                        $OutPRFileParameters.Append = $Result.Name.ToLower()
-                    } else {
-                        # Send output to ComputerName folder
-                        $OutPRFileParameters.ComputerName = $Result.Name
-                    }
-
-                    # Send each $Result to it's specific PR output file based on ComputerName
-                    $Result.Group | Out-PRFile @OutPRFileParameters
-
-                    # Format the remote execution success $Message
-                    $Message = 'Plugin {0} Execution Succeeded for {1}' -f $Item.BaseName.ToUpper(),$Result.Name
-
-                    # Write host $Message
-                    Write-PRHost -Message $Message
+                    # Inform future plugin log
+                    $LoggedPlugin = $true
                 }
             } else {
                 Write-Verbose -Message 'Detected Plugin requesting single Session'
+                # $Job = @()
+                $Results = @()
+
                 # Loop through each $SessionInstance
                 foreach ($SessionInstance in $Session) {
                     # Set $ReleventParameters.Session to the current $SessionInstance
                     $ReleventParameters.Session = $SessionInstance
 
-                    # Handle Hunt/Non-Hunt output
-                    if ($HuntName) {
-                        # Append the ComputerName to the filename
-                        $OutPRFileParameters.Append = $SessionInstance.ComputerName.ToLower()
-                    } else {
-                        # Send output to ComputerName folder
-                        $OutPRFileParameters.ComputerName = $SessionInstance.ComputerName
-                    }
-
                     try {
-                        # Execute the $Path with the $ReleventParameters
-                        & $Path @ReleventParameters | Out-PRFile @OutPRFileParameters
-
-                        # Format host success $Message
-                        $Message = 'Plugin {0} Execution Succeeded for {1} at {2}' -f (Get-Item -Path $Path).BaseName.ToUpper(),$SessionInstance.ComputerName, (Get-Date)
-
-                        # Write execution success message
-                        Write-PRHost -Message $Message
-
-                        # Write host log success
-                        Write-PRPluginLog -ComputerName $SessionInstance.ComputerName -Plugin $Item.BaseName -Success
+                        $Results += & $Path @ReleventParameters
+                        # $Job += Start-Job -ScriptBlock $function:InvokePRSplat -ArgumentList @($Path, $ReleventParameters)
                     } catch {
-                        # Format warning $Message
-                        $Message = 'Plugin {0} Execution Error for {1}: {2}' -f $Item.BaseName.ToUpper(),$SessionInstance.ComputerName,$PSItem
+                        # Encountered an error
+                        Write-PRPluginLog -FrameworkFailure -ComputerName $Session.ComputerName -Plugin $Item.BaseName -RemoteErrors $PSItem
 
-                        # Write warning $Message to screen along with some admin advice
-                        Write-PRWarning -Message $Message -Append "`nAre you running as admin?"
-
-                        # Write host log success
-                        Write-PRPluginLog -ComputerName $SessionInstance.ComputerName -Plugin $Item.BaseName
+                        # Inform future plugin log
+                        $LoggedPlugin = $true
                     }
                 }
             }
         }
+
+
+        # Gather the explicitly remote $RemoteErrors
+        $RemoteErrors = $Error | Where-Object { $PSItem -is [System.Management.Automation.Runspaces.RemotingErrorRecord] }
+
+        if (!$LoggedPlugin) {
+            # Write plugin logs and print plugin success/fail message
+            Write-PRPluginLog -ComputerName $Session.ComputerName -Plugin $Item.BaseName -RemoteErrors $RemoteErrors
+        }
+
+        # Loop through $Result groups
+        foreach ($Result in ($Results | Group-Object -Property 'PSComputerName')) {
+            # Handle Hunt/Non-Hunt output
+            if ($HuntName) {
+                # Append the ComputerName to the filename
+                $OutPRFileParameters.Append = $Result.Name.ToLower()
+            } else {
+                # Send output to ComputerName folder
+                $OutPRFileParameters.ComputerName = $Result.Name
+            }
+
+            # Send each $Result to it's specific PR output file based on ComputerName
+            $Result.Group | Out-PRFile @OutPRFileParameters
+        }
+
     }
 
     end {
@@ -1327,7 +1264,7 @@ function Out-PRFile {
 function Protect-PRFile {
     param (
         [Parameter(Position=0)]
-        [String[]]$Path = (Get-ChildItem -File -Force -Recurse -Attributes '!ReadOnly' -Exclude '*.xlsx' -Path (Get-PRPath -Output) -ErrorAction 'SilentlyContinue' | Select-Object -ExpandProperty 'FullName'),
+        [String[]]$Path = (Get-ChildItem -File -Force -Recurse -Attributes '!ReadOnly' -Exclude '*.xlsx' -Path (Get-PRPath -Output) -ErrorAction 'Ignore' | Select-Object -ExpandProperty 'FullName'),
 
         [ValidateSet('SHA1','SHA256','SHA384','SHA512','MACTripleDES','MD5','RIPEMD160')]
         [String]$HashAlgorithm = $global:PowerResponse.Config.HashAlgorithm
@@ -1361,20 +1298,31 @@ function Write-PRPluginLog {
     param (
         [String[]]$ComputerName,
         [String]$Plugin,
-        [Switch]$Success
+        [PSObject]$RemoteErrors,
+        [Switch]$FrameworkFailure
     )
 
     process {
-        # Build $LogLine
-        $LogLine = [PSCustomObject]@{
-            Date = '{0:u}' -f (Get-Date).ToUniversalTime()
-            UserName = $ENV:UserName
-            Plugin = $Plugin
-            Success = $Success
-        }
-
         # Loop through each $Computer
         foreach ($Computer in $ComputerName) {
+            # Check for a $RemoteError
+            $RemoteError = $RemoteErrors | Where-Object { $PSItem.OriginInfo.PSComputerName -eq $Computer }
+
+            # Build $LogLine
+            $LogLine = [PSCustomObject]@{
+                Date = '{0:u}' -f (Get-Date).ToUniversalTime()
+                UserName = $ENV:UserName
+                Plugin = $Plugin
+                Success = -not [Boolean]$RemoteError
+                Error = $RemoteError.Exception
+            }
+
+            # If the framework was unable to execute the plugin, say so
+            if ($FrameworkFailure) {
+                $LogLine.Success = $false
+                $LogLine.Error = 'The framework failed to execute this plugin'
+            }
+
             # Get the log file name
             $FileName = '{0}_plugin-log.csv' -f $Computer.ToLower()
 
@@ -1393,7 +1341,7 @@ function Write-PRPluginLog {
             $Append = Test-Path -Path $LogPath
 
             # Make the log file writeable
-            Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $false -ErrorAction 'SilentlyContinue'
+            # Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $false -ErrorAction 'SilentlyContinue'
 
             try {
                 # Write the $LogLine to $LogPath
@@ -1406,8 +1354,23 @@ function Write-PRPluginLog {
                 Write-PRWarning -Message $Message
             }
 
+            # Write the success or failure message to screen
+            if ($LogLine.Success) {
+                # Format host success $Message
+                $Message = 'Plugin {0} Execution Succeeded for {1} at {2}' -f $Plugin, $Computer, (Get-Date)
+
+                # Write execution success message
+                Write-PRHost -Message $Message
+            } else {
+                # Format the remote error $Message
+                $Message = 'Plugin {0} Execution Error for {1}: {2}' -f $Plugin.ToUpper(),$Computer,$LogLine.Error
+
+                # Write warning $Message
+                Write-PRWarning -Message $Message
+            }
+
             # Make the log file readonly
-            Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $true -ErrorAction 'SilentlyContinue'
+            # Set-ItemProperty -Path $LogPath -Name 'IsReadOnly' -Value $true -ErrorAction 'SilentlyContinue'
         }
     }
 }
