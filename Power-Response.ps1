@@ -33,7 +33,7 @@ function Copy-PRItem {
                 [String[]]$Path,
 
                 [Parameter(Position=1,Mandatory=$true)]
-                [String]$Destination,
+                [String]$DestinationDirectory,
 
                 [Parameter(Position=2,Mandatory=$true)]
                 [String]$Algorithm
@@ -44,25 +44,25 @@ function Copy-PRItem {
                 # Create add meta data function
                 function AddMetaData {
                     param (
-                        [String]$Path,
+                        [System.IO.FileInfo]$Path,
                         [String]$Destination,
+                        [String]$DestinationDirectory,
                         [String]$Hash,
                         [String]$Algorithm
                     )
 
                     process {
-                        # Get the item at path
-                        $Item = Get-Item -Force -Path $Path -ErrorAction 'SilentlyContinue'
+                        # Set destination attributes
+                        $Item = Get-Item -Force -Path $Destination
+                        $Item.CreationTime = $Path.CreationTime
+                        $Item.LastAccessTime = $Path.LastAccessTime
+                        $Item.LastWriteTime = $Path.LastWriteTime
 
                         # Select the relevent metadata
-                        if ($Item -ne $null) {
-                            $MetaData = $Item | Select-Object @{Name='Item'; Expression={$PSItem.Name}},'Directory','CreationTimeUtc',@{Name='ModifiedTimeUtc'; Expression={$PSItem.LastWriteTimeUTC}},@{Name='AccessTimeUtc'; Expression={$PSItem.LastAccessTimeUTC}},@{Name=$Algorithm; Expression={$Hash}}
-                        } else {
-                            $MetaData = '' | Select-Object @{Name='Item'; Expression={Split-Path -Leaf -Path $Path}},@{Name='Directory'; Expression={Split-Path -Parent -Path $Path}},'CreationTimeUtc','ModifiedTimeUtc','AccessTimeUtc',@{Name=$Algorithm; Expression={$Hash}}
-                        }
+                        $MetaData = $Path | Select-Object @{Name='Item'; Expression={$PSItem.Name}},'Directory','CreationTimeUtc',@{Name='ModifiedTimeUtc'; Expression={$PSItem.LastWriteTimeUTC}},@{Name='AccessTimeUtc'; Expression={$PSItem.LastAccessTimeUTC}},@{Name=$Algorithm; Expression={$Hash}}
 
                         # Build destination csv
-                        $DestinationCsv = Join-Path -Path $Destination -ChildPath 'CopyItems_Metadata.csv'
+                        $DestinationCsv = Join-Path -Path $DestinationDirectory -ChildPath 'CopyItems_Metadata.csv'
 
                         # Export meta data to csv
                         $MetaData | Export-Csv -Append -NoTypeInformation -Path $DestinationCsv
@@ -70,10 +70,10 @@ function Copy-PRItem {
                 }
 
                 # Create destination location helper function
-                function GetLocation {
+                function GetDestination {
                     param (
                         [String]$Path,
-                        [String]$Destination
+                        [String]$DestinationDirectory
                     )
 
                     process {
@@ -85,9 +85,9 @@ function Copy-PRItem {
                         $ChildPath = $Path -Replace ':','%3a' -Replace '\$','%24'
 
                         # Compute destination location
-                        $Location = Join-Path -Path $Destination -ChildPath $ChildPath
+                        $Destination = Join-Path -Path $DestinationDirectory -ChildPath $ChildPath
 
-                        return $Location
+                        return [System.IO.FileInfo]$Destination
                     }
                 }
 
@@ -129,8 +129,8 @@ function Copy-PRItem {
 
                 ### Ensure destination folder exists
                 # Create $Destination directory if it doesn't exist
-                if (!(Test-Path -Path $Destination -PathType 'Container')) {
-                    $null = New-Item -Type 'Directory' -Path $Destination
+                if (!(Test-Path -Path $DestinationDirectory -PathType 'Container')) {
+                    $null = New-Item -Type 'Directory' -Path $DestinationDirectory
                 }
 
                 # Save error action preference for later manipulation
@@ -183,29 +183,30 @@ function Copy-PRItem {
                                 $Bytes = [PowerForensics.FileSystems.Ntfs.FileRecord]::GetContentBytes($GetContent.Path, $GetContent.Stream)
                             } catch [System.Management.Automation.MethodInvocationException] {
                                 # Unable to find file
-                                Write-Warning -Message ("Unable to collect file: {0}" -f $File)
+                                Write-Warning -Message ('Unable to collect file: {0}' -f $File)
+                                continue
+                            } catch {
+                                # Unexpected error occurred
+                                Write-Warning -Message ('Unexpected error copying file {0}: {1}' -f $File, $PSItem)
                                 continue
                             }
                         }
 
-                        # Create the end $Location full path
-                        $Location = GetLocation -Path $File -Destination $Destination
-
-                        # Get the containing directory
-                        $Directory = Split-Path -Parent -Path $Location
+                        # Create the end $Destination full path
+                        $Destination = GetDestination -Path $File -DestinationDirectory $DestinationDirectory
 
                         # Create the destination directory if it doesn't exist
-                        if (!(Test-Path -Path $Directory -PathType 'Container')) {
-                            $null = New-Item -ItemType 'Directory' -Path $Directory
+                        if (!$Destination.Directory.Exists) {
+                            $null = New-Item -ItemType 'Directory' -Path $Destination.DirectoryName
                         }
 
                         # Verbose print results
-                        Write-Verbose -Message ("File:     '{0}'" -f $GetContent.Path)
-                        Write-Verbose -Message ("Location: '{0}'" -f $Location)
-                        Write-Verbose -Message ("Stream:   '{0}'" -f $GetContent.Stream)
+                        Write-Verbose -Message ("File:        '{0}'" -f $GetContent.Path)
+                        Write-Verbose -Message ("Destination: '{0}'" -f $Destination.FullName)
+                        Write-Verbose -Message ("Stream:      '{0}'" -f $GetContent.Stream)
 
                         # For now, write the file to disk. Eventually GZIP stream the bytes
-                        [System.IO.File]::WriteAllBytes($Location, $Bytes)
+                        [System.IO.File]::WriteAllBytes($Destination.FullName, $Bytes)
 
                         # Null out bytes
                         $Bytes = $null
@@ -214,10 +215,10 @@ function Copy-PRItem {
                         [System.GC]::Collect()
 
                         # Compute the hash of bytes
-                        $Hash = Get-FileHash -Algorithm $Algorithm -Path $Location | Select-Object -ExpandProperty 'Hash'
+                        $Hash = Get-FileHash -Algorithm $Algorithm -Path $Destination.FullName | Select-Object -ExpandProperty 'Hash'
 
                         # Add to the meta data file
-                        AddMetaData -Path $GetContent.Path -Destination $Destination -Hash $Hash -Algorithm $Algorithm
+                        AddMetaData -Path $GetContent.Path -Destination $Destination.FullName -DestinationDirectory $DestinationDirectory -Hash $Hash -Algorithm $Algorithm
                     }
                 }
             }
