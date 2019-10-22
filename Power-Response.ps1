@@ -472,7 +472,7 @@ function Import-Config {
 
     begin {
         # List out required values to check for
-        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','EncryptPassword','HashAlgorithm','OutputType','Path','PromptText','PSSession','RemoteStagePath','ThrottleLimit')
+        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','EncryptPassword','HashAlgorithm','OutputType','Path','PromptText','PSSession','RemoteStagePath','ThrottleLimit','ShowParametersAtStart')
         $PathRequiredValues = @('Bin','Logs','Output','Plugins')
         $PSSessionRequiredValues = @('NoMachineProfile')
     }
@@ -489,6 +489,7 @@ function Import-Config {
             PromptText = 'power-response'
             RemoteStagePath = 'C:\ProgramData\Power-Response'
             ThrottleLimit = 32
+            ShowParametersAtStart = $true
 
             # C:\Path\To\Power-Response\{FolderName}
             Path = @{
@@ -1495,6 +1496,13 @@ function Write-PRWarning {
     }
 }
 
+# Initialize $global:PowerResponse hashtable
+$global:PowerResponse = @{}
+
+# Import $global:PowerResponse.Config from data file
+Import-Config -Path $ConfigPath
+Write-Debug 'After Import-Config'
+
 # $Banner for Power-Response
 $Banner = @'
     ____                                ____
@@ -1503,15 +1511,22 @@ $Banner = @'
  / ____/ /_/ / |/ |/ /  __/ /  /_____/ _, _/  __(__  ) /_/ / /_/ / / / (__  )  __/
 /_/    \____/|__/|__/\___/_/        /_/ |_|\___/____/ .___/\____/_/ /_/____/\___/
                                                    /_/
-'@
+
+'@ 
 
 Write-Host -Object $Banner
 
-# Initialize $global:PowerResponse hashtable
-$global:PowerResponse = @{}
+if ($global:PowerResponse.Config.ShowParametersAtStart){
 
-# Import $global:PowerResponse.Config from data file
-Import-Config -Path $ConfigPath
+    #Display Config Parameters
+    Write-Host "Power-Response Parameters"
+    $global:PowerResponse.Config
+    Write-Host "`n"
+    Write-Host "Path Parameters"
+    $global:PowerResponse.Config.Path
+    Write-Host "`n"
+
+}
 
 # Write a log to indicate framework startup
 Write-PRLog -Message 'Began the Power-Response framework'
