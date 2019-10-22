@@ -488,8 +488,8 @@ function Import-Config {
             OutputType = @('CSV','XLSX')
             PromptText = 'power-response'
             RemoteStagePath = 'C:\ProgramData\Power-Response'
-            ThrottleLimit = 32
             ShowParametersAtStart = $true
+            ThrottleLimit = 32
 
             # C:\Path\To\Power-Response\{FolderName}
             Path = @{
@@ -505,15 +505,12 @@ function Import-Config {
             }
         }
 
+        $Config = [Ordered]@{}
+
         # Try to import the data, on failure set to default
         try {
-            # If the Config file $Path does not exist, throw an error to skip to catch block
-            if (!(Test-Path $Path)) {
-                throw 'Path does not exist'
-            }
-
             # Get the Config file at $Path
-            $File = Get-Item -Path $Path
+            $File = Get-Item -Path $Path -ErrorAction 'Stop'
 
             # Import the Config data file and bind it to the $Config variable
             Import-LocalizedData -BindingVariable 'Config' -BaseDirectory $File.PSParentPath -FileName $File.Name
@@ -1505,6 +1502,7 @@ Write-Debug 'After Import-Config'
 
 # $Banner for Power-Response
 $Banner = @'
+
     ____                                ____
    / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________
   / /_/ / __ \ | /| / / _ \/ ___/_____/ /_/ / _ \/ ___/ __ \/ __ \/ __ \/ ___/ _ \
@@ -1517,13 +1515,15 @@ $Banner = @'
 Write-Host -Object $Banner
 
 if ($global:PowerResponse.Config.ShowParametersAtStart){
+    Write-Host "`nPower-Response Parameters"
 
-    #Display Config Parameters
-    Write-Host "Power-Response Parameters"
-    $global:PowerResponse.Config
-    Write-Host "`n"
-    Write-Host "Path Parameters"
-    $global:PowerResponse.Config.Path
+    # Alphabetize non-hashtable values first, then hashtable values expanded with .s after
+    $ConfigCopy = [Ordered]@{}
+    $global:PowerResponse.Config.GetEnumerator() | Where-Object { $PSItem.Value -isnot [HashTable] } | Sort-Object -Property 'Name' -PipelineVariable 'Item' | Foreach-Object { $ConfigCopy.($Item.Key) = $Item.Value }
+    $global:PowerResponse.Config.GetEnumerator() | Where-Object { $PSItem.Value -is [HashTable] } | Sort-Object -Property 'Name' -PipelineVariable 'Item' | Foreach-Object { $Item.Value.GetEnumerator() | Sort-Object -Property 'Name' | Foreach-Object { $ConfigCopy.('{0}.{1}' -f $Item.Key,$PSItem.Key) = $PSItem.Value } }
+
+    # #Display Config Parameters
+    [PSCustomObject]$ConfigCopy
     Write-Host "`n"
 
 }
