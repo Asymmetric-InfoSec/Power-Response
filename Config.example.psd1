@@ -18,6 +18,7 @@
     # PromptText = 'power-response'
     # RemoteStagingDirectory = 'C:\ProgramData\Power-Response'
     # ThrottleLimit = 32
+    # ShowParametersAtStart = $true
     # --------- End General Section ----------
 
     # ---------- Begin Path Section ----------
