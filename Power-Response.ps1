@@ -472,7 +472,7 @@ function Import-Config {
 
     begin {
         # List out required values to check for
-        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','EncryptPassword','HashAlgorithm','OutputType','Path','PromptText','PSSession','RemoteStagePath','ThrottleLimit')
+        $TopRequiredValues = @('AdminUserName','AutoAnalyze','AutoClear','EncryptPassword','HashAlgorithm','OutputType','Path','PromptText','PSSession','RemoteStagePath','ThrottleLimit','ShowParametersAtStart')
         $PathRequiredValues = @('Bin','Logs','Output','Plugins')
         $PSSessionRequiredValues = @('NoMachineProfile')
     }
@@ -488,6 +488,7 @@ function Import-Config {
             OutputType = @('CSV','XLSX')
             PromptText = 'power-response'
             RemoteStagePath = 'C:\ProgramData\Power-Response'
+            ShowParametersAtStart = $true
             ThrottleLimit = 32
 
             # C:\Path\To\Power-Response\{FolderName}
@@ -504,15 +505,12 @@ function Import-Config {
             }
         }
 
+        $Config = [Ordered]@{}
+
         # Try to import the data, on failure set to default
         try {
-            # If the Config file $Path does not exist, throw an error to skip to catch block
-            if (!(Test-Path $Path)) {
-                throw 'Path does not exist'
-            }
-
             # Get the Config file at $Path
-            $File = Get-Item -Path $Path
+            $File = Get-Item -Path $Path -ErrorAction 'Stop'
 
             # Import the Config data file and bind it to the $Config variable
             Import-LocalizedData -BindingVariable 'Config' -BaseDirectory $File.PSParentPath -FileName $File.Name
@@ -1495,23 +1493,40 @@ function Write-PRWarning {
     }
 }
 
+# Initialize $global:PowerResponse hashtable
+$global:PowerResponse = @{}
+
+# Import $global:PowerResponse.Config from data file
+Import-Config -Path $ConfigPath
+Write-Debug 'After Import-Config'
+
 # $Banner for Power-Response
 $Banner = @'
+
     ____                                ____
    / __ \____ _      _____  _____      / __ \___  _________  ____  ____  ________
   / /_/ / __ \ | /| / / _ \/ ___/_____/ /_/ / _ \/ ___/ __ \/ __ \/ __ \/ ___/ _ \
  / ____/ /_/ / |/ |/ /  __/ /  /_____/ _, _/  __(__  ) /_/ / /_/ / / / (__  )  __/
 /_/    \____/|__/|__/\___/_/        /_/ |_|\___/____/ .___/\____/_/ /_/____/\___/
                                                    /_/
-'@
+
+'@ 
 
 Write-Host -Object $Banner
 
-# Initialize $global:PowerResponse hashtable
-$global:PowerResponse = @{}
+if ($global:PowerResponse.Config.ShowParametersAtStart){
+    Write-Host "`nPower-Response Parameters"
 
-# Import $global:PowerResponse.Config from data file
-Import-Config -Path $ConfigPath
+    # Alphabetize non-hashtable values first, then hashtable values expanded with .s after
+    $ConfigCopy = [Ordered]@{}
+    $global:PowerResponse.Config.GetEnumerator() | Where-Object { $PSItem.Value -isnot [HashTable] } | Sort-Object -Property 'Name' -PipelineVariable 'Item' | Foreach-Object { $ConfigCopy.($Item.Key) = $Item.Value }
+    $global:PowerResponse.Config.GetEnumerator() | Where-Object { $PSItem.Value -is [HashTable] } | Sort-Object -Property 'Name' -PipelineVariable 'Item' | Foreach-Object { $Item.Value.GetEnumerator() | Sort-Object -Property 'Name' | Foreach-Object { $ConfigCopy.('{0}.{1}' -f $Item.Key,$PSItem.Key) = $PSItem.Value } }
+
+    # #Display Config Parameters
+    [PSCustomObject]$ConfigCopy
+    Write-Host "`n"
+
+}
 
 # Write a log to indicate framework startup
 Write-PRLog -Message 'Began the Power-Response framework'
