@@ -49,7 +49,7 @@ begin {
             if ($Response.Content -Match '<title>(.+) - Chrome Web Store</title>' -and $Matches.Count -gt 1) {
                 return $Matches[1]
             } else {
-                return 'Unknown Extension'
+                return ''
             }
         }
     }
