@@ -57,5 +57,6 @@ process{
     Invoke-PRPlugin -Name Collect-WMIFilters.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-LocalUsers.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-UserProfileListing.ps1 -Session $Session
+    Invoke-PRPlugin -Name Retrieve-ChromeExtensions.ps1 -Session $Session
     # End plugin logic
 }
