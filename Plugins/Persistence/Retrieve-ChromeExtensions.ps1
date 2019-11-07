@@ -65,7 +65,5 @@ process {
     # Gather the extension list
     $Extensions = Invoke-Command -Session $Session -ScriptBlock { Get-Item -Path $using:ChromeExtensions }
 
-    # $Extensions | Foreach-Object { Add-Member -InputObject $PSItem -NotePropertyName 'ExtensionName' -NotePropertyValue () }
-
     return $Extensions | Select-Object -Property @{Name='ExtensionID'; Expression={$PSItem.Name}},@{Name='ExtensionName'; Expression={Resolve-ChromeExtension -ExtensionID $PSItem.Name}},@{Name='User'; Expression={$PSItem.FullName -Split '\\' | Select-Object -First 1 -Skip 2}},@{Name='Path'; Expression={$PSItem.FullName}},'LastWriteTime','PSComputerName'
 }
