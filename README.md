@@ -86,7 +86,7 @@ At anytime you can execute the `show` command to see what is available to you in
 
 ### Video Tutorials for Power-Response can be found using the link below
 
-[Intro to Power-Response](https://xxxxxxxxxxx)
+[Power-Response on the YouTubes](https://www.youtube.com/channel/UC-QhxHobpQ2cKhEsVshqtsg/featured)
 
 ### Contact Information ###
 
