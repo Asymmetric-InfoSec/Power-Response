@@ -90,6 +90,8 @@ At anytime you can execute the `show` command to see what is available to you in
 
 ### Contact Information ###
 
+asymmetricinfosec@gmail.com
+
 Drew Schmitt - @5ynax (Twitter)
 
 Matt Weikert - @5k33tz (Twitter)
