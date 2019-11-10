@@ -106,13 +106,15 @@ process {
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunServicesOnce",
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run",
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce",
+        "HKLM:\SOFTWARE\WOW6432NODE\MICROSOFT\WINDOWS\CURRENTVERSION\RUNONCE",
+        "HKLM:\SOFTWARE\WOW6432NODE\MICROSOFT\WINDOWS\CURRENTVERSION\RUN",
+        "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\",
         "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Shell",
+        "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\Notify",
         "HKLM:\Software\Microsoft\Active Setup\Installed Components\KeyName",
         "HKLM:\Software\Microsoft\Windows\CurrentVersion\explorer\User Shell Folders",
-        "HKLM:\Software\Microsoft\Windows\CurrentVersion\explorer\Shell Folders",
-        "HKLM:\SOFTWARE\WOW6432NODE\MICROSOFT\WINDOWS\CURRENTVERSION\RUNONCE",
-        "HKLM:\SOFTWARE\WOW6432NODE\MICROSOFT\WINDOWS\CURRENTVERSION\RUN"
-
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\explorer\Shell Folders"
+        
         ) 
 
     foreach ($HKLMKey in $HKLMKeys){
@@ -163,7 +165,7 @@ process {
         "HKLM:\Software\CLASSES\htafile\shell\open\command",
         "HKLM:\Software\CLASSES\piffile\shell\open\command"
         
-        )
+    )
 
     foreach ($ShellOpenKey in $ShellOpenKeys){
 
@@ -196,8 +198,7 @@ process {
                     }
             }
 
-            [PSCustomObject]$OutHash | Select Type, User, Key, Property, Value
-            
+            [PSCustomObject]$OutHash | Select Type, User, Key, Property, Value 
         }
     }
 }
