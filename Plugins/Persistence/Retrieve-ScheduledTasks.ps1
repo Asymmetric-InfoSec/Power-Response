@@ -151,7 +151,8 @@ process{
     # Collect System Artifacts    
     $SystemArtifacts = @(
         'C:\Windows\System32\Tasks\',
-        'C:\Windows\Tasks\'
+        'C:\Windows\Tasks\',
+        'C:\Windows\SysWOW64\Tasks\'
     )
 
     # Stage System Artifacts   
