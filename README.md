@@ -80,6 +80,10 @@ Any output generated will be moved to the **Output** directory and named based o
 
 At anytime you can execute the `show` command to see what is available to you in a menu or plugin.
 
+### Checkout our presentation from Security BSides MSP 2019
+
+[Powering Up Incident Response with Power-Response](https://github.com/Asymmetric-InfoSec/Power-Response/blob/master/Extras/Powering-Up-Incident-Response-with-Power-Response_Security_BsidesMSP.pdf)
+
 ### Video Tutorials for Power-Response can be found using the link below
 
 [Intro to Power-Response](https://xxxxxxxxxxx)
