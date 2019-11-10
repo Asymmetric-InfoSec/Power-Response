@@ -8,7 +8,7 @@
     or CSV input file. The output will return True or False based on
     whether or not it was discovered on the system.
 
-    Note: The CSV import file must have a column header of 'RegistryKey'
+    Note: The CSV import file must have a column header of 'RegKey'
 
     Note: Keep in mind that this scoping plugin scopes based on KEY and not Property or Values.
 
@@ -33,13 +33,13 @@
     Power-Response Execution
 
     Set ComputerName Test-PC
-    Set RegistryKey HKLM:\Path\To\Malicious\Key
+    Set RegKey HKLM:\Path\To\Malicious\Key
     run
     
     OR
 
     Set ComputerName Test-PC
-    Set RegistryKeyList C:\Tools\RegKeys.csv
+    Set RegKeyList C:\Tools\RegKeys.csv
     run
 
 .NOTES
@@ -53,22 +53,22 @@
   
 #>
 
-[cmdletbinding(DefaultParameterSetName="RegistryKey")]
+[cmdletbinding(DefaultParameterSetName="RegKey")]
 
 param (
 
-    [Parameter(ParameterSetName = "RegistryKey", Position = 0, Mandatory = $true)]
-    [String[]]$RegistryKey,
+    [Parameter(ParameterSetName = "RegKey", Position = 0, Mandatory = $true)]
+    [String[]]$RegKey,
 
-    [Parameter(ParameterSetName = "RegistryKeyList", Position = 0, Mandatory = $true)]
-    [String]$RegistryKeyList,
+    [Parameter(ParameterSetName = "RegKeyList", Position = 0, Mandatory = $true)]
+    [String]$RegKeyList,
 
-    [Parameter(ParameterSetName = "RegistryKey",Position = 1,Mandatory = $true)]
-    [Parameter(ParameterSetName = "RegistryKeyList",Position = 1,Mandatory = $true)]
+    [Parameter(ParameterSetName = "RegKey",Position = 1,Mandatory = $true)]
+    [Parameter(ParameterSetName = "RegKeyList",Position = 1,Mandatory = $true)]
     [String]$ScopeName,
 
-    [Parameter(ParameterSetName = "RegistryKey",Position = 2,Mandatory = $true)]
-    [Parameter(ParameterSetName = "RegistryKeyList",Position = 2,Mandatory = $true)]
+    [Parameter(ParameterSetName = "RegKey",Position = 2,Mandatory = $true)]
+    [Parameter(ParameterSetName = "RegKeyList",Position = 2,Mandatory = $true)]
     [System.Management.Automation.Runspaces.PSSession[]]$Session
 )
 
@@ -88,8 +88,8 @@ process {
     #Generate based on parameter set
     switch ($PSCmdlet.ParameterSetName){
 
-        "RegistryKey" {[String[]]$RegistryKeys = $RegistryKey}
-        "RegistryKeyList"{[String[]]$RegistryKeys = (Import-CSV -Path $RegistryKeyList | Select-Object -ExpandProperty 'RegistryKey')}
+        "RegKey" {[String[]]$RegistryKeys = $RegKey}
+        "RegKeyList"{[String[]]$RegistryKeys = (Import-CSV -Path $RegKeyList | Select-Object -ExpandProperty 'RegKey')}
 
     }
 
