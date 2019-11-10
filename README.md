@@ -37,13 +37,13 @@ If you downloaded the zip from GitHub, Unblock `Setup.ps1` (previously `Config-P
 
 Execute `Setup.ps1` located in the Power-Response root directory to satisfy all dependencies
 
-Big shout outs to Eric Zimmerman, Michael Cohen, and the Sysinternals crew for making amazing tools we can incorporate into our framework!
+Big shout outs to Eric Zimmerman, Michael Cohen, The Sleuth Kit Team, and the Sysinternals crew for making amazing tools we can incorporate into our framework!
 
 ### Start Power-Response
 
 Power-Response comes with pre-built plugins in the plugins directory of the repository (we will continue to add plugins as rapidly as possible), so you should be able to get going pretty quickly. Don't worry too much about any other directories, Power-Response will generate all necessary directories on the fly as needed. 
 
-It is recommended that you run Power-Response in a user context that allows you to collect data on all target machines. 
+Note: It is recommended that you run Power-Response in a user context that allows you to collect data on all target machines. 
 
 Invoke Power-Response by executing `.\Power-Response.ps1`
 
@@ -68,21 +68,21 @@ As you navigate the framework, you may end up having questions about what you ca
 
 ### Data Collection and Plugin Execution with Power-Response
 
-When you enter into a plugin, Power-Response will show you the parameters (both optional and required) that are available for the plugin. The parameters will also show you what parameter type they are (string, string array, integer, etc.) so you can provide the correct value type. To set a value for a parameter, you will use the set command.
+When you enter into a plugin, Power-Response will show you the parameters (both optional and required) that are available for the plugin. The parameters will also show you what parameter type they are (string, string array, integer, etc.) so you can provide the correct value type. To set a value for a parameter, you will use the `set` command.
 
 Example: `set ComputerName test-pc` -- will set the ComputerName variable to "test-PC"
 
 After you have set all parameters for the plugin, simply execute the `run` command and the plugin will run to completion. If there are errors during execution, Power-Response will let you know.
 
-Any output generated will be moved to the **Output** directory and named based on plugin run and timestamp. By default, Power-Response will provide the plugin output in both XML and CSV format.
+Any output generated will be moved to the **Output** directory and named based on plugin run and timestamp. By default, Power-Response will provide the plugin output in both XSLX and CSV format. It is possible to get output in XML format if desired.
 
 **Note:** As you navigate from plugin to plugin, Power-Response will attempt to maintain parameter values. For instance, if you set `ComputerName` in one plugin and navigate to another plugin to collect more data, the `ComputerName` parameter will already be assigned (as long as the parameter types are the same - see the Wiki for more details)
 
 At anytime you can execute the `show` command to see what is available to you in a menu or plugin.
 
-### For a quick video tutorial, take a look at this video
+### Video Tutorials for Power-Response can be found using the link below
 
-[Intro to Power-Response](https://www.youtube.com/watch?v=BMOyyZsQvPs&t=2s)
+[Intro to Power-Response](https://xxxxxxxxxxx)
 
 ### Contact Information ###
 
