@@ -269,7 +269,13 @@ function Format-Parameter {
         # Foreach $CommandParam listed in $Arguments
         foreach ($CommandParam in $Arguments) {
             # Gather the $CommandParameters $ParameterType
-            $ParameterType = $CommandParameters.$CommandParam.ParameterType
+            if ($CommandParameters.$CommandParam.ParameterType -eq [System.Management.Automation.SwitchParameter]) {
+                # Special handling for Switch parameters to cast to Boolean instead
+                $ParameterType = [Boolean]
+            } else {
+                # Get the $ParameterType
+                $ParameterType = $CommandParameters.$CommandParam.ParameterType
+            }
 
             # Gather the $global:PowerResponse.Parameters.$CommandParameter $ValueType
             $ValueType = $global:PowerResponse.Parameters.$CommandParam.GetType()
@@ -303,14 +309,13 @@ function Format-Parameter {
             # Loop while we haven't resolved a successful $ExpressionResult and we still have more $Commands to try
             do {
                 # Try to evaluate the $Commands string
-                try { $ExpressionResult = Invoke-Expression -Command $Commands[$i] } catch {}
+                try { $ExpressionResult = Invoke-Expression -Command $Commands[$i] } catch { Write-Verbose -Message ('Cannot resolve command: {0}, {1}' -f $Commands[$i],$PSItem) }
 
                 # Increment $i
                 $i += 1
-            } while (!$ExpressionResult -and $i -lt $Commands.Length)
-
+            } while ($ExpressionResult -eq $null -and $i -lt $Commands.Length)
             # If successful command execution
-            if ($ExpressionResult) {
+            if ($ExpressionResult -ne $null) {
                 # Set $global:PowerResponse.Parameters.$CommandParam to $ExpressionResult
                 $global:PowerResponse.Parameters.$CommandParam = $ExpressionResult
             } else {
