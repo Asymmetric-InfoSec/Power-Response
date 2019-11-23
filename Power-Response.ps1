@@ -826,8 +826,17 @@ function Invoke-ShowCommand {
     process {
         # If we have selected a file $global:PowerResponse.Location
         if (!$global:PowerResponse.Location.PSIsContainer) {
+            # Get command information about the $global:PowerResponse.Location
+            $Command = Get-Command -Name $global:PowerResponse.Location
+
+            # Gather any default values
+            $CommandDefaultValues = @{}
+
+            # Gather any parameter default values from the $Command.ScriptBlock.Ast
+            $Command.ScriptBlock.Ast.FindAll({ $Args[0] -is [System.Management.Automation.Language.ParameterAst] }, $true) | Where-Object { $PSItem.DefaultValue } | Foreach-Object { $CommandDefaultValues.($PSItem.Name.VariablePath.UserPath) = Invoke-Expression -Command $PSItem.DefaultValue.Extent.Text }
+
             # Gather to $global:PowerResponse.Location's $CommandParameters
-            $CommandParameters = Get-CommandParameter -Path $global:PowerResponse.Location
+            $CommandParameters = $Command.Parameters
 
             # Remove the 'Session' parameter
             $null = $CommandParameters.Remove('Session')
@@ -876,12 +885,15 @@ function Invoke-ShowCommand {
         }
 
         # Initialize empty $Param(eter) return HashTable
-        $Param = @{}
+        $Param = [Ordered]@{}
 
         # For plugins with no parameters, write-host to run plugin
         if ($CommandParameters.Count -gt 0) {
             # Set $Param.[Type]$Key to the $global:PowerResponse.Parameters.$Key value
             $Arguments | Sort-Object | Foreach-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem)=$global:PowerResponse.Parameters.$PSItem }
+
+            # Fill in blank values with the parameter defaults
+            $Arguments | Sort-Object | Where-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem) -eq $null -and $CommandDefaultValues.$PSItem } | Foreach-Object { $Param.('[{0}]{1}' -f $CommandParameters.$PSItem.ParameterType.Name,$PSItem) = $CommandDefaultValues.$PSItem }
         } else {
             # Set $Param.$Key to the $global:PowerResponse.Parameters.$Key value
             $Arguments | Sort-Object | Foreach-Object { $Param.$PSItem=$global:PowerResponse.Parameters.$PSItem }
@@ -1509,7 +1521,6 @@ $global:PowerResponse = @{}
 
 # Import $global:PowerResponse.Config from data file
 Import-Config -Path $ConfigPath
-Write-Debug 'After Import-Config'
 
 # $Banner for Power-Response
 $Banner = @'
