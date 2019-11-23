@@ -382,6 +382,12 @@ process{
                     Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libvhdi.dll" -Destination $Expand_Path -Force
                     Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libvmdk.dll" -Destination $Expand_Path -Force
                     Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\zlib.dll" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\msvcp140.dll" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\vcruntime140.dll" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\concrt140.dll" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\libtsk_jni.dll" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\ucrtbase.dll" -Destination $Expand_Path -Force
+                    Copy-Item "$Expand_Stage\sleuthkit-*-win32\bin\vccorlib140.dll" -Destination $Expand_Path -Force
 
                 } catch {
 
