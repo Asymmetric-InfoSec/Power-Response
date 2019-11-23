@@ -1222,7 +1222,7 @@ function Out-PRFile {
                     $ExcelParameters.WorksheetName = Add-Worksheet @ExcelParameters -MoveAfter * | Select-Object -ExpandProperty 'Name'
 
                     # Export $Objects as XLSX data
-                    $Objects | Export-Excel @ExcelParameters -AutoSize
+                    $Objects | Export-Excel @ExcelParameters -Autosize -FreezeTopRow -WarningAction 'SilentlyContinue'
 
                     # Specifically don't track $FilePath for protecting later since we want to write more things to it later
                 }
