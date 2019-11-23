@@ -632,6 +632,10 @@ function Invoke-HelpCommand {
             $Property = @('Name','Description')
         }
 
+        if (!$global:PowerResponse.Location.PSIsContainer){
+            Get-Help -Full $global:PowerResponse.Location
+        }
+
         # Print out the rows of $Commands specified by $Arguments and the columns specified by $Property
         return $Commands | Where-Object { $Arguments -Contains $PSItem.Name } | Select-Object -Property $Property | Format-Table
     }
