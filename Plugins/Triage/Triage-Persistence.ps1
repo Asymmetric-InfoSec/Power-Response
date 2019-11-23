@@ -46,7 +46,7 @@ param (
 
 process{
     # Begin plugin logic
-    Invoke-PRPlugin -Name Collect-RunKeys.ps1 -Session $Session
+    Invoke-PRPlugin -Name Collect-RegKeyPersistence.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-ScheduledTaskInfo.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-ScheduledTaskDetails.ps1 -Session $Session
     Invoke-PRPlugin -Name Collect-Services.ps1 -Session $Session
