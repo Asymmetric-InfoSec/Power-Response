@@ -101,7 +101,7 @@ process {
             $null = New-PSDrive -Name HKU -PSProvider Registry -Root HKEY_USERS -ErrorACtion SilentlyContinue
             
             # Determine if found on system
-            $FullKeyEval = ((Get-Item -Path $Using:RegistryKeyItem).Name -Join "`n" -ErrorAction SilentlyContinue)
+            $FullKeyEval = ((Get-Item -Path $Using:RegistryKeyItem -ErrorAction SilentlyContinue).Name -Join "`n" )
 
             # return PSCustomObject for recording in CSV
             $OutHash =@{Host = $env:COMPUTERNAME; Detected = [Boolean]$FullKeyEval; Keys = $FullKeyEval}
