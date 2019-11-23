@@ -1,8 +1,9 @@
 [CmdletBinding()]
 param(
-    [String]$ConfigPath = ('{0}\Config.psd1' -f $PSScriptRoot),
     [String[]]$ComputerName = 'LOCALHOST',
-    [PSCredential]$Credential
+    [String]$ConfigPath = ('{0}\Config.psd1' -f $PSScriptRoot),
+    [PSCredential]$Credential,
+    [String[]]$Plugin
 )
 
 # $ErrorActionPreference of 'Stop' and $ProgressPreference of 'SilentlyContinue'
@@ -682,12 +683,13 @@ function Invoke-RemoveCommand {
 
 function Invoke-RunCommand {
     param (
-        [String[]]$Arguments
+        [String[]]$Arguments,
+        [System.IO.FileInfo]$Item = $global:PowerResponse.Location
     )
 
     process {
         # If we have selected a file $global:PowerResponse.Location
-        if ($global:PowerResponse.Parameters.ComputerName -and $global:PowerResponse.Location -and !$global:PowerResponse.Location.PSIsContainer) {
+        if ($global:PowerResponse.Parameters.ComputerName -and $Item -and !$Item.PSIsContainer) {
             # Gather the $SessionOption from $global:PowerResponse.Config.PSSession
             $SessionOption = $global:PowerResponse.Config.PSSession
 
@@ -733,7 +735,7 @@ function Invoke-RunCommand {
 
             try {
                 # Invoke the PR Plugin
-                Invoke-PRPlugin -Path $global:PowerResponse.Location -Session $Session
+                Invoke-PRPlugin -Path $Item -Session $Session
 
             } catch {
                 # Format warning $Message
@@ -1222,7 +1224,7 @@ function Out-PRFile {
                     $ExcelParameters.WorksheetName = Add-Worksheet @ExcelParameters -MoveAfter * | Select-Object -ExpandProperty 'Name'
 
                     # Export $Objects as XLSX data
-                    $Objects | Export-Excel @ExcelParameters -AutoSize
+                    $Objects | Export-Excel @ExcelParameters -Autosize -FreezeTopRow -WarningAction 'SilentlyContinue'
 
                     # Specifically don't track $FilePath for protecting later since we want to write more things to it later
                 }
@@ -1571,6 +1573,21 @@ $global:PowerResponse.Parameters = @{
 # If we have have a executing-admin user name mismatch, gather the credential object and store it in the $global:PowerResponse.Parameters hashtable
 if ($ENV:UserName -ne $global:PowerResponse.Config.AdminUserName -and $Credential.UserName -ne $global:PowerResponse.Config.AdminUserName) {
     $global:PowerResponse.Parameters.Credential = Get-Credential -UserName $global:PowerResponse.Config.AdminUserName -Message 'Enter administrative credentials'
+}
+
+# Check for specific plugins to execute
+if ($Plugin.Count -gt 0) {
+    # Force no prompt for enter when running from the command line
+    $global:PowerResponse.Config.AutoClear = $false
+
+    # Loop through provided plugins
+    foreach ($Name in $Plugin) {
+        # Execute the resolved plugin path
+        Invoke-RunCommand -Item (Get-PRPlugin -Name $Name)
+    }
+
+    # Return early
+    return 
 }
 
 # Trap 'exit's and Ctrl-C interrupts
