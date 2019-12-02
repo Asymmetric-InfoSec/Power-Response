@@ -1,8 +1,11 @@
 [CmdletBinding()]
-param(
-    [String[]]$ComputerName = 'LOCALHOST',
+Param (
+    [String[]]$ComputerName,
     [String]$ConfigPath = ('{0}\Config.psd1' -f $PSScriptRoot),
     [PSCredential]$Credential,
+    [ValidateSet('CSV','XLSX','XML')]
+    [String]$OutputType,
+    [HashTable]$Parameter = @{ ComputerName = $ComputerName; OutputType = $OutputType },
     [String[]]$Plugin
 )
 
@@ -13,13 +16,13 @@ $ProgressPreference = 'SilentlyContinue'
 # Function to copy remote file (locked or not) to a remote destination
 function Copy-PRItem {
     param (
-        [Parameter(Position=0,Mandatory=$true)]
+        [Parameter(Position=0, Mandatory=$true)]
         [System.Management.Automation.Runspaces.PSSession[]]$Session,
 
-        [Parameter(Position=1,Mandatory=$true,ValueFromPipeline=$true)]
+        [Parameter(Position=1, Mandatory=$true, ValueFromPipeline=$true)]
         [String[]]$Path,
 
-        [Parameter(Position=2,Mandatory=$true)]
+        [Parameter(Position=2, Mandatory=$true)]
         [String]$Destination,
 
         [Parameter(Position=3)]
@@ -30,13 +33,13 @@ function Copy-PRItem {
         function CopyItem {
             [CmdletBinding()]
             param (
-                [Parameter(Position=0,Mandatory=$true,ValueFromPipeline=$true)]
+                [Parameter(Position=0, Mandatory=$true, ValueFromPipeline=$true)]
                 [String[]]$Path,
 
-                [Parameter(Position=1,Mandatory=$true)]
+                [Parameter(Position=1, Mandatory=$true)]
                 [String]$DestinationDirectory,
 
-                [Parameter(Position=2,Mandatory=$true)]
+                [Parameter(Position=2, Mandatory=$true)]
                 [String]$Algorithm
             )
 
@@ -239,12 +242,13 @@ function Copy-PRItem {
 
 function Format-Parameter {
     param (
-        [String[]]$Arguments
+        [String[]]$Arguments,
+        [System.IO.FileInfo]$Item = $global:PowerResponse.Location
     )
 
     process {
-        # Gather to $global:PowerResponse.Location's $CommandParameters
-        $CommandParameters = Get-CommandParameter -Path $global:PowerResponse.Location
+        # Gather to $Item's $CommandParameters
+        $CommandParameters = Get-CommandParameter -Path $Item
 
         # If $CommandParameters does not contain a 'ComputerName' entry
         if ($CommandParameters.Keys -NotContains 'ComputerName') {
@@ -408,7 +412,7 @@ function Get-PRPath {
         [Parameter(ParameterSetName='Plugins')]
         [Switch]$Plugins,
 
-        [Parameter(ParameterSetName='Output-Specific',Mandatory=$true)]
+        [Parameter(ParameterSetName='Output-Specific', Mandatory=$true)]
         [Alias('HuntName')]
         [Alias('ScopeName')]
         [String]$ComputerName,
@@ -473,7 +477,7 @@ function Get-PRPlugin {
 
 function Import-Config {
     param (
-        [String]$Path = ('{0}\Config.psd1' -f $PSScriptRoot)
+        [String]$Path
     )
 
     begin {
@@ -485,7 +489,7 @@ function Import-Config {
 
     process {
         # Default 'Config' values
-        $Default = @{
+        $Default = [Ordered]@{
             AdminUserName = $ENV:UserName
             AutoAnalyze = $true
             AutoClear = $true
@@ -699,6 +703,9 @@ function Invoke-RunCommand {
     process {
         # If we have selected a file $global:PowerResponse.Location
         if ($global:PowerResponse.Parameters.ComputerName -and $Item -and !$Item.PSIsContainer) {
+            # Ensure all parameters are formatted to this $Item
+            Format-Parameter -Item $Item
+
             # Gather the $SessionOption from $global:PowerResponse.Config.PSSession
             $SessionOption = $global:PowerResponse.Config.PSSession
 
@@ -741,7 +748,7 @@ function Invoke-RunCommand {
 
             # Write execution to host
             Write-PRHost -Message $Message
-
+Write-Debug 'stahp'
             try {
                 # Invoke the PR Plugin
                 Invoke-PRPlugin -Path $Item -Session $Session
@@ -934,9 +941,9 @@ function Invoke-PRCommand {
 
 function Invoke-PRSplat {
     param (
-        [Parameter(Mandatory=$true,Position=0)]
+        [Parameter(Mandatory=$true, Position=0)]
         [String]$Path,
-        [Parameter(Mandatory=$true,Position=1)]
+        [Parameter(Mandatory=$true, Position=1)]
         [HashTable]$Parameters
     )
 
@@ -949,10 +956,10 @@ function Invoke-PRSplat {
 function Invoke-PRPlugin {
     [CmdletBinding(DefaultParameterSetName='Name')]
     param (
-        [Parameter(Mandatory=$true,ParameterSetName='Path')]
+        [Parameter(Mandatory=$true, ParameterSetName='Path')]
         [String]$Path,
 
-        [Parameter(Mandatory=$true,ParameterSetName='Name')]
+        [Parameter(Mandatory=$true, ParameterSetName='Name')]
         [String]$Name,
 
         [Parameter(Mandatory=$true)]
@@ -1124,7 +1131,7 @@ function Invoke-PRPlugin {
 
 function Out-PRFile {
     param (
-        [Parameter(Mandatory=$true,ValueFromPipeline=$true)]
+        [Parameter(Mandatory=$true, ValueFromPipeline=$true)]
         [PSObject]$InputObject,
 
         [Parameter(Mandatory=$true)]
@@ -1583,16 +1590,27 @@ if (!(Get-ChildItem $global:PowerResponse.Location)) {
     exit
 }
 
-# Initialize tracked $global:PowerResponse.Parameters to $global:PowerResponse.Config data
-$global:PowerResponse.Parameters = @{
-    ComputerName = $ComputerName
-    Credential = $Credential
-    OutputType = $global:PowerResponse.Config.OutputType
-}
-
 # If we have have a executing-admin user name mismatch, gather the credential object and store it in the $global:PowerResponse.Parameters hashtable
 if ($ENV:UserName -ne $global:PowerResponse.Config.AdminUserName -and $Credential.UserName -ne $global:PowerResponse.Config.AdminUserName) {
-    $global:PowerResponse.Parameters.Credential = Get-Credential -UserName $global:PowerResponse.Config.AdminUserName -Message 'Enter administrative credentials'
+    $Credential = Get-Credential -UserName $global:PowerResponse.Config.AdminUserName -Message 'Enter administrative credentials'
+}
+
+# Initialize tracked $global:PowerResponse.Parameters provided $Parameter hashtable
+$global:PowerResponse.Parameters = $Parameter
+
+# Ensure default value for ComputerName parameter
+if (!$global:PowerResponse.Parameters.ComputerName) {
+    $global:PowerResponse.Parameters.ComputerName = 'LOCALHOST'
+}
+
+# Ensure default value for ComputerName parameter
+if (!$global:PowerResponse.Parameters.Credential) {
+    $global:PowerResponse.Parameters.Credential = $Credential
+}
+
+# Ensure default value for OutputType parameter
+if (!$global:PowerResponse.Parameters.OutputType) {
+    $global:PowerResponse.Parameters.OutputType = $global:PowerResponse.Config.OutputType
 }
 
 # Check for specific plugins to execute
@@ -1602,8 +1620,18 @@ if ($Plugin.Count -gt 0) {
 
     # Loop through provided plugins
     foreach ($Name in $Plugin) {
-        # Execute the resolved plugin path
-        Invoke-RunCommand -Item (Get-PRPlugin -Name $Name)
+        # Get referenced plugin $Name
+        $Item = Get-PRPlugin -Name $Name
+
+        if ($Item) {
+            # Execute the resolved plugin path
+            Invoke-RunCommand -Item $Item
+        } else {
+            # Format warning $Message
+            $Message = 'No plugins matched the identifier: {0}' -f $Name
+
+            Write-PRWarning -Message $Message
+        }
     }
 
     # Return early
