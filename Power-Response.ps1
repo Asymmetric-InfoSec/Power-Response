@@ -762,7 +762,7 @@ function Invoke-RunCommand {
 
             # Write execution to host
             Write-PRHost -Message $Message
-
+Write-Debug 'stahp'
             try {
                 # Invoke the PR Plugin
                 Invoke-PRPlugin -Path $Item -Session $Session
