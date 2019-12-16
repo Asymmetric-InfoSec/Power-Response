@@ -1,6 +1,6 @@
 [CmdletBinding()]
 Param (
-    [String[]]$ComputerName,
+    [String[]]$ComputerName = 'LOCALHOST',
     [String]$ConfigPath = ('{0}\Config.psd1' -f $PSScriptRoot),
     [PSCredential]$Credential,
     [ValidateSet('CSV','XLSX','XML')]
@@ -732,6 +732,9 @@ function Invoke-RunCommand {
 
                     # Write $Message to host
                     Write-PRHost -Message $Message
+
+                    # Write host plugin log
+                    Write-PRPluginLog -FrameworkFailure -ComputerName $ComputerName -Plugin $Item.BaseName -FrameworkError $Message
                 } catch {
                     # Format warning $Message
                     $Message = 'Error creating Session: {0}' -f $PSItem
@@ -743,12 +746,23 @@ function Invoke-RunCommand {
                 }
             }
 
+            # Return early if we have no sessions to execute plugin on
+            if ($Session.Count -eq 0) {
+                # Format early return message
+                $Message = 'No sessions created, skipping plugin execution'
+
+                # Write host $Message
+                Write-PRHost -Message $Message
+
+                return
+            }
+
             # Format execution $Message
             $Message = 'Plugin Execution Started at {0}' -f (Get-Date)
 
             # Write execution to host
             Write-PRHost -Message $Message
-Write-Debug 'stahp'
+
             try {
                 # Invoke the PR Plugin
                 Invoke-PRPlugin -Path $Item -Session $Session
@@ -1328,7 +1342,8 @@ function Write-PRPluginLog {
         [String[]]$ComputerName,
         [String]$Plugin,
         [PSObject]$RemoteErrors,
-        [Switch]$FrameworkFailure
+        [Switch]$FrameworkFailure,
+        [String]$FrameworkError = 'The framework failed to execute this plugin'
     )
 
     process {
@@ -1349,7 +1364,7 @@ function Write-PRPluginLog {
             # If the framework was unable to execute the plugin, say so
             if ($FrameworkFailure) {
                 $LogLine.Success = $false
-                $LogLine.Error = 'The framework failed to execute this plugin'
+                $LogLine.Error = $FrameworkError
             }
 
             # Get the log file name
@@ -1443,7 +1458,8 @@ function Write-PRContext {
 function Write-PRLog {
     param (
         [Parameter(Mandatory=$true)]
-        [String]$Message
+        [String]$Message,
+        [String]$UserName = $ENV:UserName
     )
 
     process {
@@ -1463,7 +1479,7 @@ function Write-PRLog {
         # Build $LogLine
         $LogLine = [PSCustomObject]@{
             Date = '{0:u}' -f $Date
-            UserName = $ENV:UserName
+            UserName = $UserName
             Context = $Context
             Message = $Message
         }
@@ -1596,11 +1612,11 @@ if ($ENV:UserName -ne $global:PowerResponse.Config.AdminUserName -and $Credentia
 }
 
 # Initialize tracked $global:PowerResponse.Parameters provided $Parameter hashtable
-$global:PowerResponse.Parameters = $Parameter
+$global:PowerResponse.Parameters = $Parameter.Clone()
 
 # Ensure default value for ComputerName parameter
 if (!$global:PowerResponse.Parameters.ComputerName) {
-    $global:PowerResponse.Parameters.ComputerName = 'LOCALHOST'
+    $global:PowerResponse.Parameters.ComputerName = $ComputerName
 }
 
 # Ensure default value for ComputerName parameter
