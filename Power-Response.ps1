@@ -742,6 +742,8 @@ function Invoke-RunCommand {
                     # Write warning $Message
                     Write-PRWarning -Message ("{0}`n`tSkipping plugin execution" -f $Message)
 
+                    # Don't leave the user hangin, give them some context of where they land if they hit this catch block
+                    Invoke-ShowCommand
                     return
                 }
             }
@@ -754,6 +756,8 @@ function Invoke-RunCommand {
                 # Write host $Message
                 Write-PRHost -Message $Message
 
+                # Don't leave the user hangin, give them some context of where they land if they hit this catch block
+                Invoke-ShowCommand
                 return
             }
 
@@ -762,7 +766,7 @@ function Invoke-RunCommand {
 
             # Write execution to host
             Write-PRHost -Message $Message
-Write-Debug 'stahp'
+
             try {
                 # Invoke the PR Plugin
                 Invoke-PRPlugin -Path $Item -Session $Session
@@ -774,6 +778,8 @@ Write-Debug 'stahp'
                 # Write warning $Message
                 Write-PRWarning -Message $Message -Append "`n`tSkipping plugin execution"
 
+                # Don't leave the user hangin, give them some context of where they land if they hit this catch block
+                Invoke-ShowCommand
                 return
             }
 
