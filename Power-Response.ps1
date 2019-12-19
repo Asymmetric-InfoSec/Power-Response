@@ -734,7 +734,7 @@ function Invoke-RunCommand {
                     Write-PRLog -Message $Message
 
                     # Write host plugin log
-                    Write-PRPluginLog -FrameworkFailure -ComputerName $ComputerName -Plugin $Item.BaseName -FrameworkError $Message
+                    Write-PRPluginLog -FrameworkFailure -ComputerName $ComputerName -Plugin $Item.BaseName -FrameworkError 'Machine is Offline'
                 } catch {
                     # Format warning $Message
                     $Message = 'Error creating Session: {0}' -f $PSItem
