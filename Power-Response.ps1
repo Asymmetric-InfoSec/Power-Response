@@ -731,7 +731,7 @@ function Invoke-RunCommand {
                     $Message = 'Unable to connect to computer: {0}' -f $ComputerName
 
                     # Write $Message to host
-                    Write-PRHost -Message $Message
+                    Write-PRLog -Message $Message
 
                     # Write host plugin log
                     Write-PRPluginLog -FrameworkFailure -ComputerName $ComputerName -Plugin $Item.BaseName -FrameworkError $Message
@@ -752,7 +752,7 @@ function Invoke-RunCommand {
                 $Message = 'No sessions created, skipping plugin execution'
 
                 # Write host $Message
-                Write-PRHost -Message $Message
+                Write-PRWarning -Message $Message
 
                 return
             }
