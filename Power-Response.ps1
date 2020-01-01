@@ -731,10 +731,10 @@ function Invoke-RunCommand {
                     $Message = 'Unable to connect to computer: {0}' -f $ComputerName
 
                     # Write $Message to host
-                    Write-PRHost -Message $Message
+                    Write-PRLog -Message $Message
 
                     # Write host plugin log
-                    Write-PRPluginLog -FrameworkFailure -ComputerName $ComputerName -Plugin $Item.BaseName -FrameworkError $Message
+                    Write-PRPluginLog -FrameworkFailure -ComputerName $ComputerName -Plugin $Item.BaseName -FrameworkError 'Machine is Offline'
                 } catch {
                     # Format warning $Message
                     $Message = 'Error creating Session: {0}' -f $PSItem
@@ -754,10 +754,11 @@ function Invoke-RunCommand {
                 $Message = 'No sessions created, skipping plugin execution'
 
                 # Write host $Message
-                Write-PRHost -Message $Message
+                Write-PRWarning -Message $Message
 
                 # Don't leave the user hangin, give them some context of where they land if they hit this catch block
                 Invoke-ShowCommand
+
                 return
             }
 
