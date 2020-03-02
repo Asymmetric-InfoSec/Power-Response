@@ -62,6 +62,24 @@ process{
         }
     }
 
+    #Install the PSSQLite module from PSGallery
+    $Sqlite_Test = Get-Module -ListAvailable -Name 'PSSQLite'
+    if (!$Sqlite_Test) {
+
+        Write-Host -Object "Installing 'PSSQLite' module"
+
+        try {
+
+            Install-Module -Force -Name "PSSQLite"
+
+        } catch {
+
+            Write-Warning -Message "Installing module in current user ($ENV:UserName) context. To install the module system-wide, run the 'Setup.ps1' script as admin"
+            Install-Module -Force -Name "PSSQLite" -Scope "CurrentUser"
+
+        }
+    }
+
     #Verify that Bin exists and is ready for Setup process
 
     $Bin_Test = Test-Path "$PSScriptRoot\Bin"

@@ -151,6 +151,7 @@ process{
     # Collect System Artifacts    
     $SystemArtifacts = @(
         "C:\users\*\AppData\Local\Google\Chrome\User*\Default\History*",
+        "C:\users\*\AppData\Local\Google\Chrome\User*\Profile*\History*",
         "C:\users\*\AppData\Local\Microsoft\Windows\WebCache\*",
         "C:\users\*\AppData\Roaming\Mozilla\Firefox\Profiles\*.default\places.sqlite"
     )
