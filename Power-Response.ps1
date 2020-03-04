@@ -26,7 +26,10 @@ function Copy-PRItem {
         [String]$Destination,
 
         [Parameter(Position=3)]
-        [String]$Algorithm = $global:PowerResponse.Config.HashAlgorithm
+        [String]$Algorithm = $global:PowerResponse.Config.HashAlgorithm,
+
+        [Parameter(Position=4)]
+        [Switch]$ShadowCopy
     )
 
     begin {
@@ -40,7 +43,10 @@ function Copy-PRItem {
                 [String]$DestinationDirectory,
 
                 [Parameter(Position=2, Mandatory=$true)]
-                [String]$Algorithm
+                [String]$Algorithm,
+
+                [Parameter(Position=3)]
+                [Switch]$ShadowCopy
             )
 
             begin {
@@ -123,6 +129,64 @@ function Copy-PRItem {
                         [Reflection.Assembly]::Load($UncompressedFileBytes) | Out-Null
                     }
                 }
+                # Create Volume Shadow Copy mount helper function
+                function NewShadowLink {
+                    param (
+                        [Parameter(Position=0)]
+                        $LinkPath="$($ENV:SystemDrive)\ShadowCopy"
+                    )
+
+                    begin {
+                        Write-Verbose "Creating a snapshot of $($ENV:SystemDrive)\"
+                        $Result = Invoke-CimMethod -ClassName 'Win32_ShadowCopy' -Arguments @{ Volume = "$ENV:SystemDrive\"; Context = 'ClientAccessible' } -MethodName 'Create'
+                        # $Class=[WMICLASS]"root\cimv2:win32_shadowcopy";
+                        # $Result = $Class.Create("$ENV:SystemDrive\", "ClientAccessible");
+                        Write-Verbose "Getting the full target path for a symlink to the shadow snapshot"
+                        $Shadow = Get-CimInstance -ClassName Win32_ShadowCopy | Where-Object { $PSItem.ID -eq $Result.ShadowID }
+                        $Target = "$($Shadow.DeviceObject)\";
+                    }
+
+                    process {
+                        Write-Verbose "Creating SymLink to shadowcopy at $LinkPath"
+                        Invoke-Expression -Command "cmd /c mklink /d '$LinkPath' '$Target'";
+                    }
+
+                    end {
+                        Write-Verbose "Created link to shadowcopy snapshot of $($ENV:SystemDrive)\ at $LinkPath";
+                        Write-Verbose "Returning shadowcopy snapshot object"
+                        return $Shadow;
+                    }
+                }
+                # Create Volume Shadow Copy Link Removal helper function 
+                function RemoveShadowLink {
+                    param (
+                        [Parameter(Position=0)]
+                        $Shadow,
+                        [Parameter(Position=1)]
+                        $LinkPath="$($ENV:SystemDrive)\ShadowCopy"
+                    )
+
+                    begin {
+                        Write-verbose "Removing shadow copy link at $linkPath"
+                    }
+
+                    process {
+                        Write-Verbose "Deleting the shadowcopy snapshot"
+                        Remove-CimInstance -InputObject $Shadow;
+                        Write-Verbose "Deleting the now empty folder"
+                        Try {
+                            Remove-Item -Force -Recurse $LinkPath -ErrorAction Stop;
+                        }
+                        catch {
+                            Invoke-Expression -Command "cmd /c rmdir /S /Q '$LinkPath'";
+                        }
+                    }
+
+                    end {
+                        Write-Verbose "Shadow link and snapshot have been removed";
+                        return;
+                    }
+                }
 
                 ### Constants
                 # Initialize Get-Content parameters
@@ -139,6 +203,14 @@ function Copy-PRItem {
 
                 # Save error action preference for later manipulation
                 $SavedErrorActionPreference = $ErrorActionPreference
+
+                if ($ShadowCopy) {
+                    # If ShadowCopy is requested, make a fresh Volume Shadow Copy
+                    $Shadow = NewShadowLink
+
+                    # Modify Path items with the VS prefix
+                    $Path = $Path | Foreach-Object { $PSItem -Replace $ENV:SystemDrive,"$($ENV:SystemDrive)\ShadowCopy" }
+                }
             }
 
             process {
@@ -226,13 +298,19 @@ function Copy-PRItem {
                     }
                 }
             }
+
+            end {
+                if ($ShadowCopy) {
+                    RemoveShadowLink -Shadow $Shadow
+                }
+            }
         }
     }
 
     process {
         try {
             # Invoke CopyFile on sessions
-            Invoke-Command -ScriptBlock $function:CopyItem -Session $Session -ArgumentList @($Path),$Destination,$Algorithm
+            Invoke-Command -ScriptBlock $function:CopyItem -Session $Session -ArgumentList @($Path),$Destination,$Algorithm,$ShadowCopy
         } catch {
             # Caught error
             Write-Error -Message "Invoke command error: $PSItem" -ErrorAction 'Continue'
