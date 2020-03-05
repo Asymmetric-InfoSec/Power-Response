@@ -159,7 +159,7 @@ process {
     # Stage System Artifacts   
     try {        
         # Copy the files
-        Copy-PRItem -Session $Session -Path $SystemArtifacts -Destination $RemoteStageDirectory
+        Copy-PRItem -Session $Session -NoValidate -Path $SystemArtifacts -Destination $RemoteStageDirectory
     } catch {
         # Caught an error
         Write-Warning -Message ('Copy-PRItem error: {0}' -f $PSItem)

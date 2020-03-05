@@ -48,6 +48,9 @@ param (
     [Parameter(Position=1,Mandatory=$true)]
     [String[]]$Path,
 
+    [Parameter(Position=2)]
+    [Switch]$NoValidate,
+
     [Parameter(Position=3)]
     [Switch]$NoEncrypt
 )
@@ -132,7 +135,7 @@ process {
     # Begin plugin logic
     try {
         # Copy the files
-        Copy-PRItem -Path $Path -Destination $RemoteStageDirectory -Session $Session
+        Copy-PRItem -Path $Path -Destination $RemoteStageDirectory -Session $Session -NoValidate:$NoValidate
     } catch {
         # Caught an error
         Write-Warning -Message ('Copy-PRItem error: {0}' -f $PSItem)

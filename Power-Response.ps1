@@ -15,6 +15,7 @@ $ProgressPreference = 'SilentlyContinue'
 
 # Function to copy remote file (locked or not) to a remote destination
 function Copy-PRItem {
+    [CmdletBinding()]
     param (
         [Parameter(Position=0, Mandatory=$true)]
         [System.Management.Automation.Runspaces.PSSession[]]$Session,
@@ -26,7 +27,10 @@ function Copy-PRItem {
         [String]$Destination,
 
         [Parameter(Position=3)]
-        [String]$Algorithm = $global:PowerResponse.Config.HashAlgorithm
+        [String]$Algorithm = $global:PowerResponse.Config.HashAlgorithm,
+
+        [Parameter(Position=4)]
+        [Switch]$NoValidate
     )
 
     begin {
@@ -40,7 +44,10 @@ function Copy-PRItem {
                 [String]$DestinationDirectory,
 
                 [Parameter(Position=2, Mandatory=$true)]
-                [String]$Algorithm
+                [String]$Algorithm,
+
+                [Parameter(Position=3)]
+                [Switch]$NoValidate
             )
 
             begin {
@@ -143,12 +150,16 @@ function Copy-PRItem {
 
             process {
                 foreach ($Item in $Path) {
-                    try {
-                        # Resolve wildcards into full path(s), can't use Resolve-Path since it doesn't have a -Force parameter to see system files
-                        $Items = Get-Item -Force -Path ($Item -Replace ':([^\\]+)$') -ErrorAction 'Stop' | Foreach-Object { if ($PSItem.PSIsContainer) { Get-ChildItem -File -Force -Recurse -Path $PSItem.FullName } else { $PSItem } } | Select-Object -ExpandProperty 'FullName'
-                    } catch {
-                        # Failed to get any children
+                    # Resolve wildcards into full path(s), can't use Resolve-Path since it doesn't have a -Force parameter to see system files
+                    [String[]]$Items = Get-Item -Force -Path ($Item -Replace ':([^\\]+)$') -ErrorAction 'SilentlyContinue' | Foreach-Object { if ($PSItem.PSIsContainer) { Get-ChildItem -File -Force -Recurse -Path $PSItem.FullName } else { $PSItem } } | Select-Object -ExpandProperty 'FullName'
+
+                    # If an empty expansion result and no path validation direction
+                    if ($Items.Count -eq 0 -and $NoValidate) {
+                        # Set back to original item
                         $Items = $Item
+                    } elseif ($Items.Count -eq 0) {
+                        # Write-Warning -Message ("File not found: '{0}'" -f $Item)
+                        [PSCustomObject]@{ Item = $Item; Message = 'File does not exist' }
                     }
 
                     foreach ($File in $Items) {
@@ -187,7 +198,8 @@ function Copy-PRItem {
                                 $Bytes = [PowerForensics.FileSystems.Ntfs.FileRecord]::GetContentBytes($GetContent.Path, $GetContent.Stream)
                             } catch [System.Management.Automation.MethodInvocationException] {
                                 # Unable to find file
-                                Write-Warning -Message ('Unable to collect file: {0}' -f $File)
+                                # Write-Warning -Message ('Unable to collect file: {0}' -f $File)
+                                [PSCustomObject]@{ Item = $File; Message = 'Failed to copy file' }
                                 continue
                             } catch {
                                 # Unexpected error occurred
@@ -232,7 +244,10 @@ function Copy-PRItem {
     process {
         try {
             # Invoke CopyFile on sessions
-            Invoke-Command -ScriptBlock $function:CopyItem -Session $Session -ArgumentList @($Path),$Destination,$Algorithm
+            $Failed = Invoke-Command -ScriptBlock $function:CopyItem -Session $Session -ArgumentList @($Path),$Destination,$Algorithm,$NoValidate
+
+            # Write failed file log
+            $Failed | Foreach-Object { Write-PRWarning -Message ('{0}: {1}: {2}' -f $PSItem.PSComputerName.ToUpper(),$PSItem.Message,$PSItem.Item) }
         } catch {
             # Caught error
             Write-Error -Message "Invoke command error: $PSItem" -ErrorAction 'Continue'
