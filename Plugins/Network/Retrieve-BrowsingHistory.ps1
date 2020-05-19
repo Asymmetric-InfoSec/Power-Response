@@ -32,7 +32,10 @@ param (
     [System.Management.Automation.Runspaces.PSSession[]]$Session,
 
     [Parameter(Position=1)]
-    [Switch]$Force
+    [Switch]$Force,
+
+    [Parameter(Position=2)]
+    [Switch]$KillBrowsers
 
 )
 
@@ -151,12 +154,19 @@ process{
     # Collect System Artifacts    
     $SystemArtifacts = @(
         "C:\users\*\AppData\Local\Google\Chrome\User*\Default\History*",
+        "C:\users\*\AppData\Local\Google\Chrome\User*\Profile*\History*",
         "C:\users\*\AppData\Local\Microsoft\Windows\WebCache\*",
         "C:\users\*\AppData\Roaming\Mozilla\Firefox\Profiles\*.default\places.sqlite"
     )
 
     # Stage System Artifacts   
-    try {        
+    try {
+        # If we are in the business of killing browsers
+        if ($KillBrowsers) {
+            # Kill all the browsers
+            Invoke-Command -Session $Session -ScriptBlock { Get-Process -Name 'chrome','iexplore','firefox' -ErrorAction 'SilentlyContinue' | Stop-Process -Force }
+        }
+
         # Copy the files
         Copy-PRItem -Session $Session -Path $SystemArtifacts -Destination $RemoteStageDirectory
     } catch {
